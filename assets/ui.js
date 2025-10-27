@@ -27,5 +27,7 @@ function updateURL(url) {
 }
 
 function focusAddressBar() {
-    document.getElementById('address').focus();
+    let address = document.getElementById('address');
+    address.focus();
+    address.select();
 }

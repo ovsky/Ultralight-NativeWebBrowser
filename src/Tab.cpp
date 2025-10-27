@@ -157,7 +157,7 @@ void Tab::OnFailLoading(View* caller, uint64_t frame_id, bool is_main_frame, con
   const String& description, const String& error_domain, int error_code) {
   if (is_main_frame) {
     char error_code_str[16]; 
-    sprintf(error_code_str,"%d", error_code);
+    sprintf_s(error_code_str, "%d", error_code);
 
     String html_string = "<html><head><style>";
     html_string += "* { font-family: sans-serif; }";

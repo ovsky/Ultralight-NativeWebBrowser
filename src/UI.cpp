@@ -48,6 +48,11 @@ bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
       return false;
     }
   }
+
+  if (active_tab()) {
+    active_tab()->view()->FireKeyEvent(evt);
+  }
+
   return true;
 }
 
