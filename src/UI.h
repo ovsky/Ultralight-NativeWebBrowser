@@ -86,6 +86,7 @@ protected:
   JSFunction addTab;
   JSFunction updateTab;
   JSFunction closeTab;
+  JSFunction focusAddressBar;
 
   friend class Tab;
 };

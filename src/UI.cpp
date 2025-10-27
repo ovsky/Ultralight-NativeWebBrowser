@@ -26,13 +26,27 @@ UI::~UI()
 
 bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
 {
-  // Check for Ctrl+T shortcut
-  if (evt.type == KeyEvent::kType_KeyDown &&
-      evt.virtual_key_code == 'T' &&
-      (evt.modifiers & 0x4)) // 0x4 is typically the control key modifier bit
+  if (evt.type == KeyEvent::kType_RawKeyDown && (evt.modifiers & KeyEvent::kMod_CtrlKey))
   {
-    CreateNewTab();
-    return false; // Prevent the event from propagating
+    switch (evt.virtual_key_code)
+    {
+    case 'T':
+      CreateNewTab();
+      return false;
+    case 'W':
+      if (active_tab())
+      {
+        OnRequestTabClose({}, {active_tab_id_});
+      }
+      return false;
+    case 'L':
+      if (focusAddressBar)
+      {
+        RefPtr<JSContext> lock(view()->LockJSContext());
+        focusAddressBar({});
+      }
+      return false;
+    }
   }
   return true;
 }
@@ -123,6 +137,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   addTab = global["addTab"];
   updateTab = global["updateTab"];
   closeTab = global["closeTab"];
+  focusAddressBar = global["focusAddressBar"];
 
   global["OnBack"] = BindJSCallback(&UI::OnBack);
   global["OnForward"] = BindJSCallback(&UI::OnForward);

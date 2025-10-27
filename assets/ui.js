@@ -25,3 +25,7 @@ function updateLoading(is_loading) {
 function updateURL(url) {
 	document.getElementById('address').value = url;
 }
+
+function focusAddressBar() {
+    document.getElementById('address').focus();
+}
