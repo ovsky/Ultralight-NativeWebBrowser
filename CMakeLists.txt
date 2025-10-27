@@ -107,5 +107,5 @@ add_custom_command(
   TARGET Ultralight-WebBrowser POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory
   "${ULTRALIGHT_SDK_ROOT}/inspector"
-  "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets"
+  "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/inspector"
 )
