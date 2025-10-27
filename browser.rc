@@ -17,3 +17,5 @@ LANGUAGE 9, 1
 IDI_MYICON              ICON                    "browser.ico"
 
 #endif    // English (United States) resources
+
+pause;;
