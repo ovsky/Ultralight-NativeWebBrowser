@@ -17,7 +17,7 @@ link_directories(
 
 # --- Custom add_app function ---
 function(add_app NAME)
-  add_executable(${NAME} ${ARGN})
+  add_executable(${NAME} WIN32 ${ARGN})
 
   # Disable RTTI
   if(MSVC)

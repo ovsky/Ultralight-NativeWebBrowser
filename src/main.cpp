@@ -9,7 +9,9 @@ void PauseForDebugger() { MessageBoxA(NULL, "Pause", "Caption", MB_OKCANCEL); }
 void PauseForDebugger() { }
 #endif
 
-int main() {
+#include <Windows.h>
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
   PauseForDebugger();
 
   Browser browser;
