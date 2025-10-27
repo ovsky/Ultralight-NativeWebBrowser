@@ -1,0 +1,247 @@
+<html>
+
+<head>
+  <title>Release Notes</title>
+  <style type="text/css">
+    body {
+      background: linear-gradient(45deg, #4085ec, #592dd2, #b16ae7);
+      margin: 0;
+      line-height: 1.5;
+      font-weight: 300;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+      color: #e3e3e3;
+    }
+
+    h1, h2, h3, h4, strong, dt {
+      font-weight: 500;
+      color: white;
+      letter-spacing: 0.01em;
+    }
+    
+    h2 {
+      font-size: 2em;
+      margin-bottom: 1em;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 0.5em;
+    }
+
+    a, a:link, a:visited {
+      color: #ffffffd9;
+      font-weight: 500;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 4px 14px;
+      border-radius: 18px;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      display: inline-block;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    a:hover {
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    a:active {
+      transform: translateY(1px);
+      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
+    }
+
+    code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+      background-color: rgb(0 0 0 / 16%);
+      padding: 2px 5px;
+      font-size: 0.9em;
+      border-radius: 4px;
+      color: #ffffffdb;
+    }
+
+    #content {
+      max-width: 800px;
+      width: 90%;
+      margin: 60px auto;
+      padding: 50px;
+      color: white;
+      border-radius: 20px;
+      background: rgba(0, 0, 0, 0.3);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(255, 255, 255, 0.1) inset;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+    }
+
+    h3 {
+      margin-top: 1em;
+      font-size: 1.5em;
+    }
+
+    h4, dt {
+      margin: 0;
+      margin-top: 1.5em;
+      padding: 6px 0;
+      font-size: 1.2em;
+    }
+
+    p {
+      padding: 6px 0;
+      margin: 0.5em 0;
+      margin-bottom: 1.5em;
+      line-height: 1.6;
+      font-size: 1.1em;
+    }
+
+    ul {
+      padding-left: 1.5em;
+    }
+
+    li {
+      margin-bottom: 0.5em;
+    }
+
+    dd ul {
+      padding: 0;
+      margin: 0.5em 0 1.5em 0;
+      list-style-type: none;
+    }
+    
+    .section-list {
+      margin-left: 1.2em;
+    }
+    
+    .section-list li {
+      margin-bottom: 0.7em;
+    }
+    
+    .signature {
+      text-align: right;
+      margin-top: 3em;
+      font-style: italic;
+      opacity: 0.8;
+      color: white;
+    }
+    
+    dl {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      grid-gap: 1em 2em;
+      align-items: center;
+    }
+    
+    dt {
+      margin-top: 0;
+    }
+    
+    dd {
+      margin: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="content">
+
+    <h2>Ultralight v1.4.0 Release Notes</h2>
+
+    <p>This major new release updates the engine to latest WebKit, adds support for macOS Apple Silicon and Linux arm64 architectures, 
+        enables CSS filters (blurs, saturation, etc.), adds API to composite external image sources, and much more.
+    </p>
+
+    <h3>Changelog</h3>
+    <h4 id="major-improvements">Major Improvements</h4>
+    <ul>
+    <li>Synchronize with upstream WebKit (Safari 16.4.1 / WebKit 615.1.18.100.1)</li>
+    <li>Add support for Apple Silicon architecture on macOS</li>
+    <li>Add support for ARM64 architecture on Linux</li>
+    <li>Add support for WebP and animated WebP videos</li>
+    <li>Add support for compositing external textures / images (new <code>ImageSource</code> API)</li>
+    <li>Add support for CSS filter effects (blurs, saturation, sepia, etc.) (note: not yet natively GPU accelerated, incoming in 1.4.1)</li>
+    <li>Add support for file downloads (see <code>View::set_download_listener</code>)</li>
+    <li>Add support network whitelist / blacklist (see <code>View::set_network_listener</code>)</li>
+    <li>Add support for variable fonts</li>
+    <li>Animation and smooth scroll is now driven by <code>Renderer::RefreshDisplay</code></li>
+    <li>Improve interaction and rendering of dropdown menus</li>
+    <li>Improve support for SVG / Canvas path rendering</li>
+    <li>Improve support for SVG / CSS clips and masks</li>
+    <li>Improve performance of Windows port (now built via Clang)</li>
+    <li>Improve performance of AppCore (now supports high refresh-rate monitors)</li>
+    <li>Improve Chinese-Japanese-Korean text rendering on Linux (AppCore)</li>
+    <li>Improve scroll animation performance</li>
+    <li>Improve performance of the CPU renderer</li>
+    </ul>
+    <h4 id="major-api-changes">Major API Changes</h4>
+    
+    <h4>New Classes / Structs:</h4>
+    <ul class="section-list">
+      <li><code>ImageSource</code></li>
+      <li><code>ImageSourceProvider</code></li>
+      <li><code>NetworkListener</code></li>
+      <li><code>NetworkRequest</code></li>
+      <li><code>DownloadListener</code></li>
+      <li><code>ConsoleMessage</code></li>
+      <li><code>ThreadFactory</code></li>
+    </ul>
+    
+    <h4>New API Functions:</h4>
+    <ul class="section-list">
+      <li><code>Renderer::RefreshDisplay()</code> (must be called to update animations and scroll)</li>
+      <li><code>View::set_display_id()</code></li>
+      <li><code>View::display_id()</code></li>
+      <li><code>View::set_network_listener()</code></li>
+      <li><code>View::set_download_listener()</code></li>
+      <li><code>View::CancelDownload()</code></li>
+      <li><code>Platform::set_thread_factory()</code></li>
+      <li><code>String::Hash()</code></li>
+      <li><code>String</code> (various comparison operators)</li>
+      <li><code>Monitor::display_id()</code></li>
+      <li><code>Monitor::refresh_rate()</code></li>
+      <li><code>Window::EnableFrameStatistics()</code></li>
+      <li><code>ShowMessageBox()</code></li>
+    </ul>
+    
+    <h4>Changes to Existing API:</h4>
+    <ul class="section-list">
+      <li><code>ViewListener::OnAddConsoleMessage()</code> has different parameters</li>
+      <li><code>ViewConfig</code> struct has a new field "<code>display_id</code>"</li>
+      <li><code>MessageSource</code> enum values have changed</li>
+    </ul>
+    
+    <h4 id="major-bugfixes">Major Bugfixes</h4>
+    <ul>
+    <li>Fix issue where <code>Config::user_stylesheet</code> would not be applied if HTML doctype was not set</li>
+    <li>Fix issue with alpha blending and opacity in the CPU renderer</li>
+    <li>Fix issue tessellating stroked paths with round and square line-caps in the GPU renderer</li>
+    <li>Fix issue drawing radial gradients in the GPU renderer</li>
+    <li>Fix issue where CSS dashed borders would only be applied to an element when the border radius was rounded</li>
+    <li>Fix issue where files would not be displayed consistently across platforms due to inconsistent mime-type mappings</li>
+    <li>Fix issue validating SSL certificates on Linux and macOS</li>
+    <li>Fix issue where cookies weren't applied to subdomains</li>
+    <li>Fix issue where hard reloads weren't sending no-cache headers</li>
+    <li>Fix issue drawing CSS box shadows outside of the initial View rectangle</li>
+    <li>Fix issue with flickering artifacts on macOS/Metal when a Window has multiple View overlays assigned to it</li>
+    <li>Fix issue compiling on older GCC toolchains</li>
+    <li>Fix crash when rendering certain paths</li>
+    <li>Fix crash in C API due to improper mappings of <code>ULMessageSource</code> and <code>ULMessageLevel</code> enums</li>
+    <li>Fix crash when system page size is less than 16384 bytes</li>
+    <li>Fix crash when switching networks on macOS</li>
+    <li>Fix crash when a remote inspector backend was closed</li>
+    <li>Fix crash when a <code>View</code> was destroyed with dropdown menu open</li>
+    <li>Fix crash when loading Data URIs and certain resource types</li>
+    <li>Fix memory leaks in the CPU renderer</li>
+    <li>Fix memory leak in JavaScriptCore</li>
+    <li>Fix various crashes at shutdown</li>
+    <li>Fix high CPU usage when a WebSocket connection was active</li>
+    <li>Mitigate memory growth when drawing many Canvas elements</li>
+    </ul>
+    
+    <h3>Useful Links</h3>
+    <dl>
+      <dt>Website</dt>
+      <dd><a href="https://ultralig.ht">ultralig.ht</a></dd>
+      <dt>Support Docs</dt>
+      <dd><a href="https://docs.ultralig.ht">docs.ultralig.ht</a></dd>
+    </dl>
+
+    <p class="signature">- Ultralight Team</p>
+  </div>
+</body>
+
+</html>
