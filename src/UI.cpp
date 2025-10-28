@@ -24,6 +24,11 @@ UI::~UI()
   g_ui = nullptr;
 }
 
+void UI::OnAddressBarBlur(const JSObject &obj, const JSArgs &args)
+{
+  address_bar_is_focused_ = false;
+}
+
 bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
 {
   if (evt.type == KeyEvent::kType_RawKeyDown && (evt.modifiers & KeyEvent::kMod_CtrlKey))
@@ -44,12 +49,19 @@ bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
       {
         RefPtr<JSContext> lock(view()->LockJSContext());
         focusAddressBar({});
+        address_bar_is_focused_ = true;
       }
       return false;
     }
   }
 
-  if (active_tab()) {
+  if (address_bar_is_focused_) {
+    view()->FireKeyEvent(evt);
+    return false; // Consume the event
+  }
+
+  if (active_tab())
+  {
     active_tab()->view()->FireKeyEvent(evt);
   }
 
@@ -58,6 +70,15 @@ bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
 
 bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
 {
+  if (evt.type == MouseEvent::kType_MouseDown) {
+    // Check if the click is outside the UI overlay
+    if (evt.y > ui_height_) {
+      address_bar_is_focused_ = false;
+      if (active_tab()) {
+        active_tab()->view()->Focus();
+      }
+    }
+  }
   if (active_tab() && active_tab()->IsInspectorShowing())
   {
     float x_px = std::round(evt.x * window()->scale());
@@ -143,6 +164,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   updateTab = global["updateTab"];
   closeTab = global["closeTab"];
   focusAddressBar = global["focusAddressBar"];
+  isAddressBarFocused = global["isAddressBarFocused"];
 
   global["OnBack"] = BindJSCallback(&UI::OnBack);
   global["OnForward"] = BindJSCallback(&UI::OnForward);
@@ -153,6 +175,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnRequestTabClose"] = BindJSCallback(&UI::OnRequestTabClose);
   global["OnActiveTabChange"] = BindJSCallback(&UI::OnActiveTabChange);
   global["OnRequestChangeURL"] = BindJSCallback(&UI::OnRequestChangeURL);
+  global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
 
   CreateNewTab();
 }

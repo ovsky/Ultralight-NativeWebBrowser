@@ -31,3 +31,9 @@ function focusAddressBar() {
     address.focus();
     address.select();
 }
+
+document.getElementById('address').addEventListener('blur', () => {
+  if (window.OnAddressBarBlur) {
+    window.OnAddressBarBlur();
+  }
+});

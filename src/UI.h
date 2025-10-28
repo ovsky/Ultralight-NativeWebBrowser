@@ -44,6 +44,7 @@ class UI : public WindowListener,
   void OnRequestTabClose(const JSObject& obj, const JSArgs& args);
   void OnActiveTabChange(const JSObject& obj, const JSArgs& args);
   void OnRequestChangeURL(const JSObject& obj, const JSArgs& args);
+  void OnAddressBarBlur(const JSObject& obj, const JSArgs& args);
 
   RefPtr<Window> window() { return window_; }
 
@@ -78,6 +79,7 @@ protected:
   bool is_over_inspector_resize_drag_handle_;
   int inspector_resize_begin_height_;
   int inspector_resize_begin_mouse_y_;
+  bool address_bar_is_focused_ = false;
 
   JSFunction updateBack;
   JSFunction updateForward;
@@ -87,6 +89,7 @@ protected:
   JSFunction updateTab;
   JSFunction closeTab;
   JSFunction focusAddressBar;
+  JSFunction isAddressBarFocused;
 
   friend class Tab;
 };
