@@ -1,0 +1,43 @@
+# .github/workflows/macos-build.yml
+#
+# Builds the project on macOS (Xcode)
+# This also uses a multi-config generator, so the --config flag
+# is used during the build step.
+
+name: Build - macOS
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest # You can specify macos-13 or macos-14 if needed
+
+    steps:
+    - name: '1. Checkout Code (with submodules)'
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+
+    - name: '2. Configure CMake'
+      # No build type needed here; Xcode (default) will handle it
+      run: cmake -S . -B build
+
+    - name: '3. Build Project'
+      # We specify the 'Release' config at build time
+      run: cmake --build build --config Release --parallel
+
+    - name: '4. Archive Artifacts'
+      # For multi-config, outputs are in 'build/bin/Release'
+      # This will correctly zip the 'WebBrowser.app' bundle and other libs
+      run: |
+        cd build/bin/Release
+        zip -r ../../../ultralight-macos.zip .
+
+    - name: '5. Upload Artifact'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ultralight-macos-build
+        path: ultralight-macos.zip
