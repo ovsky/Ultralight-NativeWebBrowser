@@ -1,0 +1,49 @@
+# .github/workflows/linux-build.yml
+#
+# Builds the project on Ubuntu (Linux)
+# This uses a single-config generator (Makefiles), so CMAKE_BUILD_TYPE
+# is set during the configure step.
+
+name: Build - Linux
+
+on:
+  push:
+    branches: [ "main" ] # Triggers on push to main
+  workflow_dispatch:      # Allows manual triggering from the Actions tab
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: '1. Install Linux Dependencies'
+      # These are required by Ultralight for rendering
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgtk-3-dev libnss3-dev libgdk-pixbuf2.0-dev libxtst-dev libxss-dev libdbus-glib-1-dev
+
+    - name: '2. Checkout Code (with submodules)'
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+
+    - name: '3. Configure CMake'
+      # We set the build type here for single-config generators
+      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: '4. Build Project'
+      # No --config flag needed here, as it was set at configure time
+      run: cmake --build build --parallel
+
+    - name: '5. Archive Artifacts'
+      # The outputs for single-config are in 'build/bin'
+      # We 'cd' into the directory to zip its contents, not the folder itself
+      run: |
+        cd build/bin
+        zip -r ../../ultralight-linux.zip .
+
+    - name: '6. Upload Artifact'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ultralight-linux-build
+        path: ultralight-linux.zip
