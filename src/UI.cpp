@@ -1,4 +1,5 @@
 #include "UI.h"
+#include <cstring>
 
 static UI *g_ui = 0;
 
@@ -300,7 +301,7 @@ void UI::CreateNewTab()
   tabs_[id]->view()->LoadURL("https://www.google.com");
 
   RefPtr<JSContext> lock(view()->LockJSContext());
-  addTab({id, "New Tab", "", tabs_[id]->view()->is_loading()});
+  addTab({id, "New Tab", GetFaviconURL("https://www.google.com"), tabs_[id]->view()->is_loading()});
 }
 
 RefPtr<View> UI::CreateNewTabForChildView(const String &url)
@@ -313,7 +314,7 @@ RefPtr<View> UI::CreateNewTabForChildView(const String &url)
   tabs_[id].reset(new Tab(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_));
 
   RefPtr<JSContext> lock(view()->LockJSContext());
-  addTab({id, "", url, tabs_[id]->view()->is_loading()});
+  addTab({id, "", GetFaviconURL(url), tabs_[id]->view()->is_loading()});
 
   return tabs_[id]->view();
 }
@@ -321,7 +322,8 @@ RefPtr<View> UI::CreateNewTabForChildView(const String &url)
 void UI::UpdateTabTitle(uint64_t id, const ultralight::String &title)
 {
   RefPtr<JSContext> lock(view()->LockJSContext());
-  updateTab({id, title, "", tabs_[id]->view()->is_loading()});
+  // Title changed; pass current page URL-derived favicon
+  updateTab({id, title, GetFaviconURL(tabs_[id]->view()->url()), tabs_[id]->view()->is_loading()});
 }
 
 void UI::UpdateTabURL(uint64_t id, const ultralight::String &url)
@@ -336,7 +338,8 @@ void UI::UpdateTabNavigation(uint64_t id, bool is_loading, bool can_go_back, boo
     return;
 
   RefPtr<JSContext> lock(view()->LockJSContext());
-  updateTab({id, tabs_[id]->view()->title(), "", tabs_[id]->view()->is_loading()});
+  // Loading/nav state; update favicon based on current URL
+  updateTab({id, tabs_[id]->view()->title(), GetFaviconURL(tabs_[id]->view()->url()), tabs_[id]->view()->is_loading()});
 
   if (id == active_tab_id_)
   {
@@ -374,4 +377,30 @@ void UI::SetCursor(ultralight::Cursor cursor)
 {
   if (App::instance())
     window_->SetCursor(cursor);
+}
+
+String UI::GetFaviconURL(const String &page_url)
+{
+  // Best-effort: use origin + "/favicon.ico" for http/https URLs.
+  auto utf8 = page_url.utf8();
+  const char* url = utf8.data();
+  if (!url)
+    return String("");
+
+  if (strncmp(url, "http://", 7) != 0 && strncmp(url, "https://", 8) != 0)
+    return String("");
+
+  const char* scheme_sep = strstr(url, "://");
+  if (!scheme_sep)
+    return String("");
+  const char* host_start = scheme_sep + 3;
+  const char* slash_after_host = strchr(host_start, '/');
+  if (!slash_after_host)
+  {
+    return String(url) + String("/favicon.ico");
+  }
+
+  uint32_t origin_len = (uint32_t)(slash_after_host - url);
+  String origin(url, origin_len);
+  return origin + String("/favicon.ico");
 }

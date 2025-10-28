@@ -183,7 +183,7 @@
 
     updateTab(tabEl, tabProperties) {
       tabEl.querySelector('.chrome-tab-title').textContent = tabProperties.title
-      tabEl.querySelector('.chrome-tab-favicon').style.backgroundImage = `url('${tabProperties.favicon}')`
+      tabEl.querySelector('.chrome-tab-favicon').style.backgroundImage = `url(${tabProperties.favicon})`
       tabEl.querySelector('.chrome-tab-favicon').style.display = tabProperties.loading ? 'none' : 'inline-block'
       tabEl.querySelector('.chrome-tab-spinner').style.display = tabProperties.loading ? 'inline-block' : 'none'
     }

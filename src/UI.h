@@ -20,7 +20,7 @@ class UI : public WindowListener,
  public:
   UI(RefPtr<Window> window);
   ~UI();
-               
+
   // Inherited from WindowListener
   virtual bool OnKeyEvent(const ultralight::KeyEvent& evt) override;
   virtual bool OnMouseEvent(const ultralight::MouseEvent& evt) override;
@@ -61,8 +61,11 @@ protected:
   void SetURL(const String& url);
   void SetCursor(Cursor cursor);
 
+  // Compute a best-effort favicon URL (origin + "/favicon.ico") for http/https URLs
+  String GetFaviconURL(const String& page_url);
+
   Tab* active_tab() { return tabs_.empty() ? nullptr : tabs_[active_tab_id_].get(); }
-               
+
   RefPtr<View> view() { return overlay_->view(); }
 
   RefPtr<Window> window_;
