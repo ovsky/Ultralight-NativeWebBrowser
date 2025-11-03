@@ -1,5 +1,6 @@
 #include "UI.h"
 #include <cstring>
+#include <cmath>
 
 static UI *g_ui = 0;
 
@@ -86,8 +87,8 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
   }
   if (active_tab() && active_tab()->IsInspectorShowing())
   {
-    float x_px = std::round(evt.x * window()->scale());
-    float y_px = std::round(evt.y * window()->scale());
+  int x_px = static_cast<int>(std::lround(evt.x * window()->scale()));
+  int y_px = static_cast<int>(std::lround(evt.y * window()->scale()));
 
     if (is_resizing_inspector_)
     {
@@ -105,7 +106,7 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
 
     IntRect drag_handle = active_tab()->GetInspectorResizeDragHandle();
 
-    bool over_drag_handle = drag_handle.Contains(Point(x_px, y_px));
+  bool over_drag_handle = drag_handle.Contains(Point(static_cast<float>(x_px), static_cast<float>(y_px)));
 
     if (over_drag_handle && !is_over_inspector_resize_drag_handle_)
     {
