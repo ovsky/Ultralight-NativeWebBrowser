@@ -1,7 +1,7 @@
-# .github/workflows/build-macos.yml
-# macOS build using SDK archives hosted in the repo's sdks branch.
+# .github/workflows/build-linux-sdks.yml
+# Linux build using SDK archives hosted in the repo's sdks branch.
 
-name: Build - macOS
+name: Build - Linux (sdks)
 
 on:
   push:
@@ -10,14 +10,14 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - name: 1. Checkout Code (with submodules)
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: 2. Detect ULTRALIGHT_SDK_URL from repo sdks branch (macOS)
+      - name: 2. Detect ULTRALIGHT_SDK_URL from repo sdks branch (Linux)
         id: detect_url
         shell: bash
         run: |
@@ -37,12 +37,11 @@ jobs:
             exit 0
           fi
           BASE_RAW="https://raw.githubusercontent.com/${{ github.repository }}/sdks/sdks"
-          echo "Detected ULTRALIGHT_VERSION=$VERSION; trying common macOS SDK URLs under $BASE_RAW"
+          echo "Detected ULTRALIGHT_VERSION=$VERSION; trying common Linux SDK URLs under $BASE_RAW"
           candidates=(
-            "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-x64.zip"
-            "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-universal.zip"
-            "$BASE_RAW/ultralight-free-sdk-$VERSION-macos-x64.zip"
-            "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-x64.tar.xz"
+            "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-x64.tar.xz"
+            "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-x64.tar.gz"
+            "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-x64.zip"
           )
           found=""
           for url in "${candidates[@]}"; do
@@ -55,11 +54,11 @@ jobs:
             echo "ULTRALIGHT_SDK_URL=$found" >> "$GITHUB_ENV"
             echo "url=$found" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::Could not auto-detect a valid macOS SDK URL in sdks branch for version $VERSION."
+            echo "::error::Could not auto-detect a valid Linux SDK URL in sdks branch for version $VERSION."
             exit 1
           fi
 
-      - name: 3. Prepare Ultralight SDK (macOS)
+      - name: 3. Prepare Ultralight SDK (Linux)
         id: prep_sdk
         shell: bash
         run: |
@@ -69,7 +68,7 @@ jobs:
           if [ -z "$ROOT" ]; then ROOT="$ROOT_DEFAULT"; fi
           echo "Initial ULTRALIGHT_SDK_ROOT candidate: $ROOT"
           present="false"
-          if [ -d "$ROOT/include" ] && ls "$ROOT/lib"/*.dylib >/dev/null 2>&1; then
+          if [ -d "$ROOT/include" ] && ls "$ROOT/lib"/*.so >/dev/null 2>&1; then
             present="true"
           elif [ -n "${ULTRALIGHT_SDK_URL:-}" ]; then
             echo "Downloading Ultralight SDK from ULTRALIGHT_SDK_URL=$ULTRALIGHT_SDK_URL"
@@ -97,28 +96,33 @@ jobs:
             echo "Using ULTRALIGHT_SDK_ROOT=$ROOT"
             echo "ULTRALIGHT_SDK_ROOT=$ROOT" >> "$GITHUB_ENV"
           else
-            echo "::error::Ultralight macOS SDK not found. Ensure sdks branch contains a valid archive or set ULTRALIGHT_SDK_ROOT/ULTRALIGHT_SDK_URL."
+            echo "::error::Ultralight Linux SDK not found. Ensure sdks branch contains a valid archive or set ULTRALIGHT_SDK_ROOT/ULTRALIGHT_SDK_URL."
             exit 1
           fi
 
-      - name: 4. Configure CMake (Xcode)
-        if: steps.prep_sdk.outputs.present == 'true'
-        run: cmake -S . -B build -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT"
+      - name: 4. Install Linux Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libnss3-dev libgdk-pixbuf2.0-dev libxtst-dev libxss-dev libdbus-glib-1-dev
 
-      - name: 5. Build Project (Release)
+      - name: 5. Configure CMake
         if: steps.prep_sdk.outputs.present == 'true'
-        run: cmake --build build --config Release --parallel
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT"
 
-      - name: 6. Archive Artifacts
+      - name: 6. Build Project
+        if: steps.prep_sdk.outputs.present == 'true'
+        run: cmake --build build --parallel
+
+      - name: 7. Archive Artifacts
         if: steps.prep_sdk.outputs.present == 'true'
         shell: bash
         run: |
           set -euo pipefail
           candidates=(
-            "build/Release"
-            "build/bin/Release"
-            "build/Ultralight-WebBrowser/Release"
-            "build/samples/Ultralight-WebBrowser/Release"
+            "build"
+            "build/bin"
+            "build/Ultralight-WebBrowser"
+            "build/samples/Ultralight-WebBrowser"
           )
           src=""
           for p in "${candidates[@]}"; do
@@ -130,11 +134,11 @@ jobs:
           fi
           echo "Archiving from: $src"
           cd "$src"
-          zip -r ../../../ultralight-macos.zip .
+          zip -r ../../ultralight-linux.zip .
 
-      - name: 7. Upload Artifact
+      - name: 8. Upload Artifact
         if: steps.prep_sdk.outputs.present == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: ultralight-macos-build
-          path: ultralight-macos.zip
+          name: ultralight-linux-build
+          path: ultralight-linux.zip

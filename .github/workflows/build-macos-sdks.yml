@@ -1,7 +1,7 @@
-# .github/workflows/build-macos.yml
+# .github/workflows/build-macos-sdks.yml
 # macOS build using SDK archives hosted in the repo's sdks branch.
 
-name: Build - macOS
+name: Build - macOS (sdks)
 
 on:
   push:

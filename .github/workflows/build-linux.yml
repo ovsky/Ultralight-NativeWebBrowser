@@ -1,42 +1,120 @@
-# .github/workflows/linux-build.yml
-#
-# Builds the project on Ubuntu (Linux)
-# This uses a single-config generator (Makefiles), so CMAKE_BUILD_TYPE
-# is set during the configure step.
+# .github/workflows/build-linux.yml
+# Linux build using SDK archives hosted in the repo's sdks branch.
 
 name: Build - Linux
 
 on:
   push:
-    branches: ["main", "dev"] # Triggers on push to main or dev
-  workflow_dispatch: # Allows manual triggering from the Actions tab
+    branches: ["main", "dev"]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: "1. Install Linux Dependencies"
-        # These are required by Ultralight for rendering
+      - name: 1. Checkout Code (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: 2. Detect ULTRALIGHT_SDK_URL from repo sdks branch (Linux)
+        id: detect_url
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${ULTRALIGHT_SDK_URL:-}" ]; then
+            echo "ULTRALIGHT_SDK_URL already provided: $ULTRALIGHT_SDK_URL"
+            exit 0
+          fi
+          HEADER="samples/Ultralight-WebBrowser/data/include/Ultralight/Defines.h"
+          if [ ! -f "$HEADER" ]; then
+            echo "Header not found at $HEADER, skipping auto-detect." >&2
+            exit 0
+          fi
+          VERSION=$(sed -n 's/^#define[[:space:]]\+ULTRALIGHT_VERSION[[:space:]]\+"\([^"]\+\)".*/\1/p' "$HEADER" | head -n1)
+          if [ -z "$VERSION" ]; then
+            echo "Could not determine ULTRALIGHT_VERSION from $HEADER, skipping auto-detect."
+            exit 0
+          fi
+          BASE_RAW="https://raw.githubusercontent.com/${{ github.repository }}/sdks/sdks"
+          echo "Detected ULTRALIGHT_VERSION=$VERSION; trying common Linux SDK URLs under $BASE_RAW"
+          candidates=(
+            "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-x64.tar.xz"
+            "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-x64.tar.gz"
+            "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-x64.zip"
+          )
+          found=""
+          for url in "${candidates[@]}"; do
+            if curl -fsI "$url" >/dev/null 2>&1; then
+              found="$url"; break
+            fi
+          done
+          if [ -n "$found" ]; then
+            echo "Auto-detected ULTRALIGHT_SDK_URL=$found"
+            echo "ULTRALIGHT_SDK_URL=$found" >> "$GITHUB_ENV"
+            echo "url=$found" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Could not auto-detect a valid Linux SDK URL in sdks branch for version $VERSION."
+            exit 1
+          fi
+
+      - name: 3. Prepare Ultralight SDK (Linux)
+        id: prep_sdk
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT_DEFAULT="${{ github.workspace }}/samples/Ultralight-WebBrowser/data"
+          ROOT="${ULTRALIGHT_SDK_ROOT:-}"
+          if [ -z "$ROOT" ]; then ROOT="$ROOT_DEFAULT"; fi
+          echo "Initial ULTRALIGHT_SDK_ROOT candidate: $ROOT"
+          present="false"
+          if [ -d "$ROOT/include" ] && ls "$ROOT/lib"/*.so >/dev/null 2>&1; then
+            present="true"
+          elif [ -n "${ULTRALIGHT_SDK_URL:-}" ]; then
+            echo "Downloading Ultralight SDK from ULTRALIGHT_SDK_URL=$ULTRALIGHT_SDK_URL"
+            mkdir -p "$RUNNER_TEMP/sdk"
+            pkg="$RUNNER_TEMP/ultralight-sdk"
+            curl -L "$ULTRALIGHT_SDK_URL" -o "$pkg"
+            mkdir -p "$RUNNER_TEMP/sdk-extract"
+            if echo "$ULTRALIGHT_SDK_URL" | grep -Ei '\\.(tar\\.(xz|gz)|txz)$' >/dev/null; then
+              tar -xvf "$pkg" -C "$RUNNER_TEMP/sdk-extract"
+            elif echo "$ULTRALIGHT_SDK_URL" | grep -Ei '\\.zip$' >/dev/null; then
+              unzip -q "$pkg" -d "$RUNNER_TEMP/sdk-extract"
+            else
+              echo "Unknown SDK archive format for: $ULTRALIGHT_SDK_URL" >&2; exit 1
+            fi
+            ROOT_FOUND=""
+            while IFS= read -r -d '' dir; do
+              if [ -d "$dir/include" ] && [ -d "$dir/lib" ]; then ROOT_FOUND="$dir"; break; fi
+            done < <(find "$RUNNER_TEMP/sdk-extract" -mindepth 1 -maxdepth 3 -type d -print0)
+            if [ -n "$ROOT_FOUND" ]; then
+              ROOT="$ROOT_FOUND"; present="true"
+            fi
+          fi
+          echo "present=$present" >> "$GITHUB_OUTPUT"
+          if [ "$present" = "true" ]; then
+            echo "Using ULTRALIGHT_SDK_ROOT=$ROOT"
+            echo "ULTRALIGHT_SDK_ROOT=$ROOT" >> "$GITHUB_ENV"
+          else
+            echo "::error::Ultralight Linux SDK not found. Ensure sdks branch contains a valid archive or set ULTRALIGHT_SDK_ROOT/ULTRALIGHT_SDK_URL."
+            exit 1
+          fi
+
+      - name: 4. Install Linux Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libnss3-dev libgdk-pixbuf2.0-dev libxtst-dev libxss-dev libdbus-glib-1-dev
 
-      - name: "2. Checkout Code (with submodules)"
-        uses: actions/checkout@v4
-        with:
-          submodules: "recursive"
+      - name: 5. Configure CMake
+        if: steps.prep_sdk.outputs.present == 'true'
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT"
 
-      - name: "3. Configure CMake"
-        # We set the build type here for single-config generators
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-
-      - name: "4. Build Project"
-        # No --config flag needed here, as it was set at configure time
+      - name: 6. Build Project
+        if: steps.prep_sdk.outputs.present == 'true'
         run: cmake --build build --parallel
 
-      - name: "5. Archive Artifacts"
-        # Detect the actual output folder and zip it (handles different generators/layouts)
+      - name: 7. Archive Artifacts
+        if: steps.prep_sdk.outputs.present == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -58,7 +136,8 @@ jobs:
           cd "$src"
           zip -r ../../ultralight-linux.zip .
 
-      - name: "6. Upload Artifact"
+      - name: 8. Upload Artifact
+        if: steps.prep_sdk.outputs.present == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ultralight-linux-build
