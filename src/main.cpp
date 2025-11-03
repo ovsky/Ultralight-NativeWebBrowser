@@ -4,19 +4,26 @@
 
 #if defined(_WIN32) && ENABLE_PAUSE_FOR_DEBUGGER
 #include <Windows.h>
-void PauseForDebugger() { MessageBoxA(NULL, "Pause", "Caption", MB_OKCANCEL); }
+static void PauseForDebugger() { MessageBoxA(NULL, "Pause", "Caption", MB_OKCANCEL); }
 #else
-void PauseForDebugger() { }
+static void PauseForDebugger() {}
 #endif
 
+#if defined(_WIN32)
 #include <Windows.h>
-
-#include <Windows.h>
-
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+{
   PauseForDebugger();
-
   Browser browser;
   browser.Run();
   return 0;
 }
+#else
+int main(int argc, char **argv)
+{
+  PauseForDebugger();
+  Browser browser;
+  browser.Run();
+  return 0;
+}
+#endif
