@@ -55,7 +55,8 @@ jobs:
           found=""
           for url in "${candidates[@]}"; do
             echo "Probing $url"
-            if curl -fsI "$url" >/dev/null 2>&1; then
+            # Use GET (not HEAD) since some raw endpoints may not respond to HEAD reliably
+            if curl -fLs -o /dev/null "$url"; then
               found="$url"; break
             fi
           done
