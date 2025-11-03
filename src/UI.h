@@ -3,68 +3,70 @@
 #include "Tab.h"
 #include <map>
 #include <memory>
+#include <string>
 
-using ultralight::JSObject;
 using ultralight::JSArgs;
 using ultralight::JSFunction;
+using ultralight::JSObject;
 using namespace ultralight;
 
 class Console;
 
 /**
-* Browser UI implementation. Renders the toolbar/addressbar/tabs in top pane.
-*/
+ * Browser UI implementation. Renders the toolbar/addressbar/tabs in top pane.
+ */
 class UI : public WindowListener,
            public LoadListener,
-           public ViewListener {
- public:
+           public ViewListener
+{
+public:
   UI(RefPtr<Window> window);
   ~UI();
 
   // Inherited from WindowListener
-  virtual bool OnKeyEvent(const ultralight::KeyEvent& evt) override;
-  virtual bool OnMouseEvent(const ultralight::MouseEvent& evt) override;
-  virtual void OnClose(ultralight::Window* window) override;
-  virtual void OnResize(ultralight::Window* window, uint32_t width, uint32_t height) override;
+  virtual bool OnKeyEvent(const ultralight::KeyEvent &evt) override;
+  virtual bool OnMouseEvent(const ultralight::MouseEvent &evt) override;
+  virtual void OnClose(ultralight::Window *window) override;
+  virtual void OnResize(ultralight::Window *window, uint32_t width, uint32_t height) override;
 
   // Inherited from LoadListener
-  virtual void OnDOMReady(View* caller, uint64_t frame_id,
-    bool is_main_frame, const String& url) override;
+  virtual void OnDOMReady(View *caller, uint64_t frame_id,
+                          bool is_main_frame, const String &url) override;
 
   // Inherited from ViewListener
-  virtual void OnChangeCursor(ultralight::View* caller, Cursor cursor) override { SetCursor(cursor); }
+  virtual void OnChangeCursor(ultralight::View *caller, Cursor cursor) override { SetCursor(cursor); }
 
   // Called by UI JavaScript
-  void OnBack(const JSObject& obj, const JSArgs& args);
-  void OnForward(const JSObject& obj, const JSArgs& args);
-  void OnRefresh(const JSObject& obj, const JSArgs& args);
-  void OnStop(const JSObject& obj, const JSArgs& args);
-  void OnToggleTools(const JSObject& obj, const JSArgs& args);
-  void OnRequestNewTab(const JSObject& obj, const JSArgs& args);
-  void OnRequestTabClose(const JSObject& obj, const JSArgs& args);
-  void OnActiveTabChange(const JSObject& obj, const JSArgs& args);
-  void OnRequestChangeURL(const JSObject& obj, const JSArgs& args);
-  void OnAddressBarBlur(const JSObject& obj, const JSArgs& args);
+  void OnBack(const JSObject &obj, const JSArgs &args);
+  void OnForward(const JSObject &obj, const JSArgs &args);
+  void OnRefresh(const JSObject &obj, const JSArgs &args);
+  void OnStop(const JSObject &obj, const JSArgs &args);
+  void OnToggleTools(const JSObject &obj, const JSArgs &args);
+  void OnRequestNewTab(const JSObject &obj, const JSArgs &args);
+  void OnRequestTabClose(const JSObject &obj, const JSArgs &args);
+  void OnActiveTabChange(const JSObject &obj, const JSArgs &args);
+  void OnRequestChangeURL(const JSObject &obj, const JSArgs &args);
+  void OnAddressBarBlur(const JSObject &obj, const JSArgs &args);
 
   RefPtr<Window> window() { return window_; }
 
 protected:
   void CreateNewTab();
-  RefPtr<View> CreateNewTabForChildView(const String& url);
-  void UpdateTabTitle(uint64_t id, const String& title);
-  void UpdateTabURL(uint64_t id, const String& url);
+  RefPtr<View> CreateNewTabForChildView(const String &url);
+  void UpdateTabTitle(uint64_t id, const String &title);
+  void UpdateTabURL(uint64_t id, const String &url);
   void UpdateTabNavigation(uint64_t id, bool is_loading, bool can_go_back, bool can_go_forward);
 
   void SetLoading(bool is_loading);
   void SetCanGoBack(bool can_go_back);
   void SetCanGoForward(bool can_go_forward);
-  void SetURL(const String& url);
+  void SetURL(const String &url);
   void SetCursor(Cursor cursor);
 
   // Compute a best-effort favicon URL (origin + "/favicon.ico") for http/https URLs
-  String GetFaviconURL(const String& page_url);
+  String GetFaviconURL(const String &page_url);
 
-  Tab* active_tab() { return tabs_.empty() ? nullptr : tabs_[active_tab_id_].get(); }
+  Tab *active_tab() { return tabs_.empty() ? nullptr : tabs_[active_tab_id_].get(); }
 
   RefPtr<View> view() { return overlay_->view(); }
 
@@ -93,6 +95,10 @@ protected:
   JSFunction closeTab;
   JSFunction focusAddressBar;
   JSFunction isAddressBarFocused;
+
+  // Cache favicon URL per site origin so multiple tabs/pages reuse it
+  // Key: origin string (eg, https://example.com), Value: favicon URL
+  std::map<std::string, std::string> favicon_cache_;
 
   friend class Tab;
 };

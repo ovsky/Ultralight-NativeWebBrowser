@@ -1,4 +1,4 @@
-#include "Browser.h"
+#include "Browser.h";
 
 #define ENABLE_PAUSE_FOR_DEBUGGER 0
 
