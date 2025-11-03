@@ -5,14 +5,13 @@ name: Build - macOS
 
 on:
   push:
-    branches: ["main", "dev"]
-  workflow_dispatch:
+  pull_request:
 
 jobs:
   build:
     runs-on: macos-latest
     steps:
-      - name: 1. Checkout Code (with submodules)
+      - name: 1. Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -26,7 +25,7 @@ jobs:
             echo "ULTRALIGHT_SDK_URL already provided: $ULTRALIGHT_SDK_URL"
             exit 0
           fi
-          HEADER="samples/Ultralight-WebBrowser/data/include/Ultralight/Defines.h"
+          HEADER="data/include/Ultralight/Defines.h"
           if [ ! -f "$HEADER" ]; then
             echo "Header not found at $HEADER, skipping auto-detect." >&2
             exit 0
@@ -37,15 +36,25 @@ jobs:
             exit 0
           fi
           BASE_RAW="https://raw.githubusercontent.com/${{ github.repository }}/sdks/sdks"
-          echo "Detected ULTRALIGHT_VERSION=$VERSION; trying common macOS SDK URLs under $BASE_RAW"
-          candidates=(
+          ARCH=$(uname -m)
+          echo "Detected ULTRALIGHT_VERSION=$VERSION; ARCH=$ARCH; probing macOS SDK URLs under $BASE_RAW"
+          candidates=()
+          if [ "$ARCH" = "arm64" ]; then
+            candidates+=(
+              "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-arm64.7z"
+              "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-arm64.zip"
+              "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-universal.zip"
+            )
+          fi
+          candidates+=(
+            "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-x64.7z"
             "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-x64.zip"
-            "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-universal.zip"
             "$BASE_RAW/ultralight-free-sdk-$VERSION-macos-x64.zip"
             "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-x64.tar.xz"
           )
           found=""
           for url in "${candidates[@]}"; do
+            echo "Probing $url"
             if curl -fsI "$url" >/dev/null 2>&1; then
               found="$url"; break
             fi
@@ -59,12 +68,17 @@ jobs:
             exit 1
           fi
 
-      - name: 3. Prepare Ultralight SDK (macOS)
+      - name: 3. Install 7zip (macOS)
+        run: |
+          brew update
+          brew install 7zip || brew install p7zip
+
+      - name: 4. Prepare Ultralight SDK (macOS)
         id: prep_sdk
         shell: bash
         run: |
           set -euo pipefail
-          ROOT_DEFAULT="${{ github.workspace }}/samples/Ultralight-WebBrowser/data"
+          ROOT_DEFAULT="${{ github.workspace }}/data"
           ROOT="${ULTRALIGHT_SDK_ROOT:-}"
           if [ -z "$ROOT" ]; then ROOT="$ROOT_DEFAULT"; fi
           echo "Initial ULTRALIGHT_SDK_ROOT candidate: $ROOT"
@@ -77,7 +91,12 @@ jobs:
             pkg="$RUNNER_TEMP/ultralight-sdk"
             curl -L "$ULTRALIGHT_SDK_URL" -o "$pkg"
             mkdir -p "$RUNNER_TEMP/sdk-extract"
-            if echo "$ULTRALIGHT_SDK_URL" | grep -Ei '\\.(tar\\.(xz|gz)|txz)$' >/dev/null; then
+            if echo "$ULTRALIGHT_SDK_URL" | grep -Ei '\\.(7z)$' >/dev/null; then
+              EXTRACTOR=""
+              if command -v 7z >/dev/null 2>&1; then EXTRACTOR=7z; elif command -v 7zz >/dev/null 2>&1; then EXTRACTOR=7zz; fi
+              if [ -z "$EXTRACTOR" ]; then echo "7zip extractor not found" >&2; exit 1; fi
+              "$EXTRACTOR" x -y -o"$RUNNER_TEMP/sdk-extract" "$pkg"
+            elif echo "$ULTRALIGHT_SDK_URL" | grep -Ei '\\.(tar\\.(xz|gz)|txz)$' >/dev/null; then
               tar -xvf "$pkg" -C "$RUNNER_TEMP/sdk-extract"
             elif echo "$ULTRALIGHT_SDK_URL" | grep -Ei '\\.zip$' >/dev/null; then
               unzip -q "$pkg" -d "$RUNNER_TEMP/sdk-extract"
@@ -101,15 +120,15 @@ jobs:
             exit 1
           fi
 
-      - name: 4. Configure CMake (Xcode)
+      - name: 5. Configure CMake (Xcode)
         if: steps.prep_sdk.outputs.present == 'true'
         run: cmake -S . -B build -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT"
 
-      - name: 5. Build Project (Release)
+      - name: 6. Build Project (Release)
         if: steps.prep_sdk.outputs.present == 'true'
         run: cmake --build build --config Release --parallel
 
-      - name: 6. Archive Artifacts
+      - name: 7. Archive Artifacts
         if: steps.prep_sdk.outputs.present == 'true'
         shell: bash
         run: |
@@ -132,7 +151,7 @@ jobs:
           cd "$src"
           zip -r ../../../ultralight-macos.zip .
 
-      - name: 7. Upload Artifact
+      - name: 8. Upload Artifact
         if: steps.prep_sdk.outputs.present == 'true'
         uses: actions/upload-artifact@v4
         with:
