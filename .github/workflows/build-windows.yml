@@ -8,7 +8,7 @@ name: Build - Windows
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main", "dev"]
   workflow_dispatch:
 
 jobs:
@@ -16,27 +16,43 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: '1. Checkout Code (with submodules)'
-      uses: actions/checkout@v4
-      with:
-        submodules: 'recursive'
+      - name: "1. Checkout Code (with submodules)"
+        uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
 
-    - name: '2. Configure CMake'
-      # No build type needed here; Visual Studio will handle it
-      run: cmake -S . -B build
+      - name: "2. Configure CMake"
+        # No build type needed here; Visual Studio will handle it
+        run: cmake -S . -B build
 
-    - name: '3. Build Project'
-      # We specify the 'Release' config at build time
-      run: cmake --build build --config Release --parallel
+      - name: "3. Build Project"
+        # We specify the 'Release' config at build time
+        run: cmake --build build --config Release --parallel
 
-    - name: '4. Archive Artifacts'
-      # For multi-config, outputs are in a subfolder (e.g., 'build/bin/Release')
-      # We use PowerShell's Compress-Archive
-      run: |
-        Compress-Archive -Path build\bin\Release\* -DestinationPath ultralight-windows.zip
+      - name: "4. Archive Artifacts"
+        # For multi-config, Visual Studio places outputs in 'build/Release'
+        # We use PowerShell's Compress-Archive
+        shell: pwsh
+        run: |
+          # Detect the actual output folder and zip it (handles different generators/layouts)
+          $candidates = @(
+            'build\Release',
+            'build\bin\Release',
+            'build\Ultralight-WebBrowser\Release',
+            'build\samples\Ultralight-WebBrowser\Release'
+          )
+          $src = $null
+          foreach ($p in $candidates) {
+            if (Test-Path $p) { $src = $p; break }
+          }
+          if (-not $src) {
+            throw "No expected output folder found. Checked: $($candidates -join ', ')"
+          }
+          Write-Host "Archiving from: $src"
+          Compress-Archive -Path (Join-Path $src '*') -DestinationPath ultralight-windows.zip -Force
 
-    - name: '5. Upload Artifact'
-      uses: actions/upload-artifact@v4
-      with:
-        name: ultralight-windows-build
-        path: ultralight-windows.zip
+      - name: "5. Upload Artifact"
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-windows-build
+          path: ultralight-windows.zip

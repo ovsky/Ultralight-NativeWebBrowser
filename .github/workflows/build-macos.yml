@@ -8,7 +8,7 @@ name: Build - macOS
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main", "dev"]
   workflow_dispatch:
 
 jobs:
@@ -16,28 +16,44 @@ jobs:
     runs-on: macos-latest # You can specify macos-13 or macos-14 if needed
 
     steps:
-    - name: '1. Checkout Code (with submodules)'
-      uses: actions/checkout@v4
-      with:
-        submodules: 'recursive'
+      - name: "1. Checkout Code (with submodules)"
+        uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
 
-    - name: '2. Configure CMake'
-      # No build type needed here; Xcode (default) will handle it
-      run: cmake -S . -B build
+      - name: "2. Configure CMake"
+        # No build type needed here; Xcode (default) will handle it
+        run: cmake -S . -B build
 
-    - name: '3. Build Project'
-      # We specify the 'Release' config at build time
-      run: cmake --build build --config Release --parallel
+      - name: "3. Build Project"
+        # We specify the 'Release' config at build time
+        run: cmake --build build --config Release --parallel
 
-    - name: '4. Archive Artifacts'
-      # For multi-config, outputs are in 'build/bin/Release'
-      # This will correctly zip the 'WebBrowser.app' bundle and other libs
-      run: |
-        cd build/bin/Release
-        zip -r ../../../ultralight-macos.zip .
+      - name: "4. Archive Artifacts"
+        # Detect the actual output folder and zip it (handles different generators/layouts)
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates=(
+            "build/Release"
+            "build/bin/Release"
+            "build/Ultralight-WebBrowser/Release"
+            "build/samples/Ultralight-WebBrowser/Release"
+          )
+          src=""
+          for p in "${candidates[@]}"; do
+            if [ -d "$p" ]; then src="$p"; break; fi
+          done
+          if [ -z "$src" ]; then
+            echo "No expected output folder found. Checked: ${candidates[*]}" >&2
+            exit 1
+          fi
+          echo "Archiving from: $src"
+          cd "$src"
+          zip -r ../../../ultralight-macos.zip .
 
-    - name: '5. Upload Artifact'
-      uses: actions/upload-artifact@v4
-      with:
-        name: ultralight-macos-build
-        path: ultralight-macos.zip
+      - name: "5. Upload Artifact"
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-macos-build
+          path: ultralight-macos.zip

@@ -8,42 +8,58 @@ name: Build - Linux
 
 on:
   push:
-    branches: [ "main" ] # Triggers on push to main
-  workflow_dispatch:      # Allows manual triggering from the Actions tab
+    branches: ["main", "dev"] # Triggers on push to main or dev
+  workflow_dispatch: # Allows manual triggering from the Actions tab
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: '1. Install Linux Dependencies'
-      # These are required by Ultralight for rendering
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libgtk-3-dev libnss3-dev libgdk-pixbuf2.0-dev libxtst-dev libxss-dev libdbus-glib-1-dev
+      - name: "1. Install Linux Dependencies"
+        # These are required by Ultralight for rendering
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libnss3-dev libgdk-pixbuf2.0-dev libxtst-dev libxss-dev libdbus-glib-1-dev
 
-    - name: '2. Checkout Code (with submodules)'
-      uses: actions/checkout@v4
-      with:
-        submodules: 'recursive'
+      - name: "2. Checkout Code (with submodules)"
+        uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
 
-    - name: '3. Configure CMake'
-      # We set the build type here for single-config generators
-      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: "3. Configure CMake"
+        # We set the build type here for single-config generators
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
-    - name: '4. Build Project'
-      # No --config flag needed here, as it was set at configure time
-      run: cmake --build build --parallel
+      - name: "4. Build Project"
+        # No --config flag needed here, as it was set at configure time
+        run: cmake --build build --parallel
 
-    - name: '5. Archive Artifacts'
-      # The outputs for single-config are in 'build/bin'
-      # We 'cd' into the directory to zip its contents, not the folder itself
-      run: |
-        cd build/bin
-        zip -r ../../ultralight-linux.zip .
+      - name: "5. Archive Artifacts"
+        # Detect the actual output folder and zip it (handles different generators/layouts)
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates=(
+            "build"
+            "build/bin"
+            "build/Ultralight-WebBrowser"
+            "build/samples/Ultralight-WebBrowser"
+          )
+          src=""
+          for p in "${candidates[@]}"; do
+            if [ -d "$p" ]; then src="$p"; break; fi
+          done
+          if [ -z "$src" ]; then
+            echo "No expected output folder found. Checked: ${candidates[*]}" >&2
+            exit 1
+          fi
+          echo "Archiving from: $src"
+          cd "$src"
+          zip -r ../../ultralight-linux.zip .
 
-    - name: '6. Upload Artifact'
-      uses: actions/upload-artifact@v4
-      with:
-        name: ultralight-linux-build
-        path: ultralight-linux.zip
+      - name: "6. Upload Artifact"
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-linux-build
+          path: ultralight-linux.zip
