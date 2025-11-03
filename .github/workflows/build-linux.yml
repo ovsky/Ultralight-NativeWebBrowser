@@ -26,7 +26,7 @@ jobs:
             echo "ULTRALIGHT_SDK_URL already provided: $ULTRALIGHT_SDK_URL"
             exit 0
           fi
-          HEADER="samples/Ultralight-WebBrowser/data/include/Ultralight/Defines.h"
+          HEADER="data/include/Ultralight/Defines.h"
           if [ ! -f "$HEADER" ]; then
             echo "Header not found at $HEADER, skipping auto-detect." >&2
             exit 0
@@ -40,6 +40,7 @@ jobs:
           echo "Detected ULTRALIGHT_VERSION=$VERSION; trying common Linux SDK URLs under $BASE_RAW"
           candidates=(
             "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-x64.7z"
+            "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-arm64.7z"
             "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-x64.tar.xz"
             "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-x64.tar.gz"
             "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-x64.zip"
@@ -69,7 +70,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ROOT_DEFAULT="${{ github.workspace }}/samples/Ultralight-WebBrowser/data"
+          ROOT_DEFAULT="${{ github.workspace }}/data"
           ROOT="${ULTRALIGHT_SDK_ROOT:-}"
           if [ -z "$ROOT" ]; then ROOT="$ROOT_DEFAULT"; fi
           echo "Initial ULTRALIGHT_SDK_ROOT candidate: $ROOT"
