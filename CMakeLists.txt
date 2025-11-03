@@ -1,8 +1,19 @@
 cmake_minimum_required(VERSION 3.8)
 
-# --- Hardcoded path to the Ultralight SDK ---
-# Please change this path if your SDK is in a different location.
-set(ULTRALIGHT_SDK_ROOT "C:/Users/Administrator/Documents/GitHub/ultralight-free-sdk-1.4.0-win-x64/samples/Ultralight-WebBrowser/data")
+# --- Ultralight SDK root ---
+# Prefer a user-provided path, otherwise fall back to the local 'data' folder in this sample.
+# Structure expected under ULTRALIGHT_SDK_ROOT:
+#   include/ (AppCore, Ultralight, WebCore headers)
+#   lib/     (import libraries)
+#   bin/     (runtime DLLs and ICU folder)
+set(ULTRALIGHT_SDK_ROOT "" CACHE PATH "Path to Ultralight SDK root (contains include, lib, bin)")
+if(NOT ULTRALIGHT_SDK_ROOT)
+  set(ULTRALIGHT_SDK_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/data")
+endif()
+
+if(NOT EXISTS "${ULTRALIGHT_SDK_ROOT}/include" OR NOT EXISTS "${ULTRALIGHT_SDK_ROOT}/lib")
+  message(FATAL_ERROR "ULTRALIGHT_SDK_ROOT (\"${ULTRALIGHT_SDK_ROOT}\") does not look valid. Expected 'include' and 'lib' subfolders.")
+endif()
 
 # --- Include directories ---
 include_directories(
@@ -94,7 +105,6 @@ add_custom_command(
   "${ULTRALIGHT_SDK_ROOT}/bin/ICU/icudt67l.dat"
   "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/icudt67l.dat"
 )
-
 add_custom_command(
   TARGET Ultralight-WebBrowser POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy
