@@ -16,7 +16,7 @@ on:
         required: false
         type: string
       webbrowser_version:
-        description: "Override WebBrowser version used in package filenames (default 'dev')"
+        description: "Override build version name (default 'dev')"
         required: false
         type: string
       package_format:
@@ -34,7 +34,7 @@ on:
         required: false
         type: string
       webbrowser_version:
-        description: "Override WebBrowser version used in package filenames (default 'dev')"
+        description: "Override build version name (default 'dev')"
         required: false
         type: string
       package_format:
