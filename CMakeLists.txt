@@ -316,6 +316,9 @@ set(CPACK_PACKAGE_VENDOR "Ultralight")
 set(CPACK_PACKAGE_VERSION "${ULTRALIGHT_VERSION_STR}")
 set(CPACK_PACKAGE_CONTACT "noreply@example.com")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+set(CPACK_OUTPUT_FILE_PREFIX "${CMAKE_BINARY_DIR}")
+# Strip binaries in packages to minimize size and avoid shipping debug symbols
+set(CPACK_STRIP_FILES ON)
 
 # Default generator: TGZ (tar.gz). You can override: -DCPACK_GENERATOR="DEB;RPM;TGZ"
 if(NOT DEFINED CPACK_GENERATOR)
@@ -326,3 +329,33 @@ endif()
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
 
 include(CPack)
+
+# --- Linux desktop integration (DEB/RPM friendly) ---
+if(UNIX AND NOT APPLE)
+  set(APP_ID "ultralight-webbrowser")
+  # Wrapper in /usr/local/bin (or /usr/bin if CMAKE_INSTALL_PREFIX=/usr)
+  install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/packaging/ultralight-webbrowser.sh"
+          DESTINATION bin
+          RENAME ${APP_ID})
+
+  # .desktop entry in share/applications
+  set(EXEC_WRAPPER "$<IF:$<BOOL:$<TARGET_EXISTS:Ultralight-WebBrowser>>,${CMAKE_INSTALL_PREFIX}/bin/${APP_ID},${CMAKE_INSTALL_PREFIX}/bin/${APP_ID}>")
+  configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/packaging/ultralight-webbrowser.desktop.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/ultralight-webbrowser.desktop"
+    @ONLY
+  )
+  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/ultralight-webbrowser.desktop"
+          DESTINATION share/applications)
+
+  # Icon (try to reuse existing project image)
+  set(APP_ICON_SOURCE "")
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/data/screenshots/preview.png")
+    set(APP_ICON_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/data/screenshots/preview.png")
+  elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon.png")
+    set(APP_ICON_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon.png")
+  endif()
+  if(APP_ICON_SOURCE)
+    install(FILES "${APP_ICON_SOURCE}" DESTINATION share/pixmaps RENAME ${APP_ID}.png)
+  endif()
+endif()

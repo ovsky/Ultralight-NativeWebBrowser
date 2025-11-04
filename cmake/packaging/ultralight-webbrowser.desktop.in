@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Ultralight Web Browser
+GenericName=Web Browser
+Comment=Lightweight native browser powered by Ultralight
+Exec=ultralight-webbrowser %U
+Icon=ultralight-webbrowser
+Terminal=false
+Categories=Network;WebBrowser;
+StartupNotify=true
+MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;
