@@ -98,6 +98,8 @@
         var chromeTabs = new ChromeTabs()
         var select_next_mouseup = false;
         var defaultFavicon = "earth.svg";
+        var suggEl = null;
+        var suggActiveIndex = -1;
 
         chromeTabs.init(el, {
             tabOverlapDistance: 6,
@@ -155,6 +157,98 @@
                     }
 
                     return false;
+                }
+            });
+
+            // Suggestions now use a native overlay (like menu/context menu) to avoid clipping.
+
+            // Debounce helper
+            let suggTimer = null;
+            function scheduleSuggest() {
+                if (suggTimer) clearTimeout(suggTimer);
+                suggTimer = setTimeout(updateSuggestions, 80);
+            }
+
+            function hideSuggestions() {
+                suggActiveIndex = -1;
+                if (typeof CloseSuggestionsOverlay === 'function') CloseSuggestionsOverlay();
+                if (typeof OnSuggestClose === 'function') OnSuggestClose();
+            }
+
+            function showSuggestions(items) {
+                if (!items || !items.length) { hideSuggestions(); return; }
+                const r = address.getBoundingClientRect();
+                // Request temporary UI overlay growth so the panel isn't clipped
+                const rows = items.length;
+                const desired = Math.min(320, Math.max(120, 30 * rows + 12));
+                if (typeof OnSuggestOpen === 'function') OnSuggestOpen(desired);
+                // Ask native to show overlay with these items positioned under address bar
+                const json = JSON.stringify(items);
+                if (typeof OpenSuggestionsOverlay === 'function') {
+                    OpenSuggestionsOverlay(Math.round(r.left), Math.round(r.bottom + 4), Math.round(r.width), json);
+                }
+            }
+
+            function commitSuggestion(text) {
+                if (!text) return;
+                address.value = text;
+                hideSuggestions();
+                // trigger navigation same as pressing Enter
+                if (window.OnAddressBarNavigate) {
+                    let url = text;
+                    if (anchorme.validate.url(url) || anchorme.validate.ip(url)) {
+                        if (url.toLowerCase().startsWith("http://") || url.toLowerCase().startsWith("https://")) {
+                            OnAddressBarNavigate(url);
+                        } else {
+                            OnAddressBarNavigate("http://" + url);
+                        }
+                    } else {
+                        OnAddressBarNavigate("https://www.google.com/search?q=" + encodeURIComponent(url));
+                    }
+                }
+            }
+
+            function renderSuggestions(items) { suggActiveIndex = -1; showSuggestions(items); }
+
+            function updateSuggestions() {
+                const q = address.value.trim();
+                if (!q) { hideSuggestions(); return; }
+                try {
+                    if (typeof GetSuggestions === 'function') {
+                        const raw = GetSuggestions(q, 10);
+                        let arr = [];
+                        if (typeof raw === 'string') arr = JSON.parse(raw);
+                        else if (Array.isArray(raw)) arr = raw;
+                        renderSuggestions(arr || []);
+                    } else {
+                        hideSuggestions();
+                    }
+                } catch (e) {
+                    hideSuggestions();
+                }
+            }
+
+            // Events for suggestions
+            address.addEventListener('input', () => { scheduleSuggest(); });
+            address.addEventListener('focus', () => { if (address.value.trim()) { scheduleSuggest(); } });
+            address.addEventListener('blur', () => { setTimeout(hideSuggestions, 50); });
+            window.addEventListener('resize', () => { /* overlay will be closed and reopened on input change */ });
+
+            address.addEventListener('keydown', (e) => {
+                if (suggEl.style.display !== 'block') return;
+                const total = suggEl.children.length;
+                if (e.key === 'ArrowDown' && total) {
+                    e.preventDefault();
+                    suggActiveIndex = (suggActiveIndex + 1 + total) % total;
+                    Array.from(suggEl.children).forEach((c, i) => c.classList.toggle('active', i === suggActiveIndex));
+                } else if (e.key === 'ArrowUp' && total) {
+                    e.preventDefault();
+                    suggActiveIndex = (suggActiveIndex - 1 + total) % total;
+                    Array.from(suggEl.children).forEach((c, i) => c.classList.toggle('active', i === suggActiveIndex));
+                } else if (e.key === 'Enter') {
+                    // Let Enter flow to existing navigation logic; overlay will be closed by blur/commit.
+                } else if (e.key === 'Escape') {
+                    hideSuggestions();
                 }
             });
         }

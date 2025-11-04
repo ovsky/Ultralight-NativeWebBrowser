@@ -1,4 +1,4 @@
-#include "UI.h";
+#include "UI.h"
 #include <cstring>
 #include <cmath>
 #include <Ultralight/Renderer.h>
@@ -6,6 +6,8 @@
 #include <fstream>
 #include <sstream>
 #include <cctype>
+#include <algorithm>
+#include <unordered_set>
 
 static UI *g_ui = 0;
 
@@ -29,6 +31,8 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
 
   // Load popular sites for suggestions
   LoadPopularSites();
+  // Load suggestions favicons flag
+  LoadSuggestionsFaviconsFlag();
 
   // Load history from disk
   LoadHistoryFromDisk();
@@ -55,6 +59,8 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
 
   // Load popular sites for suggestions
   LoadPopularSites();
+  // Load suggestions favicons flag
+  LoadSuggestionsFaviconsFlag();
 
   // Load history from disk
   LoadHistoryFromDisk();
@@ -92,6 +98,21 @@ bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
   if (context_menu_overlay_ && context_menu_overlay_->view())
   {
     context_menu_overlay_->view()->FireKeyEvent(evt);
+    return false;
+  }
+  // If suggestions overlay is open, route navigation keys to it, others to UI overlay (address bar)
+  if (suggestions_overlay_ && suggestions_overlay_->view())
+  {
+    // Virtual key codes: use evt.virtual_key_code values for arrows/enter/escape
+    int vk = evt.virtual_key_code;
+    bool isNavKey = (vk == 0x26 /*UP*/ || vk == 0x28 /*DOWN*/ || vk == 0x0D /*ENTER*/ || vk == 0x1B /*ESC*/ || vk == 0x09 /*TAB*/);
+    if (isNavKey)
+    {
+      suggestions_overlay_->view()->FireKeyEvent(evt);
+      return false;
+    }
+    // Otherwise send to UI overlay so address bar receives typing
+    view()->FireKeyEvent(evt);
     return false;
   }
 
@@ -247,6 +268,45 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
     context_menu_overlay_->view()->FireMouseEvent(evt);
     return false;
   }
+  // If suggestions overlay is active, route mouse to it and consume
+  if (suggestions_overlay_ && suggestions_overlay_->view())
+  {
+    suggestions_overlay_->view()->FireMouseEvent(evt);
+    return false;
+  }
+
+  // Handle right-clicks globally (both navbar/UI and page content)
+  if (evt.type == MouseEvent::kType_MouseDown && evt.button == MouseEvent::kButton_Right)
+  {
+    bool on_ui = evt.y <= ui_height_;
+    // Build a small script to collect context info at the click point
+    char script_buf[512];
+    std::snprintf(script_buf, sizeof(script_buf),
+                  "(function(x,y){try{var t=document.elementFromPoint(x,y);var a=t&&t.closest?t.closest('a[href]'):null;var img=t&&t.closest?t.closest('img[src]'):null;var sel='';try{sel=String(window.getSelection?window.getSelection():'');}catch(_){ }var info={linkURL:a&&a.href?a.href:'',imageURL:img&&img.src?img.src:'',selectionText:sel||'',isEditable:!!(t&&(t.isContentEditable||(t.tagName==='INPUT'||t.tagName==='TEXTAREA')))};return JSON.stringify(info);}catch(e){return '{}';}})(%d,%d)",
+                  on_ui ? evt.x : evt.x,
+                  on_ui ? evt.y : (evt.y - ui_height_ < 0 ? 0 : evt.y - ui_height_));
+
+    ultralight::String json;
+    if (on_ui)
+    {
+      RefPtr<View> uiView = view();
+      json = uiView->EvaluateScript(script_buf, nullptr);
+      ctx_target_ = 1;
+    }
+    else if (active_tab())
+    {
+      json = active_tab()->view()->EvaluateScript(script_buf, nullptr);
+      ctx_target_ = 2;
+    }
+    else
+    {
+      ctx_target_ = 0;
+      json = "{}";
+    }
+
+    ShowContextMenuOverlay(evt.x, evt.y, json);
+    return false; // consume right-click
+  }
 
   // If mouse is interacting within the UI overlay region, forward to UI view and consume
   if (evt.y <= ui_height_)
@@ -263,38 +323,6 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
 
   if (evt.type == MouseEvent::kType_MouseDown)
   {
-    // Right-click: open our custom context menu overlay above everything
-    if (evt.button == MouseEvent::kButton_Right)
-    {
-      // Determine if click is on UI overlay (navbar) or page content
-      bool on_ui = evt.y <= ui_height_;
-      char script_buf[512];
-      std::snprintf(script_buf, sizeof(script_buf),
-                    "(function(x,y){try{var t=document.elementFromPoint(x,y);var a=t&&t.closest?t.closest('a[href]'):null;var img=t&&t.closest?t.closest('img[src]'):null;var sel='';try{sel=String(window.getSelection?window.getSelection():'');}catch(_){}var info={linkURL:a&&a.href?a.href:'',imageURL:img&&img.src?img.src:'',selectionText:sel||'',isEditable:!!(t&&(t.isContentEditable||(t.tagName==='INPUT'||t.tagName==='TEXTAREA')))};return JSON.stringify(info);}catch(e){return '{}';}})(%d,%d)",
-                    on_ui ? evt.x : evt.x, on_ui ? evt.y : (evt.y - ui_height_ < 0 ? 0 : evt.y - ui_height_));
-
-      ultralight::String json;
-      if (on_ui)
-      {
-        // Query UI overlay document
-        RefPtr<View> uiView = view();
-        json = uiView->EvaluateScript(script_buf, nullptr);
-        ctx_target_ = 1;
-      }
-      else if (active_tab())
-      {
-        json = active_tab()->view()->EvaluateScript(script_buf, nullptr);
-        ctx_target_ = 2;
-      }
-      else
-      {
-        ctx_target_ = 0;
-        json = "{}";
-      }
-
-      ShowContextMenuOverlay(evt.x, evt.y, json);
-      return false; // consume
-    }
     // Click occurred outside the UI overlay (handled above), switch focus to page
     address_bar_is_focused_ = false;
     if (active_tab())
@@ -387,8 +415,9 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   auto url_utf8 = url.utf8();
   bool is_menu_view = url_utf8.data() && std::strstr(url_utf8.data(), "menu.html") != nullptr;
   bool is_ctx_view = url_utf8.data() && std::strstr(url_utf8.data(), "contextmenu.html") != nullptr;
+  bool is_sugg_view = url_utf8.data() && std::strstr(url_utf8.data(), "suggestions.html") != nullptr;
 
-  if (!is_menu_view && !is_ctx_view)
+  if (!is_menu_view && !is_ctx_view && !is_sugg_view)
   {
     // Only main UI view has these functions
     updateBack = global["updateBack"];
@@ -424,6 +453,18 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
       setupContextMenu({(double)pending_ctx_position_.first, (double)pending_ctx_position_.second, info});
     }
   }
+  if (is_sugg_view)
+  {
+    // suggestions overlay actions
+    global["OnSuggestionPick"] = BindJSCallback(&UI::OnSuggestionPick);
+    global["OnSuggestionPaste"] = BindJSCallback(&UI::OnSuggestionPaste);
+    setupSuggestions = global["setupSuggestions"];
+    if (setupSuggestions)
+    {
+      ultralight::String items = pending_sugg_json_.empty() ? ultralight::String("[]") : pending_sugg_json_;
+      setupSuggestions({(double)pending_sugg_position_.first, (double)pending_sugg_position_.second, (double)pending_sugg_width_, items});
+    }
+  }
   global["OnRequestNewTab"] = BindJSCallback(&UI::OnRequestNewTab);
   global["OnRequestTabClose"] = BindJSCallback(&UI::OnRequestTabClose);
   global["OnActiveTabChange"] = BindJSCallback(&UI::OnActiveTabChange);
@@ -433,8 +474,12 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
   global["OnAddressBarFocus"] = BindJSCallback(&UI::OnAddressBarFocus);
   global["GetSuggestions"] = BindJSCallbackWithRetval(&UI::OnGetSuggestions);
+  global["OpenSuggestionsOverlay"] = BindJSCallback(&UI::OnOpenSuggestionsOverlay);
+  global["CloseSuggestionsOverlay"] = BindJSCallback(&UI::OnCloseSuggestionsOverlay);
+  global["OnSuggestOpen"] = BindJSCallback(&UI::OnSuggestOpen);
+  global["OnSuggestClose"] = BindJSCallback(&UI::OnSuggestClose);
 
-  if (!is_menu_view && !is_ctx_view)
+  if (!is_menu_view && !is_ctx_view && !is_sugg_view)
   {
     CreateNewTab();
   }
@@ -742,26 +787,41 @@ void UI::RecordHistory(const String &url, const String &title)
   if (strncmp(c_url, "http://", 7) != 0 && strncmp(c_url, "https://", 8) != 0)
     return;
 
-  // Basic cap to avoid unbounded growth
-  if (history_.size() >= 500)
-    history_.erase(history_.begin());
-
+  // Basic cap to avoid unbounded growth later (we'll prune oldest when exceeding)
   auto title_u = title.utf8();
   std::string t = title_u.data() ? title_u.data() : "";
   std::string u = c_url;
   uint64_t now_ms = (uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
                         std::chrono::system_clock::now().time_since_epoch())
                         .count();
-  // Coalesce consecutive identical URLs: update latest entry instead of pushing a duplicate
-  if (!history_.empty() && history_.back().url == u)
+
+  // Find existing entry by URL and update; otherwise push new
+  bool found = false;
+  for (auto &e : history_)
   {
-    if (!t.empty())
-      history_.back().title = t; // fill in title when available
-    history_.back().timestamp_ms = now_ms;
+    if (e.url == u)
+    {
+      if (!t.empty()) e.title = t;
+      e.timestamp_ms = now_ms;
+      e.visit_count = (e.visit_count + 1);
+      found = true;
+      break;
+    }
   }
-  else
+  if (!found)
   {
-    history_.push_back({u, t, now_ms});
+    history_.push_back({u, t, now_ms, 1});
+  }
+
+  // Cap to 500 by removing oldest (by timestamp)
+  if (history_.size() > 500)
+  {
+    // Find oldest
+    size_t idx = 0; uint64_t oldest = UINT64_MAX; size_t oldest_i = 0;
+    for (idx = 0; idx < history_.size(); ++idx) {
+      if (history_[idx].timestamp_ms < oldest) { oldest = history_[idx].timestamp_ms; oldest_i = idx; }
+    }
+    history_.erase(history_.begin() + oldest_i);
   }
 
   // Save history to disk after recording
@@ -881,6 +941,16 @@ void UI::AdjustUIHeight(uint32_t new_height)
   overlay_->Resize(window_->width(), ui_height_);
 
   // Note: Do NOT move or resize tabs here; we only enlarge the UI overlay canvas.
+}
+
+void UI::OnSuggestOpen(const JSObject &obj, const JSArgs &args)
+{
+  // No-op: suggestions are shown in a top overlay; do not move layout.
+}
+
+void UI::OnSuggestClose(const JSObject &obj, const JSArgs &args)
+{
+  // No-op.
 }
 
 void UI::ShowMenuOverlay()
@@ -1264,8 +1334,25 @@ void UI::LoadHistoryFromDisk()
       }
     }
 
+    // Extract count (optional)
+    size_t count_key = obj.find("\"count\"");
+    uint32_t count = 1;
+    if (count_key != std::string::npos)
+    {
+      size_t colon2 = obj.find(':', count_key);
+      if (colon2 != std::string::npos)
+      {
+        size_t num_start = colon2 + 1;
+        while (num_start < obj.size() && (obj[num_start] == ' ' || obj[num_start] == '\t')) num_start++;
+        size_t num_end = num_start;
+        while (num_end < obj.size() && std::isdigit(obj[num_end])) num_end++;
+        if (num_end > num_start)
+          count = (uint32_t)std::stoul(obj.substr(num_start, num_end - num_start));
+      }
+    }
+
     if (!url.empty())
-      history_.push_back({url, title, timestamp});
+      history_.push_back({url, title, timestamp, count});
 
     pos = obj_end + 1;
   }
@@ -1283,9 +1370,10 @@ void UI::SaveHistoryToDisk()
     if (i > 0)
       out << ",";
     const auto &entry = history_[i];
-    out << "{\"url\":\"" << jsonEscape(entry.url) 
-        << "\",\"title\":\"" << jsonEscape(entry.title)
-        << "\",\"time\":" << entry.timestamp_ms << "}";
+  out << "{\"url\":\"" << jsonEscape(entry.url) 
+    << "\",\"title\":\"" << jsonEscape(entry.title)
+    << "\",\"time\":" << entry.timestamp_ms
+    << ",\"count\":" << entry.visit_count << "}";
   }
   out << "]";
   out.close();
@@ -1294,8 +1382,59 @@ void UI::SaveHistoryToDisk()
 std::vector<std::string> UI::GetSuggestions(const std::string &input, int maxResults)
 {
   std::vector<std::string> suggestions;
+  if (maxResults <= 0)
+    maxResults = 10;
+
+  // We'll build (url, score) pairs, then sort by score
+  struct Scored { std::string url; double score; };
+  std::vector<Scored> scored;
+  auto push_scored = [&](const std::string &u, double s){ scored.push_back({u,s}); };
+
+  auto now_ms = (uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count();
+
+  auto score_history = [&](const std::string &u, const HistoryEntry &e, const std::string &q)->double{
+    std::string ul = u, ql = q;
+    std::transform(ul.begin(), ul.end(), ul.begin(), ::tolower);
+    std::transform(ql.begin(), ql.end(), ql.begin(), ::tolower);
+    double prefix = 0.0, contains = 0.0;
+    // check domain part prefix
+    size_t proto = ul.find("://"); size_t start = (proto==std::string::npos? 0: proto+3);
+    if (ul.find(ql, start) == start) prefix = 1.0; // strong boost for prefix
+    if (ul.find(ql) != std::string::npos) contains = 0.5;
+    // recency: within ~30 days fades to 0
+    double age_days = std::max<double>(0.0, (double)(now_ms - e.timestamp_ms) / (1000.0*60.0*60.0*24.0));
+    double recency = std::max(0.0, 1.0 - (age_days / 30.0));
+    // frequency: log scale
+    double freq = std::log(1.0 + (double)std::max<uint32_t>(1, e.visit_count)) / std::log(10.0);
+    return 2.0*prefix + 1.0*contains + 2.0*recency + 2.0*freq;
+  };
+
+  // If no input, suggest top by recency/frequency
   if (input.empty())
+  {
+    std::unordered_set<std::string> seen;
+    // History candidates
+    for (const auto &e : history_)
+    {
+      double s = score_history(e.url, e, std::string());
+      if (seen.insert(e.url).second) push_scored(e.url, s);
+    }
+    // Sort by score desc
+    std::sort(scored.begin(), scored.end(), [](const Scored&a,const Scored&b){return a.score>b.score;});
+    for (const auto &p : scored)
+    {
+      if ((int)suggestions.size() >= maxResults) break;
+      suggestions.push_back(p.url);
+    }
+    // Fill with popular sites
+    for (const auto &site : popular_sites_)
+    {
+      if ((int)suggestions.size() >= maxResults) break;
+      if (std::find(suggestions.begin(), suggestions.end(), site) == suggestions.end()) suggestions.push_back(site);
+    }
     return suggestions;
+  }
 
   std::string input_lower = input;
   std::transform(input_lower.begin(), input_lower.end(), input_lower.begin(), ::tolower);
@@ -1318,49 +1457,39 @@ std::vector<std::string> UI::GetSuggestions(const std::string &input, int maxRes
     return url_lower.find(input_lower) != std::string::npos;
   };
 
-  // First, add matching history entries (most recent first)
-  for (auto it = history_.rbegin(); it != history_.rend() && suggestions.size() < maxResults; ++it)
+  // First, score matching history entries
   {
-    if (matches(it->url))
+    std::unordered_set<std::string> seen;
+    for (const auto &e : history_)
     {
-      // Check for duplicates
-      bool duplicate = false;
-      for (const auto &existing : suggestions)
+      if (matches(e.url))
       {
-        if (existing == it->url)
-        {
-          duplicate = true;
-          break;
-        }
+        double s = score_history(e.url, e, input);
+        if (seen.insert(e.url).second) push_scored(e.url, s);
       }
-      if (!duplicate)
-        suggestions.push_back(it->url);
     }
   }
 
-  // Then, add matching popular sites
+  // Then, add matching popular sites (lower score)
   for (const auto &site : popular_sites_)
   {
-    if (suggestions.size() >= maxResults)
-      break;
-    
     if (matches(site))
     {
-      // Check for duplicates
-      bool duplicate = false;
-      for (const auto &existing : suggestions)
-      {
-        if (existing == site)
-        {
-          duplicate = true;
-          break;
-        }
-      }
-      if (!duplicate)
-        suggestions.push_back(site);
+      // Low baseline score; small prefix boost
+      double s = 0.6; std::string sl = site, il = input; std::transform(sl.begin(),sl.end(),sl.begin(),::tolower); std::transform(il.begin(),il.end(),il.begin(),::tolower);
+      if (sl.find(il) == sl.find("://") + 3) s += 0.6;
+      push_scored(site, s);
     }
   }
 
+  // Sort by score and emit unique URLs
+  std::sort(scored.begin(), scored.end(), [](const Scored&a,const Scored&b){return a.score>b.score;});
+  std::unordered_set<std::string> emitted;
+  for (const auto &p : scored)
+  {
+    if ((int)suggestions.size() >= maxResults) break;
+    if (emitted.insert(p.url).second) suggestions.push_back(p.url);
+  }
   return suggestions;
 }
 
@@ -1369,8 +1498,9 @@ JSValue UI::OnGetSuggestions(const JSObject &obj, const JSArgs &args)
   if (args.size() < 1 || !args[0].IsString())
     return JSValue();
 
-  auto input_str = args[0].ToString();
-  std::string input = input_str.utf8().data() ? input_str.utf8().data() : "";
+  ultralight::String input_ul = args[0];
+  auto input_ul8 = input_ul.utf8();
+  std::string input = input_ul8.data() ? input_ul8.data() : "";
 
   int maxResults = 10;
   if (args.size() >= 2 && args[1].IsNumber())
@@ -1378,15 +1508,143 @@ JSValue UI::OnGetSuggestions(const JSObject &obj, const JSArgs &args)
 
   auto suggestions = GetSuggestions(input, maxResults);
 
-  // Build JSON array
+  // Build JSON array (strings or objects with favicon)
   std::string json = "[";
   for (size_t i = 0; i < suggestions.size(); ++i)
   {
-    if (i > 0)
-      json += ",";
-    json += "\"" + jsonEscape(suggestions[i]) + "\"";
+    if (i > 0) json += ",";
+    if (suggestion_favicons_enabled_)
+    {
+      std::string u = suggestions[i];
+      auto fav = GetFaviconURL(String(u.c_str()));
+      auto f8 = fav.utf8();
+      std::string f = f8.data() ? f8.data() : "";
+      json += "{\"url\":\"" + jsonEscape(u) + "\"";
+      if (!f.empty()) json += ",\"favicon\":\"" + jsonEscape(f) + "\"";
+      json += "}";
+    }
+    else
+    {
+      json += "\"" + jsonEscape(suggestions[i]) + "\"";
+    }
   }
   json += "]";
 
   return JSValue(json.c_str());
+}
+
+void UI::LoadSuggestionsFaviconsFlag()
+{
+  suggestion_favicons_enabled_ = true; // default
+  std::ifstream in("assets/suggestions_favicons.txt", std::ios::in | std::ios::binary);
+  if (!in.is_open()) return;
+  std::ostringstream ss; ss << in.rdbuf(); std::string txt = ss.str(); in.close();
+  // Normalize
+  std::string s; s.reserve(txt.size());
+  for (char c: txt){ if (!std::isspace((unsigned char)c)) s += (char)std::tolower((unsigned char)c); }
+  if (s == "off" || s == "0" || s == "false") suggestion_favicons_enabled_ = false;
+}
+
+void UI::ShowSuggestionsOverlay(int x, int y, int width, const ultralight::String &json_items)
+{
+  // Recreate each time for simplicity
+  if (suggestions_overlay_)
+    HideSuggestionsOverlay();
+
+  ultralight::ViewConfig cfg;
+  cfg.is_transparent = true;
+  cfg.initial_device_scale = window_->scale();
+  if (overlay_ && overlay_->view())
+  {
+    cfg.is_accelerated = overlay_->view()->is_accelerated();
+    cfg.display_id = overlay_->view()->display_id();
+  }
+  auto view = App::instance()->renderer()->CreateView(window_->width(), window_->height(), cfg, nullptr);
+  suggestions_overlay_ = Overlay::Create(window_, view, 0, 0);
+  suggestions_overlay_->Show();
+  // Do not steal focus from address bar; leave unfocused
+  view->set_load_listener(this);
+  view->set_view_listener(this);
+  pending_sugg_position_ = {x, y};
+  pending_sugg_width_ = width;
+  pending_sugg_json_ = json_items;
+  view->LoadURL("file:///suggestions.html");
+}
+
+void UI::HideSuggestionsOverlay()
+{
+  if (!suggestions_overlay_)
+    return;
+  suggestions_overlay_->Hide();
+  suggestions_overlay_->Unfocus();
+  suggestions_overlay_->view()->set_load_listener(nullptr);
+  suggestions_overlay_ = nullptr;
+  pending_sugg_json_ = "";
+}
+
+void UI::OnOpenSuggestionsOverlay(const JSObject &obj, const JSArgs &args)
+{
+  // args: x, y, width, items_json
+  if (args.size() < 4)
+    return;
+  int x = (int)args[0].ToInteger();
+  int y = (int)args[1].ToInteger();
+  int w = (int)args[2].ToInteger();
+  ultralight::String items = args[3].ToString();
+  ShowSuggestionsOverlay(x, y, w, items);
+}
+
+void UI::OnCloseSuggestionsOverlay(const JSObject &obj, const JSArgs &args)
+{
+  HideSuggestionsOverlay();
+}
+
+void UI::OnSuggestionPick(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() < 1 || !args[0].IsString())
+  {
+    HideSuggestionsOverlay();
+    return;
+  }
+  ultralight::String s = args[0].ToString();
+  HideSuggestionsOverlay();
+  // Navigate like pressing Enter on the address bar
+  std::string url = s.utf8().data() ? s.utf8().data() : "";
+  if (url.empty()) return;
+  // If second arg is "newtab", open in a new tab
+  bool open_new_tab = false;
+  if (args.size() >= 2 && args[1].IsString())
+  {
+    ultralight::String mode = args[1].ToString();
+    auto m8 = mode.utf8();
+    std::string m = m8.data() ? m8.data() : "";
+    open_new_tab = (m == "newtab");
+  }
+  if (open_new_tab)
+  {
+    RefPtr<View> child = CreateNewTabForChildView(s);
+    if (child) child->LoadURL(s);
+    return;
+  }
+  if (!tabs_.empty())
+  {
+    auto &tab = tabs_[active_tab_id_];
+    tab->view()->LoadURL(s);
+  }
+}
+
+void UI::OnSuggestionPaste(const JSObject &obj, const JSArgs &args)
+{
+  // args: url string to paste into address bar; no navigation
+  if (args.size() < 1 || !args[0].IsString())
+    return;
+  ultralight::String s = args[0].ToString();
+  // Update address bar text in main UI without navigating
+  if (updateURL)
+  {
+    RefPtr<JSContext> lock(view()->LockJSContext());
+    updateURL({s});
+  }
+  // keep focus on address bar for continued typing
+  address_bar_is_focused_ = true;
 }

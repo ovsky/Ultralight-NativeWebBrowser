@@ -128,3 +128,31 @@ svg#icon_defs path {
      background: #3a3a4e;
      margin: 6px 0;
 }
+
+/* Address suggestions panel */
+.suggestions-panel {
+     position: fixed;
+     background: #2b2b38;
+     border: 1px solid #313146;
+     border-radius: 8px;
+     box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+     padding: 4px 0;
+     z-index: 2000;
+     color: #e2e1ea;
+     max-height: 320px;
+     overflow-y: auto;
+     display: none;
+}
+
+.suggestions-item {
+     padding: 8px 12px;
+     cursor: pointer;
+     white-space: nowrap;
+     overflow: hidden;
+     text-overflow: ellipsis;
+}
+
+.suggestions-item:hover,
+.suggestions-item.active {
+     background: #343446;
+}
