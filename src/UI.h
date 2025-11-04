@@ -66,6 +66,11 @@ public:
   // Adjust UI overlay height for suggestions dropdown
   void OnSuggestOpen(const JSObject &obj, const JSArgs &args);
   void OnSuggestClose(const JSObject &obj, const JSArgs &args);
+  // Window controls
+  void OnWindowMinimize(const JSObject &obj, const JSArgs &args);
+  void OnWindowToggleMaximize(const JSObject &obj, const JSArgs &args);
+  void OnWindowClose(const JSObject &obj, const JSArgs &args);
+  void OnBeginWindowDrag(const JSObject &obj, const JSArgs &args);
 
   RefPtr<Window> window() { return window_; }
 

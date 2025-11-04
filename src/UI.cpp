@@ -10,6 +10,10 @@
 #include <unordered_set>
 #include <cstdio>
 #ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
 #include <direct.h> // _mkdir, _getcwd
 #else
 #include <sys/stat.h> // mkdir
@@ -441,6 +445,11 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     focusAddressBar = global["focusAddressBar"];
     isAddressBarFocused = global["isAddressBarFocused"];
     // (no adblock in this build)
+    // Window controls callbacks
+    global["OnWindowMinimize"] = BindJSCallback(&UI::OnWindowMinimize);
+    global["OnWindowToggleMaximize"] = BindJSCallback(&UI::OnWindowToggleMaximize);
+    global["OnWindowClose"] = BindJSCallback(&UI::OnWindowClose);
+    global["OnBeginWindowDrag"] = BindJSCallback(&UI::OnBeginWindowDrag);
   }
 
   global["OnBack"] = BindJSCallback(&UI::OnBack);
@@ -963,6 +972,38 @@ void UI::OnSuggestOpen(const JSObject &obj, const JSArgs &args)
 void UI::OnSuggestClose(const JSObject &obj, const JSArgs &args)
 {
   // No-op.
+}
+
+void UI::OnWindowMinimize(const JSObject &obj, const JSArgs &args)
+{
+#ifdef _WIN32
+  HWND hwnd = (HWND)window_->native_handle();
+  if (hwnd) ShowWindow(hwnd, SW_MINIMIZE);
+#endif
+}
+
+void UI::OnWindowToggleMaximize(const JSObject &obj, const JSArgs &args)
+{
+#ifdef _WIN32
+  HWND hwnd = (HWND)window_->native_handle();
+  if (!hwnd) return;
+  if (IsZoomed(hwnd)) ShowWindow(hwnd, SW_RESTORE); else ShowWindow(hwnd, SW_MAXIMIZE);
+#endif
+}
+
+void UI::OnWindowClose(const JSObject &obj, const JSArgs &args)
+{
+  if (window_) window_->Close();
+}
+
+void UI::OnBeginWindowDrag(const JSObject &obj, const JSArgs &args)
+{
+#ifdef _WIN32
+  HWND hwnd = (HWND)window_->native_handle();
+  if (!hwnd) return;
+  ReleaseCapture();
+  SendMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+#endif
 }
 
 void UI::ShowMenuOverlay()

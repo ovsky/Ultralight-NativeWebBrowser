@@ -22,6 +22,7 @@ body {
      border-bottom: 0.8px solid #252532;
      cursor: default;
      display: flex;
+     align-items: center;
 }
 
 #address {
@@ -80,6 +81,17 @@ svg#icon_defs path {
 .icon:not(.disabled):hover {
      background-color: #343446;
      border-radius: 100%;
+}
+
+.window-controls {
+     margin-left: auto;
+     display: flex;
+     gap: 2px;
+}
+
+.window-controls #win-close:hover {
+     background-color: #6b2b2b;
+     border-radius: 4px;
 }
 
 /* AdBlock toggle coloring: enabled => purple-blue, disabled => grey (inherited) */

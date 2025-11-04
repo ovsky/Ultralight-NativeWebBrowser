@@ -21,8 +21,9 @@ Browser::Browser()
   config.scroll_timer_delay = 1.0 / 90.0;
   app_ = App::Create(settings, config);
 
+  // Create a borderless (frameless) window and we will provide our own controls
   window_ = Window::Create(app_->main_monitor(), 1024, 768, false,
-                           kWindowFlags_Resizable | kWindowFlags_Titled | kWindowFlags_Maximizable);
+                           kWindowFlags_Resizable | kWindowFlags_Borderless | kWindowFlags_Maximizable);
   window_->SetTitle("Ultralight | Web Browser");
 
 #if defined(_WIN32)
