@@ -3,6 +3,9 @@ project(UltralightWebBrowser LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# --- Testing (CTest) ---
+include(CTest)
+
 # --- Ultralight SDK root ---
 # Prefer a user-provided path, otherwise fall back to the local 'data' folder in this sample.
 # Structure expected under ULTRALIGHT_SDK_ROOT:
@@ -79,6 +82,25 @@ set(SOURCES "src/Browser.h"
 )
 
 add_app(Ultralight-WebBrowser ${SOURCES})
+
+# --- Define simple tests when enabled ---
+if(BUILD_TESTING)
+  # Verify SDK basics
+  add_test(
+    NAME sdk_headers_and_lib_present
+    COMMAND ${CMAKE_COMMAND}
+      -DULTRALIGHT_SDK_ROOT=${ULTRALIGHT_SDK_ROOT}
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/verify_sdk.cmake
+  )
+
+  # Verify assets in repository
+  add_test(
+    NAME repo_assets_present
+    COMMAND ${CMAKE_COMMAND}
+      -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/tests/verify_assets.cmake
+  )
+endif()
 
 # --- Copy runtime libraries to the output directory ---
 if(WIN32)

@@ -74,6 +74,10 @@ jobs:
           brew install 7zip || brew install p7zip
           (7z -version || 7zz -version) 2>/dev/null || true
 
+      - name: 3.5 Install linters (clang-format, cppcheck)
+        run: |
+          brew install clang-format cppcheck
+
       - name: 4. Prepare Ultralight SDK (macOS)
         id: prep_sdk
         shell: bash
@@ -127,11 +131,30 @@ jobs:
         run: |
           cmake --version
           echo "Configuring with ULTRALIGHT_SDK_ROOT=$ULTRALIGHT_SDK_ROOT"
-          cmake -S . -B build -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT"
+          cmake -S . -B build -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT" -DBUILD_TESTING=ON
+
+      - name: 5.5 Lint (clang-format) and Static Analysis (cppcheck)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "clang-format version:"; clang-format --version
+          files=$(ls src/*.cpp src/*.h 2>/dev/null || true)
+          if [ -n "$files" ]; then
+            echo "$files" | xargs -I{} clang-format -n --Werror {}
+          else
+            echo "No source files found for clang-format check."
+          fi
+          echo "Running cppcheck..."
+          cppcheck --version
+          cppcheck --enable=warning,style,performance,portability --inline-suppr --error-exitcode=1 -I "$ULTRALIGHT_SDK_ROOT/include" src || (echo "cppcheck failed"; exit 1)
 
       - name: 6. Build Project (Release)
         if: steps.prep_sdk.outputs.present == 'true'
         run: cmake --build build --config Release --parallel
+
+      - name: 6.8 Run tests (ctest)
+        if: steps.prep_sdk.outputs.present == 'true'
+        run: ctest --test-dir build -C Release --output-on-failure
 
       - name: "6.5 Diagnostics: verify runtime contents"
         if: steps.prep_sdk.outputs.present == 'true'

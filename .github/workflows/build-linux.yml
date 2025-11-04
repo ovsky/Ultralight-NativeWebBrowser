@@ -67,6 +67,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y p7zip-full
 
+      - name: 3.5 Install linters (clang-format, cppcheck)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format cppcheck
+
       - name: 4. Prepare Ultralight SDK (Linux)
         id: prep_sdk
         shell: bash
@@ -121,16 +126,35 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libnss3-dev libgdk-pixbuf2.0-dev libxtst-dev libxss-dev libdbus-glib-1-dev
 
+      - name: 5.5 Lint (clang-format) and Static Analysis (cppcheck)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "clang-format version:"; clang-format --version
+          files=$(ls src/*.cpp src/*.h 2>/dev/null || true)
+          if [ -n "$files" ]; then
+            echo "$files" | xargs -I{} clang-format -n --Werror {}
+          else
+            echo "No source files found for clang-format check."
+          fi
+          echo "Running cppcheck..."
+          cppcheck --version
+          cppcheck --enable=warning,style,performance,portability --inline-suppr --error-exitcode=1 -I "$ULTRALIGHT_SDK_ROOT/include" src || (echo "cppcheck failed"; exit 1)
+
       - name: 6. Configure CMake
         if: steps.prep_sdk.outputs.present == 'true'
         run: |
           cmake --version
           echo "Configuring with ULTRALIGHT_SDK_ROOT=$ULTRALIGHT_SDK_ROOT"
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT"
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT" -DBUILD_TESTING=ON
 
       - name: 7. Build Project
         if: steps.prep_sdk.outputs.present == 'true'
         run: cmake --build build --parallel -- VERBOSE=1
+
+      - name: 7.8 Run tests (ctest)
+        if: steps.prep_sdk.outputs.present == 'true'
+        run: ctest --test-dir build --output-on-failure
 
       - name: "7.5 Diagnostics: verify runtime contents"
         if: steps.prep_sdk.outputs.present == 'true'
