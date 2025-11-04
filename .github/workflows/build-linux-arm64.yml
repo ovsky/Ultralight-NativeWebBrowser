@@ -1,0 +1,109 @@
+# .github/workflows/build-linux-arm64.yml
+# Dedicated ARM64 build on Linux using qemu via run-on-arch-action.
+
+name: Build - Linux (ARM64)
+
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      package_format:
+        description: "Package format(s) to produce via CPack (eg. TGZ only for ARM64 here)"
+        required: false
+        default: TGZ
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: 1. Checkout Code (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: 2. Build (ARM64 emulated)
+        id: arm64_build
+        uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: aarch64
+          distro: ubuntu22.04
+          githubToken: ${{ github.token }}
+          install: |
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y \
+              git curl zip unzip cmake build-essential pkg-config \
+              p7zip-full \
+              libgtk-3-dev libnss3-dev libgdk-pixbuf2.0-dev libxtst-dev libxss-dev libdbus-glib-1-dev
+          run: |
+            set -euo pipefail
+            cd "$GITHUB_WORKSPACE"
+            echo "== ARM64: Detect ULTRALIGHT_SDK_URL from base-sdk =="
+            API="https://api.github.com/repos/${{ github.repository }}/contents/sdks?ref=base-sdk"
+            RESP=$(curl -fLs -H "Accept: application/vnd.github+json" "$API" || true)
+            URL=""; VER=""
+            if [ -n "$RESP" ]; then
+              NAMES=$(printf "%s" "$RESP" | grep -oE '"name"\s*:\s*"[^"]+"' | sed -E 's/.*"name"\s*:\s*"([^"]+)".*/\1/')
+              for f in $NAMES; do
+                case "$f" in ultralight*-sdk-*-linux-arm64.7z)
+                  v=$(echo "$f" | sed -E 's/^.*-([0-9]+\.[0-9]+\.[0-9]+)-linux-.*$/\1/')
+                  URL="https://raw.githubusercontent.com/${{ github.repository }}/base-sdk/sdks/$f"; VER="$v"; break;;
+                esac
+              done
+            fi
+            if [ -z "$URL" ]; then
+              HEADER="data/include/Ultralight/Defines.h"
+              VER=$(sed -n 's/^#define[[:space:]]\+ULTRALIGHT_VERSION[[:space:]]\+"\([^"]\+\)".*/\1/p' "$HEADER" | head -n1 || true)
+              [ -z "$VER" ] && VER="1.4.0"
+              URL="https://raw.githubusercontent.com/${{ github.repository }}/base-sdk/sdks/ultralight-free-sdk-$VER-linux-arm64.7z"
+            fi
+            echo "Using SDK URL: $URL (version=$VER)"
+            echo "== ARM64: Fetch and extract SDK =="
+            mkdir -p "$RUNNER_TEMP/sdk-extract"
+            curl -fL "$URL" -o "$RUNNER_TEMP/ultralight-sdk.7z"
+            7z x -y -o"$RUNNER_TEMP/sdk-extract" "$RUNNER_TEMP/ultralight-sdk.7z"
+            ROOT=""
+            # Prefer a directory that has include and either lib or bin (Ultralight sometimes ships .so in bin)
+            while IFS= read -r -d '' dir; do
+              if [ -d "$dir/include" ] && { [ -d "$dir/lib" ] || [ -d "$dir/bin" ]; }; then
+                ROOT="$dir"; break
+              fi
+            done < <(find "$RUNNER_TEMP/sdk-extract" -mindepth 1 -maxdepth 4 -type d -print0)
+            if [ -z "$ROOT" ]; then
+              # Fallback: derive from include/Ultralight path
+              INC_PARENT=$(find "$RUNNER_TEMP/sdk-extract" -type d -path '*/include/Ultralight' -print -quit 2>/dev/null | xargs -I{} dirname {} | xargs -I{} dirname {}) || true
+              if [ -n "$INC_PARENT" ] && [ -d "$INC_PARENT/include" ] && { [ -d "$INC_PARENT/lib" ] || [ -d "$INC_PARENT/bin" ]; }; then
+                ROOT="$INC_PARENT"
+              fi
+            fi
+            if [ -z "$ROOT" ]; then
+              echo "::error::ARM64 SDK root not found after extraction";
+              echo "Extraction tree (depth 3):"; find "$RUNNER_TEMP/sdk-extract" -maxdepth 3 -type d -print | sed 's/^/  /'
+              exit 1
+            fi
+            echo "Found SDK at: $ROOT"; ls -la "$ROOT/lib" || true
+            echo "== ARM64: Configure & Build =="
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ROOT" -DBUILD_TESTING=OFF
+            cmake --build build --parallel
+            echo "== ARM64: Package (TGZ) =="
+            cpack --config build/CPackConfig.cmake -C Release -G TGZ -D CPACK_OUTPUT_FILE_PREFIX="$GITHUB_WORKSPACE/build"
+            echo "== ARM64: Zip runtime =="
+            (cd build && zip -r "$GITHUB_WORKSPACE/ultralight-linux-arm64.zip" .)
+
+      - name: 3. Upload ARM64 Runtime Zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-linux-arm64-build
+          path: ultralight-linux-arm64.zip
+
+      - name: 4. Upload ARM64 Packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-linux-arm64-packages
+          path: |
+            ${{ github.workspace }}/build/*.tar.gz
+            ${{ github.workspace }}/**/*.tar.gz

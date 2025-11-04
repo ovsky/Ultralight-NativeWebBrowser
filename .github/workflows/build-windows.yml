@@ -9,13 +9,16 @@ name: Build - Windows
 on:
   pull_request:
   workflow_dispatch:
+  workflow_call:
     inputs:
       sdk_url:
         description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
         required: false
+        type: string
       version:
         description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
         required: false
+        type: string
       create_installer:
         description: "Create Windows installer via CPack (NSIS)"
         required: false
@@ -26,9 +29,9 @@ jobs:
   build:
     runs-on: windows-latest
     env:
-      ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url }}
-      ULTRALIGHT_VERSION: ${{ inputs.version }}
-      CREATE_INSTALLER: ${{ inputs.create_installer }}
+      ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url || github.event.inputs.sdk_url }}
+      ULTRALIGHT_VERSION: ${{ inputs.version || github.event.inputs.version }}
+      CREATE_INSTALLER: ${{ inputs.create_installer || github.event.inputs.create_installer }}
 
     steps:
       - name: "1. Checkout Code (with submodules)"

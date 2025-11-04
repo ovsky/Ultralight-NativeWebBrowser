@@ -1,0 +1,242 @@
+# .github/workflows/build-macos-arm64.yml
+# Dedicated Apple Silicon build using SDK archives hosted in the repo's base-sdk branch.
+
+name: Build - macOS (ARM64)
+
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      sdk_url:
+        description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
+        required: false
+        type: string
+      version:
+        description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
+        required: false
+        type: string
+      package_format:
+        description: "Package format(s) to produce via CPack (eg. TGZ or DMG or multi 'TGZ;DMG')"
+        required: false
+        default: TGZ
+        type: string
+
+jobs:
+  build:
+    runs-on: macos-14
+    permissions:
+      contents: read
+      actions: write
+    env:
+      ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url }}
+      ULTRALIGHT_VERSION: ${{ inputs.version }}
+      PACKAGE_GENERATORS: ${{ inputs.package_format || 'TGZ' }}
+      TARGET_ARCH: arm64
+    steps:
+      - name: 1. Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: 2. Detect ULTRALIGHT_SDK_URL from repo base-sdk branch (macOS)
+        id: detect_url
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${ULTRALIGHT_SDK_URL:-}" ]; then
+            echo "ULTRALIGHT_SDK_URL already provided: $ULTRALIGHT_SDK_URL"
+            exit 0
+          fi
+          API="https://api.github.com/repos/${{ github.repository }}/contents/sdks?ref=base-sdk"
+          echo "Querying GitHub API for SDK files: $API"
+          RESP=$(curl -fLs -H "Authorization: Bearer ${GITHUB_TOKEN:-}" -H "Accept: application/vnd.github+json" "$API" || true)
+          if [ -n "$RESP" ]; then
+            NAMES=$(printf "%s" "$RESP" | grep -oE '"name"\s*:\s*"[^"]+"' | sed -E 's/.*"name"\s*:\s*"([^"]+)".*/\1/')
+            echo "Found files in sdks branch:"; printf ' - %s\n' $NAMES | sed 's/^/  /'
+            # Prefer arm64 for this workflow (support mac/macos/osx naming)
+            MAC_LIST=""
+            for nm in $NAMES; do
+              case "$nm" in
+                ultralight*-sdk-*-mac-arm64.7z|ultralight*-sdk-*-macos-arm64.7z|ultralight*-sdk-*-osx-arm64.7z)
+                  MAC_LIST="$MAC_LIST $nm"
+                  ;;
+              esac
+            done
+            if [ -n "$MAC_LIST" ]; then
+              BEST_VER=""; BEST_FILE=""
+              read_version() {
+                local v="$1" a r b c
+                a="${v%%.*}"; r="${v#*.}"; b="${r%%.*}"; c="${r#*.}"
+                printf '%s %s %s' "${a:-0}" "${b:-0}" "${c:-0}"
+              }
+              ver_gt() {
+                # returns 0 (true) if $1 > $2 as semantic version x.y.z
+                [ "$1" = "$2" ] && return 1
+                set -- $(read_version "$1") $(read_version "$2")
+                local a1="$1" a2="$2" a3="$3" b1="$4" b2="$5" b3="$6"
+                if [ $((10#$a1)) -gt $((10#$b1)) ]; then return 0; fi
+                if [ $((10#$a1)) -lt $((10#$b1)) ]; then return 1; fi
+                if [ $((10#$a2)) -gt $((10#$b2)) ]; then return 0; fi
+                if [ $((10#$a2)) -lt $((10#$b2)) ]; then return 1; fi
+                if [ $((10#$a3)) -gt $((10#$b3)) ]; then return 0; fi
+                return 1
+              }
+              for f in $MAC_LIST; do
+                v=$(echo "$f" | sed -E 's/^.*-([0-9]+\.[0-9]+\.[0-9]+)-(mac|macos|osx)-.*$/\1/')
+                if [ -n "$v" ]; then if [ -z "$BEST_VER" ] || ver_gt "$v" "$BEST_VER"; then BEST_VER="$v"; BEST_FILE="$f"; fi; fi
+              done
+              if [ -n "$BEST_FILE" ]; then
+                BASE_RAW="https://raw.githubusercontent.com/${{ github.repository }}/base-sdk/sdks"
+                URL="$BASE_RAW/$BEST_FILE"
+                echo "Auto-detected latest macOS ARM64 SDK URL=$URL"
+                echo "ULTRALIGHT_SDK_URL=$URL" >> "$GITHUB_ENV"
+                echo "ULTRALIGHT_VERSION=$BEST_VER" >> "$GITHUB_ENV"
+                echo "url=$URL" >> "$GITHUB_OUTPUT"
+                echo "version=$BEST_VER" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+          fi
+          HEADER="data/include/Ultralight/Defines.h"
+          VERSION=""
+          if [ -f "$HEADER" ]; then
+            VERSION=$(sed -n 's/^#define[[:space:]]\+ULTRALIGHT_VERSION[[:space:]]\+"\([^"]\+\)".*/\1/p' "$HEADER" | head -n1)
+          fi
+          [ -z "$VERSION" ] && VERSION="${ULTRALIGHT_VERSION:-1.4.0}"
+          BASE_RAW="https://raw.githubusercontent.com/${{ github.repository }}/base-sdk/sdks"
+          candidates=(
+            "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-arm64.7z"
+            "$BASE_RAW/ultralight-free-sdk-$VERSION-macos-arm64.7z"
+            "$BASE_RAW/ultralight-free-sdk-$VERSION-osx-arm64.7z"
+          )
+          found=""
+          for url in "${candidates[@]}"; do echo "Probing $url"; if curl -fLs -o /dev/null "$url"; then found="$url"; break; fi; done
+          if [ -n "$found" ]; then
+            echo "ULTRALIGHT_SDK_URL=$found" >> "$GITHUB_ENV"
+            echo "url=$found" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Could not auto-detect a valid macOS ARM64 SDK URL in base-sdk branch for version $VERSION."; exit 1
+          fi
+
+      - name: 3. Install 7zip (macOS)
+        run: |
+          brew update
+          brew install 7zip || brew install p7zip
+
+      - name: 4. Prepare Ultralight SDK (macOS)
+        id: prep_sdk
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT_DEFAULT="${{ github.workspace }}/data"
+          ROOT="${ULTRALIGHT_SDK_ROOT:-}"
+          echo "Initial ULTRALIGHT_SDK_ROOT candidate: $ROOT"
+          present="false"
+          # If a URL is available (detected or provided), prefer downloading the matching SDK for this platform/arch
+          if [ -n "${ULTRALIGHT_SDK_URL:-}" ]; then
+            URL_DL="$ULTRALIGHT_SDK_URL"
+            if echo "$URL_DL" | grep -qE '^https://github.com/.+/blob/'; then URL_DL=$(echo "$URL_DL" | sed -E 's#https://github.com/([^/]+)/([^/]+)/blob/(.+)$#https://raw.githubusercontent.com/\1/\2/\3#'); fi
+            echo "Downloading Ultralight SDK from ULTRALIGHT_SDK_URL=$URL_DL"
+            mkdir -p "$RUNNER_TEMP/sdk-extract"
+            pkg="$RUNNER_TEMP/ultralight-sdk"
+            curl -L "$URL_DL" -o "$pkg"
+            EXTRACTOR=""; command -v 7z >/dev/null 2>&1 && EXTRACTOR=7z || command -v 7zz >/dev/null 2>&1 && EXTRACTOR=7zz || true
+            [ -z "$EXTRACTOR" ] && { echo "7zip extractor not found" >&2; exit 1; }
+            "$EXTRACTOR" t -y "$pkg" >/dev/null 2>&1 || { echo "Archive invalid" >&2; exit 1; }
+            "$EXTRACTOR" x -y -o"$RUNNER_TEMP/sdk-extract" "$pkg"
+            ROOT_FOUND=""
+            # Prefer directories having include + (lib or bin)
+            while IFS= read -r -d '' dir; do
+              if [ -d "$dir/include" ] && { [ -d "$dir/lib" ] || [ -d "$dir/bin" ]; }; then
+                ROOT_FOUND="$dir"; break
+              fi
+            done < <(find "$RUNNER_TEMP/sdk-extract" -mindepth 1 -maxdepth 4 -type d -print0)
+            if [ -z "$ROOT_FOUND" ]; then
+              # Fallback: derive from include/Ultralight path
+              INC_PARENT=$(find "$RUNNER_TEMP/sdk-extract" -type d -path '*/include/Ultralight' -print -quit 2>/dev/null | xargs -I{} dirname {} | xargs -I{} dirname {}) || true
+              if [ -n "$INC_PARENT" ] && [ -d "$INC_PARENT/include" ] && { [ -d "$INC_PARENT/lib" ] || [ -d "$INC_PARENT/bin" ]; }; then
+                ROOT_FOUND="$INC_PARENT"
+              fi
+            fi
+            if [ -n "$ROOT_FOUND" ]; then
+              ROOT="$ROOT_FOUND"; present="true"
+            else
+              echo "Could not infer ULTRALIGHT_SDK_ROOT from extraction. Showing deeper tree (depth 3):"
+              find "$RUNNER_TEMP/sdk-extract" -maxdepth 3 -type d -print | sed 's/^/  /'
+            fi
+          else
+            # No URL: fallback to provided ULTRALIGHT_SDK_ROOT or the repo data folder if it appears valid
+            if [ -n "$ROOT" ] && [ -d "$ROOT/include" ] && { [ -d "$ROOT/lib" ] || [ -d "$ROOT/bin" ]; }; then
+              present="true"
+            elif [ -d "$ROOT_DEFAULT/include" ] && { [ -d "$ROOT_DEFAULT/lib" ] || [ -d "$ROOT_DEFAULT/bin" ]; }; then
+              ROOT="$ROOT_DEFAULT"; present="true"
+            fi
+          fi
+          echo "present=$present" >> "$GITHUB_OUTPUT"
+          if [ "$present" = "true" ]; then
+            echo "Using ULTRALIGHT_SDK_ROOT=$ROOT"
+            echo "ULTRALIGHT_SDK_ROOT=$ROOT" >> "$GITHUB_ENV"
+            echo "Listing selected SDK include and lib/bin:"
+            ls -la "$ROOT/include" | head -n 100 || true
+            ls -la "$ROOT/lib" 2>/dev/null || true
+            ls -la "$ROOT/bin" 2>/dev/null || true
+          else
+            echo "::error::Ultralight macOS SDK not found for ARM64."; exit 1
+          fi
+
+      - name: 5. Configure CMake (Xcode)
+        if: steps.prep_sdk.outputs.present == 'true'
+        run: |
+          cmake --version
+          echo "Configuring with ULTRALIGHT_SDK_ROOT=$ULTRALIGHT_SDK_ROOT"
+          cmake -S . -B build -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT" -DBUILD_TESTING=ON
+
+      - name: 6. Build Project (Release)
+        if: steps.prep_sdk.outputs.present == 'true'
+        run: cmake --build build --config Release --parallel
+
+      - name: 6.9 Package with CPack (macOS)
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          outdir="${{ github.workspace }}/build"
+          mkdir -p "$outdir"
+          gens_raw="${PACKAGE_GENERATORS:-TGZ}"
+          IFS=$' ;,\t\n' read -r -a GEN_LIST <<< "$gens_raw"
+          echo "Requested package formats: ${GEN_LIST[*]}"
+          for g in "${GEN_LIST[@]}"; do [ -z "$g" ] && continue; g_uc=$(echo "$g" | tr '[:lower:]' '[:upper:]'); gen="$g_uc"; [ "$g_uc" = "DMG" ] && gen="DragNDrop"; echo "Running CPack for generator: $gen"; cpack --config build/CPackConfig.cmake -C Release -G "$gen" -V -D CPACK_OUTPUT_FILE_PREFIX="$outdir"; done
+
+      - name: 7.2 Upload Packages (TGZ/DMG)
+        if: steps.prep_sdk.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-macos-arm64-packages
+          path: |
+            ${{ github.workspace }}/build/*.tar.gz
+            ${{ github.workspace }}/build/*.tgz
+            ${{ github.workspace }}/build/*.dmg
+            ${{ github.workspace }}/**/*.tar.gz
+            ${{ github.workspace }}/**/*.tgz
+            ${{ github.workspace }}/**/*.dmg
+
+      - name: 8. Archive Artifacts
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates=(
+            "build/Release" "build/bin/Release" "build/Ultralight-WebBrowser/Release" "build/samples/Ultralight-WebBrowser/Release"
+            "build" "build/bin" "build/Ultralight-WebBrowser" "build/samples/Ultralight-WebBrowser"
+          )
+          src=""; for p in "${candidates[@]}"; do [ -d "$p" ] && { src="$p"; break; }; done
+          [ -z "$src" ] && { echo "Warning: No expected output folder found. Skipping." >&2; exit 0; }
+          echo "Archiving from: $src"; dest="$GITHUB_WORKSPACE/ultralight-macos-arm64.zip"; rm -f "$dest" 2>/dev/null || true; (cd "$src" && zip -r "$dest" .)
+
+      - name: 9. Upload Artifact
+        if: steps.prep_sdk.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-macos-arm64-build
+          path: ultralight-macos-arm64.zip
