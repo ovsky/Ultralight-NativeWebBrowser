@@ -1,4 +1,5 @@
 #include "UI.h"
+#include "AdBlocker.h"
 #include <cstring>
 #include <cmath>
 
@@ -6,9 +7,9 @@ static UI *g_ui = 0;
 
 #define UI_HEIGHT 80
 
-UI::UI(RefPtr<Window> window, ultralight::NetworkListener *net_listener) : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
-                                                                           is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false),
-                                                                           net_listener_(net_listener)
+UI::UI(RefPtr<Window> window, ultralight::NetworkListener *net_listener, AdBlocker *adblocker) : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
+                                                                                                 is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false),
+                                                                                                 net_listener_(net_listener), adblocker_(adblocker)
 {
   uint32_t window_width = window_->width();
   ui_height_ = (uint32_t)std::round(UI_HEIGHT * window_->scale());
@@ -174,12 +175,14 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   closeTab = global["closeTab"];
   focusAddressBar = global["focusAddressBar"];
   isAddressBarFocused = global["isAddressBarFocused"];
+  updateAdblockEnabled = global["updateAdblockEnabled"];
 
   global["OnBack"] = BindJSCallback(&UI::OnBack);
   global["OnForward"] = BindJSCallback(&UI::OnForward);
   global["OnRefresh"] = BindJSCallback(&UI::OnRefresh);
   global["OnStop"] = BindJSCallback(&UI::OnStop);
   global["OnToggleTools"] = BindJSCallback(&UI::OnToggleTools);
+  global["OnToggleAdblock"] = BindJSCallback(&UI::OnToggleAdblock);
   global["OnRequestNewTab"] = BindJSCallback(&UI::OnRequestNewTab);
   global["OnRequestTabClose"] = BindJSCallback(&UI::OnRequestTabClose);
   global["OnActiveTabChange"] = BindJSCallback(&UI::OnActiveTabChange);
@@ -187,6 +190,12 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
 
   CreateNewTab();
+
+  // Initialize adblock state indicator, if available
+  if (adblocker_ && updateAdblockEnabled)
+  {
+    updateAdblockEnabled({adblocker_->enabled()});
+  }
 }
 
 void UI::OnBack(const JSObject &obj, const JSArgs &args)
@@ -217,6 +226,19 @@ void UI::OnToggleTools(const JSObject &obj, const JSArgs &args)
 {
   if (active_tab())
     active_tab()->ToggleInspector();
+}
+
+void UI::OnToggleAdblock(const JSObject &obj, const JSArgs &args)
+{
+  if (!adblocker_)
+    return;
+  bool now = !adblocker_->enabled();
+  adblocker_->set_enabled(now);
+  if (updateAdblockEnabled)
+  {
+    RefPtr<JSContext> lock(view()->LockJSContext());
+    updateAdblockEnabled({now});
+  }
 }
 
 void UI::OnRequestNewTab(const JSObject &obj, const JSArgs &args)

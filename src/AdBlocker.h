@@ -41,6 +41,18 @@ public:
     // Add a URL substring rule (case-insensitive)
     void AddURLSubstring(const std::string &needle);
 
+    // Enable/disable blocking at runtime
+    void set_enabled(bool enabled)
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        enabled_ = enabled;
+    }
+    bool enabled() const
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        return enabled_;
+    }
+
 private:
     bool IsBlockedHost(const std::string &host) const;
     bool IsBlockedURL(const std::string &url) const;
@@ -53,4 +65,5 @@ private:
     std::vector<std::string> url_substrings_;       // lowercase substrings
 
     mutable std::mutex mtx_;
+    bool enabled_ = true;
 };

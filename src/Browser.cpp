@@ -60,7 +60,7 @@ Browser::Browser()
   adblock_ = std::make_unique<AdBlocker>();
   adblock_->LoadDefaultBlocklist("assets/blocklist.txt");
 
-  ui_.reset(new UI(window_, adblock_.get()));
+  ui_.reset(new UI(window_, adblock_.get(), adblock_.get()));
   window_->set_listener(ui_.get());
 }
 

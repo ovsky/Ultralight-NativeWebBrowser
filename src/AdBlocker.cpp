@@ -97,6 +97,12 @@ void AdBlocker::Clear()
 
 bool AdBlocker::OnNetworkRequest(View * /*caller*/, NetworkRequest &request)
 {
+    // If disabled, allow all traffic
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        if (!enabled_)
+            return true;
+    }
     // Always allow file/data schemes and about:blank, etc.
     auto proto = request.urlProtocol().utf8();
     if (proto == "file" || proto == "data" || proto == "about")

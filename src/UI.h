@@ -15,13 +15,16 @@ class Console;
 /**
  * Browser UI implementation. Renders the toolbar/addressbar/tabs in top pane.
  */
+
+class AdBlocker;
 class UI : public WindowListener,
            public LoadListener,
            public ViewListener
 {
 public:
   UI(RefPtr<Window> window, ultralight::NetworkListener *net_listener = nullptr);
-  ~UI();
+  UI(RefPtr<Window> window, ultralight::NetworkListener *net_listener = nullptr, AdBlocker *adblocker = nullptr);
+  virtual ~UI();
 
   // Inherited from WindowListener
   virtual bool OnKeyEvent(const ultralight::KeyEvent &evt) override;
@@ -42,6 +45,7 @@ public:
   void OnRefresh(const JSObject &obj, const JSArgs &args);
   void OnStop(const JSObject &obj, const JSArgs &args);
   void OnToggleTools(const JSObject &obj, const JSArgs &args);
+  void OnToggleAdblock(const JSObject &obj, const JSArgs &args);
   void OnRequestNewTab(const JSObject &obj, const JSArgs &args);
   void OnRequestTabClose(const JSObject &obj, const JSArgs &args);
   void OnActiveTabChange(const JSObject &obj, const JSArgs &args);
@@ -79,6 +83,8 @@ protected:
   // Optional network listener for ad/tracker blocking applied to all Views we manage
   ultralight::NetworkListener *net_listener_ = nullptr;
 
+  // Optional direct pointer to the AdBlocker implementation (to toggle on/off without RTTI)
+  AdBlocker *adblocker_ = nullptr;
   std::map<uint64_t, std::unique_ptr<Tab>> tabs_;
   uint64_t active_tab_id_ = 0;
   uint64_t tab_id_counter_ = 0;
@@ -98,6 +104,7 @@ protected:
   JSFunction closeTab;
   JSFunction focusAddressBar;
   JSFunction isAddressBarFocused;
+  JSFunction updateAdblockEnabled;
 
   // Cache favicon URL per site origin so multiple tabs/pages reuse it
   // Key: origin string (eg, https://example.com), Value: favicon URL
