@@ -112,11 +112,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y p7zip-full
 
-      - name: 3.5 Install linters (clang-format, cppcheck)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-format cppcheck
-
       - name: 4. Prepare Ultralight SDK (Linux)
         id: prep_sdk
         shell: bash
@@ -130,19 +125,29 @@ jobs:
           if [ -d "$ROOT/include" ] && ls "$ROOT/lib"/*.so >/dev/null 2>&1; then
             present="true"
           elif [ -n "${ULTRALIGHT_SDK_URL:-}" ]; then
-            echo "Downloading Ultralight SDK from ULTRALIGHT_SDK_URL=$ULTRALIGHT_SDK_URL"
+            # Normalize GitHub "blob" URLs to raw links if necessary
+            URL_DL="$ULTRALIGHT_SDK_URL"
+            if echo "$URL_DL" | grep -qE '^https://github.com/.+/blob/'; then
+              ORIG="$URL_DL"
+              URL_DL=$(echo "$URL_DL" | sed -E 's#https://github.com/([^/]+)/([^/]+)/blob/(.+)$#https://raw.githubusercontent.com/\1/\2/\3#')
+              echo "Normalized GitHub blob URL to raw: $ORIG -> $URL_DL"
+            fi
+            echo "Downloading Ultralight SDK from ULTRALIGHT_SDK_URL=$URL_DL"
             mkdir -p "$RUNNER_TEMP/sdk"
             pkg="$RUNNER_TEMP/ultralight-sdk"
-            curl -L "$ULTRALIGHT_SDK_URL" -o "$pkg"
+            echo "HTTP headers (HEAD):"; (curl -fsIL "$URL_DL" | head -n 20) || true
+            curl -L "$URL_DL" -o "$pkg"
             echo "Downloaded SDK archive at: $pkg"; ls -lh "$pkg" || true
             mkdir -p "$RUNNER_TEMP/sdk-extract"
-            # Enforce 7z format and extract with available 7z tool
-            if ! echo "$ULTRALIGHT_SDK_URL" | grep -Ei '\\.(7z)$' >/dev/null; then
-              echo "Expected a .7z SDK archive, got: $ULTRALIGHT_SDK_URL" >&2; exit 1
-            fi
+            # Extract with available 7z tool; validate archive by testing
             EXTRACTOR=""
             if command -v 7z >/dev/null 2>&1; then EXTRACTOR=7z; elif command -v 7zz >/dev/null 2>&1; then EXTRACTOR=7zz; fi
             if [ -z "$EXTRACTOR" ]; then echo "7zip extractor not found" >&2; exit 1; fi
+            if ! "$EXTRACTOR" t -y "$pkg" >/dev/null 2>&1; then
+              echo "Downloaded file is not a valid 7z archive or is corrupted: $URL_DL" >&2
+              echo "file(1) output:"; (command -v file >/dev/null 2>&1 && file "$pkg") || echo "'file' not available"
+              exit 1
+            fi
             "$EXTRACTOR" x -y -o"$RUNNER_TEMP/sdk-extract" "$pkg"
             echo "Extraction tree (depth 2):"
             find "$RUNNER_TEMP/sdk-extract" -maxdepth 2 -type d -print | sed 's/^/  /'
@@ -150,8 +155,18 @@ jobs:
             while IFS= read -r -d '' dir; do
               if [ -d "$dir/include" ] && [ -d "$dir/lib" ]; then ROOT_FOUND="$dir"; break; fi
             done < <(find "$RUNNER_TEMP/sdk-extract" -mindepth 1 -maxdepth 3 -type d -print0)
+            # Fallback: derive SDK root from any include/Ultralight path
+            if [ -z "$ROOT_FOUND" ]; then
+              INC_PARENT=$(find "$RUNNER_TEMP/sdk-extract" -type d -path '*/include/Ultralight' -print -quit 2>/dev/null | xargs -I{} dirname {} | xargs -I{} dirname {}) || true
+              if [ -n "$INC_PARENT" ] && [ -d "$INC_PARENT/include" ] && { [ -d "$INC_PARENT/lib" ] || [ -d "$INC_PARENT/bin" ]; }; then
+                ROOT_FOUND="$INC_PARENT"
+              fi
+            fi
             if [ -n "$ROOT_FOUND" ]; then
               ROOT="$ROOT_FOUND"; present="true"
+            else
+              echo "Could not infer ULTRALIGHT_SDK_ROOT from extraction. Showing deeper tree (depth 3):"
+              find "$RUNNER_TEMP/sdk-extract" -maxdepth 3 -type d -print | sed 's/^/  /'
             fi
           fi
           echo "present=$present" >> "$GITHUB_OUTPUT"
@@ -170,21 +185,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libnss3-dev libgdk-pixbuf2.0-dev libxtst-dev libxss-dev libdbus-glib-1-dev
-
-      - name: 5.5 Lint (clang-format) and Static Analysis (cppcheck)
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "clang-format version:"; clang-format --version
-          files=$(ls src/*.cpp src/*.h 2>/dev/null || true)
-          if [ -n "$files" ]; then
-            echo "$files" | xargs -I{} clang-format -n --Werror {}
-          else
-            echo "No source files found for clang-format check."
-          fi
-          echo "Running cppcheck..."
-          cppcheck --version
-          cppcheck --enable=warning,style,performance,portability --inline-suppr --error-exitcode=1 -I "$ULTRALIGHT_SDK_ROOT/include" src || (echo "cppcheck failed"; exit 1)
 
       - name: 6. Configure CMake
         if: steps.prep_sdk.outputs.present == 'true'

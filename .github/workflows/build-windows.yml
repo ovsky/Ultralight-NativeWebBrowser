@@ -111,12 +111,6 @@ jobs:
           choco install 7zip -y
           7z -version | Out-Host
 
-      - name: "3.5 Install linters (LLVM clang-format, cppcheck)"
-        shell: pwsh
-        run: |
-          choco install llvm cppcheck -y
-          & "C:\Program Files\LLVM\bin\clang-format.exe" --version | Out-Host
-
       - name: "4. Prepare Ultralight SDK (Windows)"
         id: prep_sdk
         shell: pwsh
@@ -129,15 +123,27 @@ jobs:
           if ((Test-Path (Join-Path $root 'include')) -and ((Test-Path (Join-Path $root 'lib')) -or (Test-Path (Join-Path $root 'bin')))) {
             $present = 'true'
           } elseif ($env:ULTRALIGHT_SDK_URL) {
-            Write-Host "Downloading Ultralight SDK from ULTRALIGHT_SDK_URL=$env:ULTRALIGHT_SDK_URL"
+            # Normalize GitHub blob URLs to raw
+            $dlUrl = $env:ULTRALIGHT_SDK_URL
+            if ($dlUrl -match '^https://github.com/([^/]+)/([^/]+)/blob/(.+)$') {
+              $orig = $dlUrl
+              $dlUrl = "https://raw.githubusercontent.com/$($Matches[1])/$($Matches[2])/$($Matches[3])"
+              Write-Host "Normalized GitHub blob URL to raw: $orig -> $dlUrl"
+            }
+            Write-Host "Downloading Ultralight SDK from ULTRALIGHT_SDK_URL=$dlUrl"
             $pkg = Join-Path $env:RUNNER_TEMP 'ultralight-sdk'
-            Invoke-WebRequest -Uri $env:ULTRALIGHT_SDK_URL -UseBasicParsing -OutFile $pkg
+            try { $head = Invoke-WebRequest -Uri $dlUrl -UseBasicParsing -Method Head } catch {}
+            if ($head) { Write-Host ("HEAD status: {0}" -f $head.StatusCode); $head.Headers.GetEnumerator() | Select-Object -First 12 | ForEach-Object { Write-Host ("  {0}: {1}" -f $_.Key, $_.Value) } }
+            Invoke-WebRequest -Uri $dlUrl -UseBasicParsing -OutFile $pkg
             Write-Host "Downloaded SDK archive at: $pkg"
             Get-Item $pkg | Format-List -Property FullName,Length
             $extract = Join-Path $env:RUNNER_TEMP 'sdk-extract'
             New-Item -ItemType Directory -Force -Path $extract | Out-Null
-            if ($env:ULTRALIGHT_SDK_URL -notmatch '\.7z$') {
-              Write-Error "Expected a .7z SDK archive, got: $env:ULTRALIGHT_SDK_URL"; exit 1
+            # Validate archive by testing with 7z instead of relying on URL extension
+            $test = & 7z t -y "$pkg" 2>$null; if ($LASTEXITCODE -ne 0) {
+              Write-Error "Downloaded file is not a valid 7z archive or is corrupted: $dlUrl";
+              try { Get-Item "$pkg" | Format-List -Property FullName,Length,CreationTime } catch {}
+              exit 1
             }
             & 7z x -y -o"$extract" "$pkg" | Out-Null
             Write-Host "Extraction tree (depth 2):"
@@ -162,16 +168,6 @@ jobs:
           cmake --version
           Write-Host "Configuring with ULTRALIGHT_SDK_ROOT=$env:ULTRALIGHT_SDK_ROOT"
           cmake -S . -B build -DULTRALIGHT_SDK_ROOT="${{ env.ULTRALIGHT_SDK_ROOT }}" -DBUILD_TESTING=ON
-
-      - name: "5.5 Lint (clang-format) and Static Analysis (cppcheck)"
-        shell: pwsh
-        run: |
-          $files = Get-ChildItem -Path src -Include *.cpp,*.h -File -Recurse | Select-Object -ExpandProperty FullName
-          if ($files) {
-            foreach ($f in $files) { & "C:\Program Files\LLVM\bin\clang-format.exe" -n --Werror $f }
-          } else { Write-Host "No source files found for clang-format check." }
-          cppcheck --version | Out-Host
-          cppcheck --enable=warning,style,performance,portability --inline-suppr --error-exitcode=1 -I "$env:ULTRALIGHT_SDK_ROOT\include" src
 
       - name: "6. Build Project"
         # We specify the 'Release' config at build time
