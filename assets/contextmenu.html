@@ -1,29 +1,67 @@
 <!doctype html>
 <html>
+
 <head>
   <meta charset="utf-8">
   <title>Context Menu</title>
   <style>
-    html, body { background: transparent; margin: 0; padding: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    html, body, #ctx-root, #ctx-menu { cursor: default; }
-    #ctx-root { position: fixed; inset: 0; }
+    html,
+    body {
+      background: transparent;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    html,
+    body,
+    #ctx-root,
+    #ctx-menu {
+      cursor: default;
+    }
+
+    #ctx-root {
+      position: fixed;
+      inset: 0;
+    }
+
     #ctx-menu {
       position: absolute;
       min-width: 220px;
       background: #2b2b3a;
       color: #eee;
-      border: 1px solid rgba(255,255,255,0.08);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 8px;
-      box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
       overflow: hidden;
       padding: 6px 0;
     }
-    .item { padding: 8px 12px; cursor: default; white-space: nowrap; font-size: 13px; }
-    .item:hover { background: #3a3a4d; cursor: pointer; }
-    .item.disabled { opacity: .5; pointer-events: none; }
-    .sep { height: 1px; background: rgba(255,255,255,0.08); margin: 6px 0; }
+
+    .item {
+      padding: 8px 12px;
+      cursor: default;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+
+    .item:hover {
+      background: #3a3a4d;
+      cursor: pointer;
+    }
+
+    .item.disabled {
+      opacity: .5;
+      pointer-events: none;
+    }
+
+    .sep {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.08);
+      margin: 6px 0;
+    }
   </style>
 </head>
+
 <body>
   <div id="ctx-root">
     <div id="ctx-menu" role="menu" aria-hidden="false"></div>
@@ -47,7 +85,7 @@
         div.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
         div.addEventListener('click', async () => {
           if (action === 'copy-text' && (payload !== undefined)) {
-            try { await navigator.clipboard.writeText(String(payload)); } catch(_) {}
+            try { await navigator.clipboard.writeText(String(payload)); } catch (_) { }
             if (window.OnContextMenuAction) OnContextMenuAction('close');
             return;
           }
@@ -63,14 +101,14 @@
                 await navigator.clipboard.writeText(String(payload));
               }
             } catch (err) {
-              try { await navigator.clipboard.writeText(String(payload)); } catch(_) {}
+              try { await navigator.clipboard.writeText(String(payload)); } catch (_) { }
             }
             if (window.OnContextMenuAction) OnContextMenuAction('close');
             return;
           }
           if (action === 'paste') {
             let text = '';
-            try { text = await navigator.clipboard.readText(); } catch(_) {}
+            try { text = await navigator.clipboard.readText(); } catch (_) { }
             if (window.OnContextMenuAction) OnContextMenuAction('paste-text', text || '');
             return;
           }
@@ -86,7 +124,7 @@
       menu.innerHTML = '';
 
       let info = {};
-      try { info = JSON.parse(String(infoJson || '{}')); } catch(_) {}
+      try { info = JSON.parse(String(infoJson || '{}')); } catch (_) { }
       const hasLink = !!(info.linkURL);
       const hasImage = !!(info.imageURL);
       const hasSel = !!(info.selectionText && String(info.selectionText).trim().length);
@@ -101,7 +139,7 @@
         addItem(menu, 'Copy image address', 'copy-text', info.imageURL);
         addItem(menu, 'Copy image', 'copy-image', info.imageURL);
       }
-      if (hasLink || hasImage) menu.appendChild(Object.assign(document.createElement('div'), {className:'sep'}));
+      if (hasLink || hasImage) menu.appendChild(Object.assign(document.createElement('div'), { className: 'sep' }));
 
       addItem(menu, 'Copy', 'copy-text', hasSel ? info.selectionText : '', !hasSel);
       addItem(menu, 'Cut', 'cut', '', !isEditable);
@@ -117,4 +155,5 @@
     window.setupContextMenu = setupContextMenu;
   </script>
 </body>
+
 </html>

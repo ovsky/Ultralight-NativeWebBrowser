@@ -23,7 +23,7 @@ class UI : public WindowListener,
 public:
   UI(RefPtr<Window> window);
   // Overload retained for compatibility; adblockers are optional and may be unused.
-  UI(RefPtr<Window> window, AdBlocker* adblock, AdBlocker* tracker);
+  UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker);
   ~UI();
 
   // Inherited from WindowListener
@@ -91,8 +91,8 @@ protected:
   RefPtr<Overlay> context_menu_overlay_;
   float scale_;
   // Optional ad/tracker blocker references (may be unused in this build)
-  AdBlocker* adblock_ = nullptr;
-  AdBlocker* trackerblock_ = nullptr;
+  AdBlocker *adblock_ = nullptr;
+  AdBlocker *trackerblock_ = nullptr;
   // Transient context menu state
   std::pair<int, int> pending_ctx_position_ = {0, 0};
   ultralight::String pending_ctx_info_json_;
