@@ -141,6 +141,11 @@ void Tab::OnChangeTitle(View *caller, const String &title)
 void Tab::OnChangeURL(View *caller, const String &url)
 {
   ui_->UpdateTabURL(id_, url);
+  // Record history when the page URL changes (navigation start/change), not on load finish
+  if (ui_)
+  {
+    ui_->RecordHistory(url, caller->title());
+  }
 }
 
 void Tab::OnChangeTooltip(View *caller, const String &tooltip) {}
@@ -185,10 +190,6 @@ void Tab::OnBeginLoading(View *caller, uint64_t frame_id, bool is_main_frame, co
 void Tab::OnFinishLoading(View *caller, uint64_t frame_id, bool is_main_frame, const String &url)
 {
   ui_->UpdateTabNavigation(id_, caller->is_loading(), caller->CanGoBack(), caller->CanGoForward());
-  if (is_main_frame && ui_)
-  {
-    ui_->RecordHistory(url, caller->title());
-  }
 }
 
 void Tab::OnFailLoading(View *caller, uint64_t frame_id, bool is_main_frame, const String &url,

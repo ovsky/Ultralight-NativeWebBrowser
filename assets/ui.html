@@ -84,8 +84,8 @@
 
     <!-- Dropdown Menu -->
     <div id="menu-dropdown" class="menu-dropdown hidden" role="menu" aria-hidden="true">
-        <div class="menu-item" data-action="new-tab">New tab Ctrl+T</div>
-        <div class="menu-item" data-action="new-window">New window Ctrl+N</div>
+        <div class="menu-item" data-action="new-tab">New tab [Ctrl+T]</div>
+        <div class="menu-item" data-action="new-window">New window [Ctrl+N]</div>
         <div class="menu-separator"></div>
         <div class="menu-item" data-action="history">History</div>
         <div class="menu-item" data-action="downloads">Downloads</div>
@@ -141,17 +141,17 @@
                     let url = address.value;
                     if (anchorme.validate.url(url) || anchorme.validate.ip(url)) {
                         if (url.toLowerCase().startsWith("http://") || url.toLowerCase().startsWith("https://")) {
-                            OnRequestChangeURL(url);
+                            OnAddressBarNavigate(url);
                         } else {
-                            OnRequestChangeURL("http://" + url);
+                            OnAddressBarNavigate("http://" + url);
                         }
                     } else if (url.toLowerCase().startsWith("file:///")) {
-                        OnRequestChangeURL(url);
+                        OnAddressBarNavigate(url);
                     } else if (url.toLowerCase().startsWith("file://")) {
-                        OnRequestChangeURL("file:///" + url.substring(7));
+                        OnAddressBarNavigate("file:///" + url.substring(7));
                     } else {
                         // Interpret as search
-                        OnRequestChangeURL("https://www.google.com/search?q=" + encodeURIComponent(url));
+                        OnAddressBarNavigate("https://www.google.com/search?q=" + encodeURIComponent(url));
                     }
 
                     return false;

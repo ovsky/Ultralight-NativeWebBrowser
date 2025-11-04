@@ -303,6 +303,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnRequestTabClose"] = BindJSCallback(&UI::OnRequestTabClose);
   global["OnActiveTabChange"] = BindJSCallback(&UI::OnActiveTabChange);
   global["OnRequestChangeURL"] = BindJSCallback(&UI::OnRequestChangeURL);
+  global["OnAddressBarNavigate"] = BindJSCallback(&UI::OnAddressBarNavigate);
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
   global["OnAddressBarFocus"] = BindJSCallback(&UI::OnAddressBarFocus);
 
@@ -413,6 +414,19 @@ void UI::OnRequestChangeURL(const JSObject &obj, const JSArgs &args)
   {
     ultralight::String url = args[0];
 
+    if (!tabs_.empty())
+    {
+      auto &tab = tabs_[active_tab_id_];
+      tab->view()->LoadURL(url);
+    }
+  }
+}
+
+void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() == 1)
+  {
+    ultralight::String url = args[0];
     if (!tabs_.empty())
     {
       auto &tab = tabs_[active_tab_id_];
@@ -573,6 +587,23 @@ void UI::RecordHistory(const String &url, const String &title)
                         std::chrono::system_clock::now().time_since_epoch())
                         .count();
   history_.push_back({u, t, now_ms});
+
+  // If any tab is showing the History page, ask it to refresh now
+  for (auto &it : tabs_)
+  {
+    auto &tabPtr = it.second;
+    if (!tabPtr)
+      continue;
+    RefPtr<View> v = tabPtr->view();
+    if (!v)
+      continue;
+    auto vurl_u = v->url().utf8();
+    const char *vurl = vurl_u.data();
+    if (vurl && std::strstr(vurl, "history.html"))
+    {
+      v->EvaluateScript("(function(){ if (window.refresh) window.refresh(); })();", nullptr);
+    }
+  }
 }
 
 static std::string jsonEscape(const std::string &s)
