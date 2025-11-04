@@ -143,5 +143,10 @@ protected:
   std::vector<HistoryEntry> history_;
   // Always enabled (disable-history feature removed)
 
+  // Shortcuts mapping (eg, "Ctrl+T" -> "new-tab") loaded from assets/shortcuts.json
+  std::map<std::string, std::string> shortcuts_;
+  void LoadShortcuts();
+  bool RunShortcutAction(const std::string &action);
+
   friend class Tab;
 };

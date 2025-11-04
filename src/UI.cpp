@@ -3,6 +3,9 @@
 #include <cmath>
 #include <Ultralight/Renderer.h>
 #include <chrono>
+#include <fstream>
+#include <sstream>
+#include <cctype>
 
 static UI *g_ui = 0;
 
@@ -20,6 +23,9 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
   view()->set_load_listener(this);
   view()->set_view_listener(this);
   view()->LoadURL("file:///ui.html");
+
+  // Load keyboard shortcuts mapping
+  LoadShortcuts();
 }
 
 // Compatibility overload: accepts optional ad/tracker blockers (ignored if not used)
@@ -37,6 +43,9 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
   view()->set_load_listener(this);
   view()->set_view_listener(this);
   view()->LoadURL("file:///ui.html");
+
+  // Load keyboard shortcuts mapping
+  LoadShortcuts();
 }
 
 UI::~UI()
@@ -73,25 +82,19 @@ bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
 
   if (evt.type == KeyEvent::kType_RawKeyDown && (evt.modifiers & KeyEvent::kMod_CtrlKey))
   {
-    switch (evt.virtual_key_code)
+    // Build key identifier like "Ctrl+T" for A-Z
+    int vk = evt.virtual_key_code;
+    char ch = static_cast<char>(vk);
+    if (std::isalpha(static_cast<unsigned char>(ch)))
     {
-    case 'T':
-      CreateNewTab();
-      return false;
-    case 'W':
-      if (active_tab())
+      ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+      std::string key = std::string("Ctrl+") + ch;
+      auto it = shortcuts_.find(key);
+      if (it != shortcuts_.end())
       {
-        OnRequestTabClose({}, {active_tab_id_});
+        if (RunShortcutAction(it->second))
+          return false;
       }
-      return false;
-    case 'L':
-      if (focusAddressBar)
-      {
-        RefPtr<JSContext> lock(view()->LockJSContext());
-        focusAddressBar({});
-        address_bar_is_focused_ = true;
-      }
-      return false;
     }
   }
 
@@ -108,6 +111,110 @@ bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
   }
 
   return true;
+}
+
+// --- Shortcuts helpers ---
+static void trim(std::string &s)
+{
+  size_t a = s.find_first_not_of(" \t\n\r");
+  size_t b = s.find_last_not_of(" \t\n\r");
+  if (a == std::string::npos)
+  {
+    s.clear();
+    return;
+  }
+  s = s.substr(a, b - a + 1);
+}
+
+void UI::LoadShortcuts()
+{
+  // Defaults
+  shortcuts_.clear();
+  shortcuts_["Ctrl+T"] = "new-tab";
+  shortcuts_["Ctrl+W"] = "close-tab";
+  shortcuts_["Ctrl+H"] = "open-history";
+  shortcuts_["Ctrl+L"] = "focus-address";
+
+  // Try load from assets/shortcuts.json
+  std::ifstream in("assets/shortcuts.json", std::ios::in | std::ios::binary);
+  if (!in.is_open())
+    return;
+  std::ostringstream ss;
+  ss << in.rdbuf();
+  std::string txt = ss.str();
+  in.close();
+
+  // Very lenient JSON key-value parser for flat object { "Ctrl+T": "new-tab", ... }
+  size_t i = 0, n = txt.size();
+  auto next_quote = [&](size_t pos)
+  {
+    return txt.find('"', pos);
+  };
+  while (i < n)
+  {
+    size_t k1 = next_quote(i);
+    if (k1 == std::string::npos)
+      break;
+    size_t k2 = next_quote(k1 + 1);
+    if (k2 == std::string::npos)
+      break;
+    std::string key = txt.substr(k1 + 1, k2 - (k1 + 1));
+    size_t colon = txt.find(':', k2 + 1);
+    if (colon == std::string::npos)
+      break;
+    size_t v1 = next_quote(colon + 1);
+    if (v1 == std::string::npos)
+      break;
+    size_t v2 = next_quote(v1 + 1);
+    if (v2 == std::string::npos)
+      break;
+    std::string val = txt.substr(v1 + 1, v2 - (v1 + 1));
+    trim(key);
+    trim(val);
+    if (!key.empty() && !val.empty())
+      shortcuts_[key] = val;
+    i = v2 + 1;
+  }
+}
+
+bool UI::RunShortcutAction(const std::string &action)
+{
+  if (action == "new-tab")
+  {
+    CreateNewTab();
+    return true;
+  }
+  if (action == "close-tab")
+  {
+    if (active_tab())
+    {
+      OnRequestTabClose({}, {active_tab_id_});
+      return true;
+    }
+    return false;
+  }
+  if (action == "open-history")
+  {
+    if (!tabs_.empty())
+    {
+      auto &tab = tabs_[active_tab_id_];
+      tab->view()->LoadURL("file:///history.html");
+      return true;
+    }
+    return false;
+  }
+  if (action == "focus-address")
+  {
+    if (focusAddressBar)
+    {
+      RefPtr<JSContext> lock(view()->LockJSContext());
+      focusAddressBar({});
+      address_bar_is_focused_ = true;
+      return true;
+    }
+    return false;
+  }
+  return false;
 }
 
 bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)

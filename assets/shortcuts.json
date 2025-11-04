@@ -1,0 +1,6 @@
+{
+  "Ctrl+T": "new-tab",
+  "Ctrl+W": "close-tab",
+  "Ctrl+H": "open-history",
+  "Ctrl+L": "focus-address"
+}
