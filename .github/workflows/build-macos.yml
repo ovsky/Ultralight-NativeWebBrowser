@@ -1,26 +1,30 @@
 # .github/workflows/build-macos.yml
 # macOS build using SDK archives hosted in the repo's base-sdk branch.
 
-name: Build - macOS
+name: Build - macOS (x64)
 
 on:
   pull_request:
   workflow_dispatch:
+  workflow_call:
     inputs:
       sdk_url:
         description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
         required: false
+        type: string
       version:
         description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
         required: false
+        type: string
       package_format:
         description: "Package format(s) to produce via CPack (eg. TGZ or DMG or multi 'TGZ;DMG')"
         required: false
         default: DMG
+        type: string
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-13
     permissions:
       contents: read
       actions: write
@@ -28,6 +32,7 @@ jobs:
       ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url }}
       ULTRALIGHT_VERSION: ${{ inputs.version }}
       PACKAGE_GENERATORS: ${{ inputs.package_format || 'TGZ' }}
+      TARGET_ARCH: x64
     steps:
       - name: 1. Checkout
         uses: actions/checkout@v4

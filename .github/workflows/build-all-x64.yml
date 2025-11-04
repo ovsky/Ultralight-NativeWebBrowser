@@ -1,0 +1,21 @@
+# .github/workflows/build-all-x64.yml
+# Orchestrates all x64 builds (Windows, macOS x64, Linux x64)
+
+name: Build - All x64
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  windows:
+    uses: ./.github/workflows/build-windows.yml
+    secrets: inherit
+
+  macos-x64:
+    uses: ./.github/workflows/build-macos.yml
+    secrets: inherit
+
+  linux-x64:
+    uses: ./.github/workflows/build-linux.yml
+    secrets: inherit

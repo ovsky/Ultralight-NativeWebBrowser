@@ -1,22 +1,26 @@
 # .github/workflows/build-linux.yml
 # Linux build using SDK archives hosted in the repo's base-sdk branch.
 
-name: Build - Linux
+name: Build - Linux (x64)
 
 on:
   pull_request:
   workflow_dispatch:
+  workflow_call:
     inputs:
       sdk_url:
         description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
         required: false
+        type: string
       version:
         description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
         required: false
+        type: string
       package_format:
         description: "Package format(s) to produce via CPack (eg. TGZ, DEB, RPM or multi 'TGZ;DEB;RPM')"
         required: false
         default: TGZ
+        type: string
 
 jobs:
   build:
@@ -346,3 +350,4 @@ jobs:
             ${{ github.workspace }}/**/*.tgz
             ${{ github.workspace }}/**/*.deb
             ${{ github.workspace }}/**/*.rpm
+
