@@ -21,6 +21,9 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+    permissions:
+      contents: read
+      actions: write
     env:
       ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url }}
       ULTRALIGHT_VERSION: ${{ inputs.version }}
@@ -388,3 +391,23 @@ jobs:
         with:
           name: ultralight-macos-build
           path: ultralight-macos.zip
+
+      - name: 9. Delete large packages artifact (cleanup)
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const artifactName = 'ultralight-macos-packages';
+            const {owner, repo} = context.repo;
+            const run_id = context.runId;
+            core.info(`Searching artifacts for run ${run_id} in ${owner}/${repo}...`);
+            const res = await github.rest.actions.listWorkflowRunArtifacts({ owner, repo, run_id });
+            const artifacts = res.data.artifacts || [];
+            const target = artifacts.find(a => a.name === artifactName);
+            if (target) {
+              core.info(`Deleting artifact '${artifactName}' (id=${target.id}, size=${target.size_in_bytes} bytes)`);
+              await github.rest.actions.deleteArtifact({ owner, repo, artifact_id: target.id });
+              core.info(`Deleted '${artifactName}'.`);
+            } else {
+              core.info(`Artifact '${artifactName}' not found for this run; nothing to delete.`);
+            }
