@@ -322,8 +322,9 @@ jobs:
             fi
           fi
           echo "Archiving from: $src"
-          cd "$src"
-          zip -r ../../../ultralight-macos.zip .
+          dest="$GITHUB_WORKSPACE/ultralight-macos.zip"
+          rm -f "$dest" 2>/dev/null || true
+          (cd "$src" && zip -r "$dest" .)
 
       - name: 8. Upload Artifact
         if: steps.prep_sdk.outputs.present == 'true'
