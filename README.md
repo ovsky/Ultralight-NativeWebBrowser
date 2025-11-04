@@ -37,6 +37,11 @@ This browser takes a different approach by using **Ultralight**, a next-generati
 **Here’s how it compares to the status quo:**
 
 ---
+
+## 🎯 Project Philosophy & Goals
+
+This repository serves as a practical, open-source example for developers. The primary goals and features are:
+
 | **Feature** | **Ultralight (This Browser)** | **Electron / CEF**  |
 |-- |--|--|
 | **Performance** |  **Up to 6x faster** | Standard Chromium |
@@ -48,16 +53,6 @@ This browser takes a different approach by using **Ultralight**, a next-generati
 
 
 By leveraging Ultralight's high-performance, GPU-accelerated renderer, this application achieves a level of resource efficiency that is simply not possible with other frameworks. It's designed to be a component, not an OS.
-
-## 🎯 Project Philosophy & Goals
-
-This repository serves as a practical, open-source example for developers. The primary goals are:
-
-
-
-
-
-## ✨ Features
 
 ## 📥 Get the App
 
@@ -116,6 +111,8 @@ Note: GitHub Actions artifacts are attached per-run. Click “Open runs,” sele
 Linux packages install a desktop entry and icon (Application Menu → Ultralight Web Browser) and a CLI launcher `ultralight-webbrowser`.
 
 ---
+
+## ✨ Features
 
 -   **Blazing Fast Rendering:** Thanks to the Ultralight core, pages load and respond quickly.
 
