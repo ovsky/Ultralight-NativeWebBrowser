@@ -1,0 +1,119 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Context Menu</title>
+  <style>
+    html, body { background: transparent; margin: 0; padding: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    #ctx-root { position: fixed; inset: 0; }
+    #ctx-menu {
+      position: absolute;
+      min-width: 220px;
+      background: #2b2b3a;
+      color: #eee;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+      overflow: hidden;
+      padding: 6px 0;
+    }
+    .item { padding: 8px 12px; cursor: default; white-space: nowrap; font-size: 13px; }
+    .item:hover { background: #3a3a4d; }
+    .item.disabled { opacity: .5; pointer-events: none; }
+    .sep { height: 1px; background: rgba(255,255,255,0.08); margin: 6px 0; }
+  </style>
+</head>
+<body>
+  <div id="ctx-root">
+    <div id="ctx-menu" role="menu" aria-hidden="false"></div>
+  </div>
+  <script>
+    function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+    function closeMenu() {
+      if (window.OnContextMenuAction) OnContextMenuAction('close');
+    }
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); }, true);
+    window.addEventListener('mousedown', (e) => {
+      const menu = document.getElementById('ctx-menu');
+      if (!e.target.closest('#ctx-menu')) closeMenu();
+    }, true);
+
+    function addItem(menu, label, action, payload, disabled) {
+      const div = document.createElement('div');
+      div.className = 'item' + (disabled ? ' disabled' : '');
+      div.textContent = label;
+      if (!disabled) {
+        div.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+        div.addEventListener('click', async () => {
+          if (action === 'copy-text' && (payload !== undefined)) {
+            try { await navigator.clipboard.writeText(String(payload)); } catch(_) {}
+            if (window.OnContextMenuAction) OnContextMenuAction('close');
+            return;
+          }
+          if (action === 'copy-image' && payload) {
+            try {
+              const resp = await fetch(String(payload));
+              const blob = await resp.blob();
+              if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+                const item = new ClipboardItem({ [blob.type]: blob });
+                await navigator.clipboard.write([item]);
+              } else {
+                // Fallback to copying URL if binary copy not supported
+                await navigator.clipboard.writeText(String(payload));
+              }
+            } catch (err) {
+              try { await navigator.clipboard.writeText(String(payload)); } catch(_) {}
+            }
+            if (window.OnContextMenuAction) OnContextMenuAction('close');
+            return;
+          }
+          if (action === 'paste') {
+            let text = '';
+            try { text = await navigator.clipboard.readText(); } catch(_) {}
+            if (window.OnContextMenuAction) OnContextMenuAction('paste-text', text || '');
+            return;
+          }
+          if (window.OnContextMenuAction) OnContextMenuAction(action, payload || '');
+        });
+      }
+      menu.appendChild(div);
+    }
+
+    // Called by native with absolute window coords and info JSON
+    function setupContextMenu(x, y, infoJson) {
+      const menu = document.getElementById('ctx-menu');
+      menu.innerHTML = '';
+
+      let info = {};
+      try { info = JSON.parse(String(infoJson || '{}')); } catch(_) {}
+      const hasLink = !!(info.linkURL);
+      const hasImage = !!(info.imageURL);
+      const hasSel = !!(info.selectionText && String(info.selectionText).trim().length);
+      const isEditable = !!info.isEditable;
+
+      if (hasLink) {
+        addItem(menu, 'Open link in new tab', 'open_tab', info.linkURL);
+        addItem(menu, 'Copy link address', 'copy-text', info.linkURL);
+      }
+      if (hasImage) {
+        addItem(menu, 'Open image in new tab', 'open_tab', info.imageURL);
+        addItem(menu, 'Copy image address', 'copy-text', info.imageURL);
+        addItem(menu, 'Copy image', 'copy-image', info.imageURL);
+      }
+      if (hasLink || hasImage) menu.appendChild(Object.assign(document.createElement('div'), {className:'sep'}));
+
+      addItem(menu, 'Copy', 'copy-text', hasSel ? info.selectionText : '', !hasSel);
+      addItem(menu, 'Cut', 'cut', '', !isEditable);
+      addItem(menu, 'Paste', 'paste', '', !isEditable);
+
+      // Positioning
+      const vw = window.innerWidth, vh = window.innerHeight;
+      menu.style.left = clamp(x, 0, Math.max(0, vw - 240)) + 'px';
+      menu.style.top = clamp(y, 0, Math.max(0, vh - 20)) + 'px';
+    }
+
+    // Expose for native
+    window.setupContextMenu = setupContextMenu;
+  </script>
+</body>
+</html>

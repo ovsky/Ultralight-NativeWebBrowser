@@ -216,3 +216,71 @@ void Tab::OnUpdateHistory(View *caller)
 {
   ui_->UpdateTabNavigation(id_, caller->is_loading(), caller->CanGoBack(), caller->CanGoForward());
 }
+
+void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const String &url)
+{
+  // Only install on main frame documents
+  if (!is_main_frame)
+    return;
+
+  // Bind a native JS callback that the page can call when right-click occurs
+  {
+    RefPtr<JSContext> ctx = caller->LockJSContext();
+    SetJSContext(ctx->ctx());
+    JSObject global = JSGlobalObject();
+    global["NativeOpenContextMenu"] = BindJSCallback(&Tab::OnOpenContextMenu);
+  }
+
+  // Inject a contextmenu handler into the page to capture link/image/selection info
+  const char *script = R"JS(
+    (function(){
+      try {
+        if (window.__ul_ctxmenu_installed) return;
+        window.__ul_ctxmenu_installed = true;
+        document.addEventListener('contextmenu', function(e){
+          try {
+            e.preventDefault();
+            var t = e.target;
+            var a = t && t.closest ? t.closest('a[href]') : null;
+            var img = t && t.closest ? t.closest('img[src]') : null;
+            var sel = '';
+            try { sel = String(window.getSelection ? window.getSelection() : ''); } catch(_) {}
+            var info = {
+              linkURL: a && a.href ? a.href : '',
+              imageURL: img && img.src ? img.src : '',
+              selectionText: sel || '',
+              isEditable: !!(t && (t.isContentEditable || (t.tagName==='INPUT' || t.tagName==='TEXTAREA')))
+            };
+            if (window.NativeOpenContextMenu) {
+              window.NativeOpenContextMenu(e.clientX, e.clientY, JSON.stringify(info));
+            }
+          } catch (err) {
+          }
+        }, true);
+      } catch (err) {
+      }
+    })();
+  )JS";
+  caller->EvaluateScript(script, nullptr);
+}
+
+void Tab::OnOpenContextMenu(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() < 3)
+    return;
+
+  int view_x = (int)args[0];
+  int view_y = (int)args[1];
+  ultralight::String json = args[2];
+
+  // Convert to window coords by offsetting with our overlay position
+  // Convert overlay pixel offsets to CSS pixels (DIP) before adding client coords
+  double scale = ui_->window()->scale();
+  int win_x = (int)std::lround(((double)overlay_->x() / scale)) + view_x;
+  int win_y = (int)std::lround(((double)overlay_->y() / scale)) + view_y;
+
+  if (ui_)
+  {
+    ui_->ShowContextMenuOverlay(win_x, win_y, json);
+  }
+}

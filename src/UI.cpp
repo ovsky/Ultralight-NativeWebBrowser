@@ -1,5 +1,4 @@
 #include "UI.h"
-#include "AdBlocker.h"
 #include <cstring>
 #include <cmath>
 #include <Ultralight/Renderer.h>
@@ -8,9 +7,8 @@ static UI *g_ui = 0;
 
 #define UI_HEIGHT 80
 
-UI::UI(RefPtr<Window> window, ultralight::NetworkListener *net_listener, AdBlocker *adblocker) : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
-                                                                                                 is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false),
-                                                                                                 net_listener_(net_listener), adblocker_(adblocker)
+UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
+                                 is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false)
 {
   uint32_t window_width = window_->width();
   ui_height_ = (uint32_t)std::round(UI_HEIGHT * window_->scale());
@@ -20,8 +18,23 @@ UI::UI(RefPtr<Window> window, ultralight::NetworkListener *net_listener, AdBlock
 
   view()->set_load_listener(this);
   view()->set_view_listener(this);
-  if (net_listener_)
-    view()->set_network_listener(net_listener_);
+  view()->LoadURL("file:///ui.html");
+}
+
+// Compatibility overload: accepts optional ad/tracker blockers (ignored if not used)
+UI::UI(RefPtr<Window> window, AdBlocker* adblock, AdBlocker* tracker)
+    : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
+      is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false),
+      adblock_(adblock), trackerblock_(tracker)
+{
+  uint32_t window_width = window_->width();
+  ui_height_ = (uint32_t)std::round(UI_HEIGHT * window_->scale());
+  base_ui_height_ = ui_height_;
+  overlay_ = Overlay::Create(window_, window_width, ui_height_, 0, 0);
+  g_ui = this;
+
+  view()->set_load_listener(this);
+  view()->set_view_listener(this);
   view()->LoadURL("file:///ui.html");
 }
 
@@ -43,6 +56,12 @@ bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
   if (menu_overlay_ && menu_overlay_->view())
   {
     menu_overlay_->view()->FireKeyEvent(evt);
+    return false;
+  }
+  // If context menu overlay is active, route keys (eg ESC) to it and consume
+  if (context_menu_overlay_ && context_menu_overlay_->view())
+  {
+    context_menu_overlay_->view()->FireKeyEvent(evt);
     return false;
   }
 
@@ -92,9 +111,47 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
     menu_overlay_->view()->FireMouseEvent(evt);
     return false;
   }
+  // If context menu overlay is active, route mouse events to it and consume
+  if (context_menu_overlay_ && context_menu_overlay_->view())
+  {
+    context_menu_overlay_->view()->FireMouseEvent(evt);
+    return false;
+  }
 
   if (evt.type == MouseEvent::kType_MouseDown)
   {
+    // Right-click: open our custom context menu overlay above everything
+    if (evt.button == MouseEvent::kButton_Right)
+    {
+      // Determine if click is on UI overlay (navbar) or page content
+      bool on_ui = evt.y <= ui_height_;
+      char script_buf[512];
+      std::snprintf(script_buf, sizeof(script_buf),
+        "(function(x,y){try{var t=document.elementFromPoint(x,y);var a=t&&t.closest?t.closest('a[href]'):null;var img=t&&t.closest?t.closest('img[src]'):null;var sel='';try{sel=String(window.getSelection?window.getSelection():'');}catch(_){}var info={linkURL:a&&a.href?a.href:'',imageURL:img&&img.src?img.src:'',selectionText:sel||'',isEditable:!!(t&&(t.isContentEditable||(t.tagName==='INPUT'||t.tagName==='TEXTAREA')))};return JSON.stringify(info);}catch(e){return '{}';}})(%d,%d)",
+        on_ui ? evt.x : evt.x, on_ui ? evt.y : (evt.y - ui_height_ < 0 ? 0 : evt.y - ui_height_));
+
+      ultralight::String json;
+      if (on_ui)
+      {
+        // Query UI overlay document
+        RefPtr<View> uiView = view();
+        json = uiView->EvaluateScript(script_buf, nullptr);
+        ctx_target_ = 1;
+      }
+      else if (active_tab())
+      {
+        json = active_tab()->view()->EvaluateScript(script_buf, nullptr);
+        ctx_target_ = 2;
+      }
+      else
+      {
+        ctx_target_ = 0;
+        json = "{}";
+      }
+
+      ShowContextMenuOverlay(evt.x, evt.y, json);
+      return false; // consume
+    }
     // Check if the click is outside the UI overlay
     if (evt.y > ui_height_)
     {
@@ -170,6 +227,8 @@ void UI::OnResize(ultralight::Window *window, uint32_t width, uint32_t height)
 
   if (menu_overlay_)
     menu_overlay_->Resize(window->width(), window->height());
+  if (context_menu_overlay_)
+    context_menu_overlay_->Resize(window->width(), window->height());
 
   for (auto &tab : tabs_)
   {
@@ -187,8 +246,9 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   JSObject global = JSGlobalObject();
   auto url_utf8 = url.utf8();
   bool is_menu_view = url_utf8.data() && std::strstr(url_utf8.data(), "menu.html") != nullptr;
+  bool is_ctx_view = url_utf8.data() && std::strstr(url_utf8.data(), "contextmenu.html") != nullptr;
 
-  if (!is_menu_view)
+  if (!is_menu_view && !is_ctx_view)
   {
     // Only main UI view has these functions
     updateBack = global["updateBack"];
@@ -200,7 +260,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     closeTab = global["closeTab"];
     focusAddressBar = global["focusAddressBar"];
     isAddressBarFocused = global["isAddressBarFocused"];
-    updateAdblockEnabled = global["updateAdblockEnabled"];
+  // (no adblock in this build)
   }
 
   global["OnBack"] = BindJSCallback(&UI::OnBack);
@@ -208,24 +268,29 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnRefresh"] = BindJSCallback(&UI::OnRefresh);
   global["OnStop"] = BindJSCallback(&UI::OnStop);
   global["OnToggleTools"] = BindJSCallback(&UI::OnToggleTools);
-  global["OnToggleAdblock"] = BindJSCallback(&UI::OnToggleAdblock);
   global["OnMenuOpen"] = BindJSCallback(&UI::OnMenuOpen);
   global["OnMenuClose"] = BindJSCallback(&UI::OnMenuClose);
+  if (is_ctx_view)
+  {
+    // context menu overlay actions
+    global["OnContextMenuAction"] = BindJSCallback(&UI::OnContextMenuAction);
+    setupContextMenu = global["setupContextMenu"];
+    // Initialize menu now (use '{}' if pending JSON is empty)
+    if (setupContextMenu)
+    {
+      ultralight::String info = pending_ctx_info_json_.empty() ? ultralight::String("{}") : pending_ctx_info_json_;
+      setupContextMenu({(double)pending_ctx_position_.first, (double)pending_ctx_position_.second, info});
+    }
+  }
   global["OnRequestNewTab"] = BindJSCallback(&UI::OnRequestNewTab);
   global["OnRequestTabClose"] = BindJSCallback(&UI::OnRequestTabClose);
   global["OnActiveTabChange"] = BindJSCallback(&UI::OnActiveTabChange);
   global["OnRequestChangeURL"] = BindJSCallback(&UI::OnRequestChangeURL);
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
 
-  if (!is_menu_view)
+  if (!is_menu_view && !is_ctx_view)
   {
     CreateNewTab();
-
-    // Initialize adblock state indicator, if available
-    if (adblocker_ && updateAdblockEnabled)
-    {
-      updateAdblockEnabled({adblocker_->enabled()});
-    }
   }
 }
 
@@ -259,18 +324,6 @@ void UI::OnToggleTools(const JSObject &obj, const JSArgs &args)
     active_tab()->ToggleInspector();
 }
 
-void UI::OnToggleAdblock(const JSObject &obj, const JSArgs &args)
-{
-  if (!adblocker_)
-    return;
-  bool now = !adblocker_->enabled();
-  adblocker_->set_enabled(now);
-  if (updateAdblockEnabled)
-  {
-    RefPtr<JSContext> lock(view()->LockJSContext());
-    updateAdblockEnabled({now});
-  }
-}
 
 void UI::OnRequestNewTab(const JSObject &obj, const JSArgs &args)
 {
@@ -359,8 +412,6 @@ void UI::CreateNewTab()
   if (tab_height < 1)
     tab_height = 1;
   tabs_[id].reset(new Tab(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_));
-  if (net_listener_)
-    tabs_[id]->view()->set_network_listener(net_listener_);
   tabs_[id]->view()->LoadURL("https://www.google.com");
 
   RefPtr<JSContext> lock(view()->LockJSContext());
@@ -375,8 +426,7 @@ RefPtr<View> UI::CreateNewTabForChildView(const String &url)
   if (tab_height < 1)
     tab_height = 1;
   tabs_[id].reset(new Tab(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_));
-  if (net_listener_)
-    tabs_[id]->view()->set_network_listener(net_listener_);
+  
 
   RefPtr<JSContext> lock(view()->LockJSContext());
   addTab({id, "", GetFaviconURL(url), tabs_[id]->view()->is_loading()});
@@ -542,4 +592,129 @@ void UI::HideMenuOverlay()
     overlay_->Focus();
   menu_overlay_->view()->set_load_listener(nullptr);
   menu_overlay_ = nullptr;
+}
+
+void UI::ShowContextMenuOverlay(int x, int y, const ultralight::String &json_info)
+{
+  // Recreate view each time for simplicity
+  if (context_menu_overlay_)
+  {
+    HideContextMenuOverlay();
+  }
+
+  ultralight::ViewConfig cfg;
+  cfg.is_transparent = true;
+  cfg.initial_device_scale = window_->scale();
+  if (overlay_ && overlay_->view())
+  {
+    cfg.is_accelerated = overlay_->view()->is_accelerated();
+    cfg.display_id = overlay_->view()->display_id();
+  }
+  auto view = App::instance()->renderer()->CreateView(window_->width(), window_->height(), cfg, nullptr);
+  context_menu_overlay_ = Overlay::Create(window_, view, 0, 0);
+  context_menu_overlay_->Show();
+  context_menu_overlay_->Focus();
+  view->set_load_listener(this);
+  // Make data available before loading so OnDOMReady can initialize immediately
+  pending_ctx_position_ = {x, y};
+  pending_ctx_info_json_ = json_info;
+  // Load overlay document; we'll invoke setupContextMenu in OnDOMReady
+  view->LoadURL("file:///contextmenu.html");
+}
+
+void UI::HideContextMenuOverlay()
+{
+  if (!context_menu_overlay_)
+    return;
+  context_menu_overlay_->Hide();
+  context_menu_overlay_->Unfocus();
+  if (overlay_)
+    overlay_->Focus();
+  context_menu_overlay_->view()->set_load_listener(nullptr);
+  context_menu_overlay_ = nullptr;
+  pending_ctx_info_json_ = "";
+}
+
+void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
+{
+  // args: action, payload
+  if (args.size() == 0)
+  {
+    HideContextMenuOverlay();
+    return;
+  }
+  ultralight::String action = args[0];
+  if (action == "close")
+  {
+    HideContextMenuOverlay();
+    return;
+  }
+  if (action == "open_tab" && args.size() >= 2)
+  {
+    ultralight::String url = args[1];
+    RefPtr<View> child = CreateNewTabForChildView(url);
+    if (child)
+      child->LoadURL(url);
+    HideContextMenuOverlay();
+    return;
+  }
+  if (action == "cut")
+  {
+    // Hide overlay then try to cut selection in page
+    HideContextMenuOverlay();
+    RefPtr<View> targetView = (ctx_target_ == 1) ? view() : (active_tab() ? active_tab()->view() : nullptr);
+    if (targetView)
+    {
+      const char *script = R"JS((function(){
+        try{
+          if (document.execCommand && document.execCommand('cut')) return true;
+          var selText = '';
+          try { selText = String(window.getSelection ? window.getSelection() : ''); } catch(_){ }
+          if (!selText) return false;
+          try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(selText); } catch(_){ }
+          // Delete selection
+          if (document.execCommand) { document.execCommand('delete'); return true; }
+          var el = document.activeElement;
+          if (el && (el.tagName==='INPUT'||el.tagName==='TEXTAREA')){
+            var s=el.selectionStart||0, e=el.selectionEnd||0, v=el.value||'';
+            if (e>s){ el.setRangeText('', s, e, 'start'); el.dispatchEvent(new Event('input',{bubbles:true})); return true; }
+          }
+        }catch(e){}
+        return false;
+      })())JS";
+      targetView->EvaluateScript(script, nullptr);
+    }
+    return;
+  }
+  if (action == "paste-text" && args.size() >= 2)
+  {
+    // Hide overlay then insert text into focused element/contentEditable
+    ultralight::String text = args[1];
+    HideContextMenuOverlay();
+    RefPtr<View> targetView = (ctx_target_ == 1) ? view() : (active_tab() ? active_tab()->view() : nullptr);
+    if (targetView)
+    {
+      auto utf8 = text.utf8();
+      std::string t = utf8.data() ? utf8.data() : "";
+      // Minimal JS string escape for quotes and backslashes and newlines
+      std::string esc; esc.reserve(t.size()+8);
+      for (char c : t) {
+        switch(c){
+          case '\\': esc += "\\\\"; break;
+          case '"': esc += "\\\""; break;
+          case '\n': esc += "\\n"; break;
+          case '\r': esc += "\\r"; break;
+          case '\t': esc += "\\t"; break;
+          default: esc += c; break;
+        }
+      }
+      std::string script = "(function(t){try{var el=document.activeElement; if(!el) return false;";
+      script += "if(el.isContentEditable){ document.execCommand && document.execCommand('insertText', false, t); return true;}";
+      script += "var tag=el.tagName; if(tag==='INPUT'||tag==='TEXTAREA'){ var s=el.selectionStart||0,e=el.selectionEnd||0; el.setRangeText(t, s, e, 'end'); el.dispatchEvent(new Event('input',{bubbles:true})); return true;} return false;}catch(e){return false;}})(\"" + esc + "\")";
+      targetView->EvaluateScript(script.c_str(), nullptr);
+    }
+    return;
+  }
+  // Default: just close
+  HideContextMenuOverlay();
 }

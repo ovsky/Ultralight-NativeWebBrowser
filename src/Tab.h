@@ -61,6 +61,13 @@ public:
                              const String &error_domain, int error_code) override;
   virtual void OnUpdateHistory(View *caller) override;
 
+  // Inject page-side hooks when DOM is ready to capture right-click context
+  virtual void OnDOMReady(View *caller, uint64_t frame_id,
+                          bool is_main_frame, const String &url) override;
+
+  // JS callback from page when right-click occurs
+  void OnOpenContextMenu(const JSObject &obj, const JSArgs &args);
+
 protected:
   UI *ui_;
   RefPtr<Overlay> overlay_;
