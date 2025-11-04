@@ -106,21 +106,34 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
     // Right-click: open our custom context menu overlay above everything
     if (evt.button == MouseEvent::kButton_Right)
     {
-      if (active_tab())
+      // Determine if click is on UI overlay (navbar) or page content
+      bool on_ui = evt.y <= ui_height_;
+      char script_buf[512];
+      std::snprintf(script_buf, sizeof(script_buf),
+        "(function(x,y){try{var t=document.elementFromPoint(x,y);var a=t&&t.closest?t.closest('a[href]'):null;var img=t&&t.closest?t.closest('img[src]'):null;var sel='';try{sel=String(window.getSelection?window.getSelection():'');}catch(_){}var info={linkURL:a&&a.href?a.href:'',imageURL:img&&img.src?img.src:'',selectionText:sel||'',isEditable:!!(t&&(t.isContentEditable||(t.tagName==='INPUT'||t.tagName==='TEXTAREA')))};return JSON.stringify(info);}catch(e){return '{}';}})(%d,%d)",
+        on_ui ? evt.x : evt.x, on_ui ? evt.y : (evt.y - ui_height_ < 0 ? 0 : evt.y - ui_height_));
+
+      ultralight::String json;
+      if (on_ui)
       {
-        int client_x = evt.x;
-        int client_y = evt.y - ui_height_;
-        if (client_y < 0) client_y = 0;
-        // Collect context info at the click point from the page
-        char script_buf[512];
-        // Build a small IIFE to inspect element under the cursor
-        std::snprintf(script_buf, sizeof(script_buf),
-          "(function(x,y){try{var t=document.elementFromPoint(x,y);var a=t&&t.closest?t.closest('a[href]'):null;var img=t&&t.closest?t.closest('img[src]'):null;var sel='';try{sel=String(window.getSelection?window.getSelection():'');}catch(_){}var info={linkURL:a&&a.href?a.href:'',imageURL:img&&img.src?img.src:'',selectionText:sel||'',isEditable:!!(t&&(t.isContentEditable||(t.tagName==='INPUT'||t.tagName==='TEXTAREA')))};return JSON.stringify(info);}catch(e){return '{}';}})(%d,%d)",
-          client_x, client_y);
-        ultralight::String json = active_tab()->view()->EvaluateScript(script_buf, nullptr);
-        ShowContextMenuOverlay(evt.x, evt.y, json);
-        return false; // consume
+        // Query UI overlay document
+        RefPtr<View> uiView = view();
+        json = uiView->EvaluateScript(script_buf, nullptr);
+        ctx_target_ = 1;
       }
+      else if (active_tab())
+      {
+        json = active_tab()->view()->EvaluateScript(script_buf, nullptr);
+        ctx_target_ = 2;
+      }
+      else
+      {
+        ctx_target_ = 0;
+        json = "{}";
+      }
+
+      ShowContextMenuOverlay(evt.x, evt.y, json);
+      return false; // consume
     }
     // Check if the click is outside the UI overlay
     if (evt.y > ui_height_)
@@ -632,7 +645,8 @@ void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
   {
     // Hide overlay then try to cut selection in page
     HideContextMenuOverlay();
-    if (active_tab())
+    RefPtr<View> targetView = (ctx_target_ == 1) ? view() : (active_tab() ? active_tab()->view() : nullptr);
+    if (targetView)
     {
       const char *script = R"JS((function(){
         try{
@@ -651,7 +665,7 @@ void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
         }catch(e){}
         return false;
       })())JS";
-      active_tab()->view()->EvaluateScript(script, nullptr);
+      targetView->EvaluateScript(script, nullptr);
     }
     return;
   }
@@ -660,7 +674,8 @@ void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
     // Hide overlay then insert text into focused element/contentEditable
     ultralight::String text = args[1];
     HideContextMenuOverlay();
-    if (active_tab())
+    RefPtr<View> targetView = (ctx_target_ == 1) ? view() : (active_tab() ? active_tab()->view() : nullptr);
+    if (targetView)
     {
       auto utf8 = text.utf8();
       std::string t = utf8.data() ? utf8.data() : "";
@@ -679,7 +694,7 @@ void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
       std::string script = "(function(t){try{var el=document.activeElement; if(!el) return false;";
       script += "if(el.isContentEditable){ document.execCommand && document.execCommand('insertText', false, t); return true;}";
       script += "var tag=el.tagName; if(tag==='INPUT'||tag==='TEXTAREA'){ var s=el.selectionStart||0,e=el.selectionEnd||0; el.setRangeText(t, s, e, 'end'); el.dispatchEvent(new Event('input',{bubbles:true})); return true;} return false;}catch(e){return false;}})(\"" + esc + "\")";
-      active_tab()->view()->EvaluateScript(script.c_str(), nullptr);
+      targetView->EvaluateScript(script.c_str(), nullptr);
     }
     return;
   }

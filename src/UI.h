@@ -89,6 +89,8 @@ protected:
   // Transient context menu state
   std::pair<int, int> pending_ctx_position_ = {0, 0};
   ultralight::String pending_ctx_info_json_;
+  // Which view the context menu operates on (0=none,1=UI overlay,2=page/tab)
+  int ctx_target_ = 0;
 
   std::map<uint64_t, std::unique_ptr<Tab>> tabs_;
   uint64_t active_tab_id_ = 0;
