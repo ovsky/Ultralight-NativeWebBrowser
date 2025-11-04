@@ -15,16 +15,13 @@ class Console;
 /**
  * Browser UI implementation. Renders the toolbar/addressbar/tabs in top pane.
  */
-
-class AdBlocker;
 class UI : public WindowListener,
            public LoadListener,
            public ViewListener
 {
 public:
-  UI(RefPtr<Window> window, ultralight::NetworkListener *net_listener = nullptr);
-  UI(RefPtr<Window> window, ultralight::NetworkListener *net_listener = nullptr, AdBlocker *adblocker = nullptr);
-  virtual ~UI();
+  UI(RefPtr<Window> window);
+  ~UI();
 
   // Inherited from WindowListener
   virtual bool OnKeyEvent(const ultralight::KeyEvent &evt) override;
@@ -45,7 +42,6 @@ public:
   void OnRefresh(const JSObject &obj, const JSArgs &args);
   void OnStop(const JSObject &obj, const JSArgs &args);
   void OnToggleTools(const JSObject &obj, const JSArgs &args);
-  void OnToggleAdblock(const JSObject &obj, const JSArgs &args);
   void OnRequestNewTab(const JSObject &obj, const JSArgs &args);
   void OnRequestTabClose(const JSObject &obj, const JSArgs &args);
   void OnActiveTabChange(const JSObject &obj, const JSArgs &args);
@@ -53,6 +49,7 @@ public:
   void OnAddressBarBlur(const JSObject &obj, const JSArgs &args);
   void OnMenuOpen(const JSObject &obj, const JSArgs &args);
   void OnMenuClose(const JSObject &obj, const JSArgs &args);
+  void OnContextMenuAction(const JSObject &obj, const JSArgs &args);
 
   RefPtr<Window> window() { return window_; }
 
@@ -71,6 +68,8 @@ protected:
   void AdjustUIHeight(uint32_t new_height);
   void ShowMenuOverlay();
   void HideMenuOverlay();
+  void ShowContextMenuOverlay(int x, int y, const ultralight::String &json_info);
+  void HideContextMenuOverlay();
 
   // Compute a best-effort favicon URL (origin + "/favicon.ico") for http/https URLs
   String GetFaviconURL(const String &page_url);
@@ -85,13 +84,12 @@ protected:
   int base_ui_height_;
   int tab_height_;
   RefPtr<Overlay> menu_overlay_;
+  RefPtr<Overlay> context_menu_overlay_;
   float scale_;
+  // Transient context menu state
+  std::pair<int, int> pending_ctx_position_ = {0, 0};
+  ultralight::String pending_ctx_info_json_;
 
-  // Optional network listener for ad/tracker blocking applied to all Views we manage
-  ultralight::NetworkListener *net_listener_ = nullptr;
-
-  // Optional direct pointer to the AdBlocker implementation (to toggle on/off without RTTI)
-  AdBlocker *adblocker_ = nullptr;
   std::map<uint64_t, std::unique_ptr<Tab>> tabs_;
   uint64_t active_tab_id_ = 0;
   uint64_t tab_id_counter_ = 0;
@@ -111,7 +109,8 @@ protected:
   JSFunction closeTab;
   JSFunction focusAddressBar;
   JSFunction isAddressBarFocused;
-  JSFunction updateAdblockEnabled;
+  // Context menu setup function in overlay view
+  JSFunction setupContextMenu;
 
   // Cache favicon URL per site origin so multiple tabs/pages reuse it
   // Key: origin string (eg, https://example.com), Value: favicon URL

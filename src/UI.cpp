@@ -1,5 +1,4 @@
 #include "UI.h"
-#include "AdBlocker.h"
 #include <cstring>
 #include <cmath>
 #include <Ultralight/Renderer.h>
@@ -8,9 +7,8 @@ static UI *g_ui = 0;
 
 #define UI_HEIGHT 80
 
-UI::UI(RefPtr<Window> window, ultralight::NetworkListener *net_listener, AdBlocker *adblocker) : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
-                                                                                                 is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false),
-                                                                                                 net_listener_(net_listener), adblocker_(adblocker)
+UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
+                                 is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false)
 {
   uint32_t window_width = window_->width();
   ui_height_ = (uint32_t)std::round(UI_HEIGHT * window_->scale());
@@ -20,8 +18,6 @@ UI::UI(RefPtr<Window> window, ultralight::NetworkListener *net_listener, AdBlock
 
   view()->set_load_listener(this);
   view()->set_view_listener(this);
-  if (net_listener_)
-    view()->set_network_listener(net_listener_);
   view()->LoadURL("file:///ui.html");
 }
 
@@ -43,6 +39,12 @@ bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
   if (menu_overlay_ && menu_overlay_->view())
   {
     menu_overlay_->view()->FireKeyEvent(evt);
+    return false;
+  }
+  // If context menu overlay is active, route keys (eg ESC) to it and consume
+  if (context_menu_overlay_ && context_menu_overlay_->view())
+  {
+    context_menu_overlay_->view()->FireKeyEvent(evt);
     return false;
   }
 
@@ -92,9 +94,34 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
     menu_overlay_->view()->FireMouseEvent(evt);
     return false;
   }
+  // If context menu overlay is active, route mouse events to it and consume
+  if (context_menu_overlay_ && context_menu_overlay_->view())
+  {
+    context_menu_overlay_->view()->FireMouseEvent(evt);
+    return false;
+  }
 
   if (evt.type == MouseEvent::kType_MouseDown)
   {
+    // Right-click: open our custom context menu overlay above everything
+    if (evt.button == MouseEvent::kButton_Right)
+    {
+      if (active_tab())
+      {
+        int client_x = evt.x;
+        int client_y = evt.y - ui_height_;
+        if (client_y < 0) client_y = 0;
+        // Collect context info at the click point from the page
+        char script_buf[512];
+        // Build a small IIFE to inspect element under the cursor
+        std::snprintf(script_buf, sizeof(script_buf),
+          "(function(x,y){try{var t=document.elementFromPoint(x,y);var a=t&&t.closest?t.closest('a[href]'):null;var img=t&&t.closest?t.closest('img[src]'):null;var sel='';try{sel=String(window.getSelection?window.getSelection():'');}catch(_){}var info={linkURL:a&&a.href?a.href:'',imageURL:img&&img.src?img.src:'',selectionText:sel||'',isEditable:!!(t&&(t.isContentEditable||(t.tagName==='INPUT'||t.tagName==='TEXTAREA')))};return JSON.stringify(info);}catch(e){return '{}';}})(%d,%d)",
+          client_x, client_y);
+        ultralight::String json = active_tab()->view()->EvaluateScript(script_buf, nullptr);
+        ShowContextMenuOverlay(evt.x, evt.y, json);
+        return false; // consume
+      }
+    }
     // Check if the click is outside the UI overlay
     if (evt.y > ui_height_)
     {
@@ -170,6 +197,8 @@ void UI::OnResize(ultralight::Window *window, uint32_t width, uint32_t height)
 
   if (menu_overlay_)
     menu_overlay_->Resize(window->width(), window->height());
+  if (context_menu_overlay_)
+    context_menu_overlay_->Resize(window->width(), window->height());
 
   for (auto &tab : tabs_)
   {
@@ -187,8 +216,9 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   JSObject global = JSGlobalObject();
   auto url_utf8 = url.utf8();
   bool is_menu_view = url_utf8.data() && std::strstr(url_utf8.data(), "menu.html") != nullptr;
+  bool is_ctx_view = url_utf8.data() && std::strstr(url_utf8.data(), "contextmenu.html") != nullptr;
 
-  if (!is_menu_view)
+  if (!is_menu_view && !is_ctx_view)
   {
     // Only main UI view has these functions
     updateBack = global["updateBack"];
@@ -200,7 +230,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     closeTab = global["closeTab"];
     focusAddressBar = global["focusAddressBar"];
     isAddressBarFocused = global["isAddressBarFocused"];
-    updateAdblockEnabled = global["updateAdblockEnabled"];
+  // (no adblock in this build)
   }
 
   global["OnBack"] = BindJSCallback(&UI::OnBack);
@@ -208,24 +238,28 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnRefresh"] = BindJSCallback(&UI::OnRefresh);
   global["OnStop"] = BindJSCallback(&UI::OnStop);
   global["OnToggleTools"] = BindJSCallback(&UI::OnToggleTools);
-  global["OnToggleAdblock"] = BindJSCallback(&UI::OnToggleAdblock);
   global["OnMenuOpen"] = BindJSCallback(&UI::OnMenuOpen);
   global["OnMenuClose"] = BindJSCallback(&UI::OnMenuClose);
+  if (is_ctx_view)
+  {
+    // context menu overlay actions
+    global["OnContextMenuAction"] = BindJSCallback(&UI::OnContextMenuAction);
+    setupContextMenu = global["setupContextMenu"];
+    // If we have pending data, initialize menu now
+    if (setupContextMenu && !pending_ctx_info_json_.empty())
+    {
+      setupContextMenu({(double)pending_ctx_position_.first, (double)pending_ctx_position_.second, pending_ctx_info_json_});
+    }
+  }
   global["OnRequestNewTab"] = BindJSCallback(&UI::OnRequestNewTab);
   global["OnRequestTabClose"] = BindJSCallback(&UI::OnRequestTabClose);
   global["OnActiveTabChange"] = BindJSCallback(&UI::OnActiveTabChange);
   global["OnRequestChangeURL"] = BindJSCallback(&UI::OnRequestChangeURL);
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
 
-  if (!is_menu_view)
+  if (!is_menu_view && !is_ctx_view)
   {
     CreateNewTab();
-
-    // Initialize adblock state indicator, if available
-    if (adblocker_ && updateAdblockEnabled)
-    {
-      updateAdblockEnabled({adblocker_->enabled()});
-    }
   }
 }
 
@@ -259,18 +293,6 @@ void UI::OnToggleTools(const JSObject &obj, const JSArgs &args)
     active_tab()->ToggleInspector();
 }
 
-void UI::OnToggleAdblock(const JSObject &obj, const JSArgs &args)
-{
-  if (!adblocker_)
-    return;
-  bool now = !adblocker_->enabled();
-  adblocker_->set_enabled(now);
-  if (updateAdblockEnabled)
-  {
-    RefPtr<JSContext> lock(view()->LockJSContext());
-    updateAdblockEnabled({now});
-  }
-}
 
 void UI::OnRequestNewTab(const JSObject &obj, const JSArgs &args)
 {
@@ -359,8 +381,6 @@ void UI::CreateNewTab()
   if (tab_height < 1)
     tab_height = 1;
   tabs_[id].reset(new Tab(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_));
-  if (net_listener_)
-    tabs_[id]->view()->set_network_listener(net_listener_);
   tabs_[id]->view()->LoadURL("https://www.google.com");
 
   RefPtr<JSContext> lock(view()->LockJSContext());
@@ -375,8 +395,7 @@ RefPtr<View> UI::CreateNewTabForChildView(const String &url)
   if (tab_height < 1)
     tab_height = 1;
   tabs_[id].reset(new Tab(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_));
-  if (net_listener_)
-    tabs_[id]->view()->set_network_listener(net_listener_);
+  
 
   RefPtr<JSContext> lock(view()->LockJSContext());
   addTab({id, "", GetFaviconURL(url), tabs_[id]->view()->is_loading()});
@@ -542,4 +561,73 @@ void UI::HideMenuOverlay()
     overlay_->Focus();
   menu_overlay_->view()->set_load_listener(nullptr);
   menu_overlay_ = nullptr;
+}
+
+void UI::ShowContextMenuOverlay(int x, int y, const ultralight::String &json_info)
+{
+  // Recreate view each time for simplicity
+  if (context_menu_overlay_)
+  {
+    HideContextMenuOverlay();
+  }
+
+  ultralight::ViewConfig cfg;
+  cfg.is_transparent = true;
+  cfg.initial_device_scale = window_->scale();
+  if (overlay_ && overlay_->view())
+  {
+    cfg.is_accelerated = overlay_->view()->is_accelerated();
+    cfg.display_id = overlay_->view()->display_id();
+  }
+  auto view = App::instance()->renderer()->CreateView(window_->width(), window_->height(), cfg, nullptr);
+  context_menu_overlay_ = Overlay::Create(window_, view, 0, 0);
+  context_menu_overlay_->Show();
+  context_menu_overlay_->Focus();
+  view->set_load_listener(this);
+  // Store desired initial state via URL hash, actual init via setupContextMenu after DOMReady
+  view->LoadURL("file:///contextmenu.html");
+
+  // After DOM ready we will call setupContextMenu; defer data by storing in a temporary string
+  pending_ctx_position_ = {x, y};
+  pending_ctx_info_json_ = json_info;
+}
+
+void UI::HideContextMenuOverlay()
+{
+  if (!context_menu_overlay_)
+    return;
+  context_menu_overlay_->Hide();
+  context_menu_overlay_->Unfocus();
+  if (overlay_)
+    overlay_->Focus();
+  context_menu_overlay_->view()->set_load_listener(nullptr);
+  context_menu_overlay_ = nullptr;
+  pending_ctx_info_json_ = "";
+}
+
+void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
+{
+  // args: action, payload
+  if (args.size() == 0)
+  {
+    HideContextMenuOverlay();
+    return;
+  }
+  ultralight::String action = args[0];
+  if (action == "close")
+  {
+    HideContextMenuOverlay();
+    return;
+  }
+  if (action == "open_tab" && args.size() >= 2)
+  {
+    ultralight::String url = args[1];
+    RefPtr<View> child = CreateNewTabForChildView(url);
+    if (child)
+      child->LoadURL(url);
+    HideContextMenuOverlay();
+    return;
+  }
+  // Default: just close
+  HideContextMenuOverlay();
 }
