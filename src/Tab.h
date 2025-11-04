@@ -87,6 +87,30 @@ public:
   JSValue JS_IsDarkModeEnabled(const JSObject &obj, const JSArgs &args);
   JSValue JS_GetAppInfo(const JSObject &obj, const JSArgs &args);
 
+  // Lightweight Quick Inspector callbacks
+  void OnQuickInspectorClose(const JSObject &obj, const JSArgs &args);
+  void OnQuickInspectorOpenDevtools(const JSObject &obj, const JSArgs &args);
+  JSValue OnQuickInspectorGetInfo(const JSObject &obj, const JSArgs &args);
+
+  // Quick Inspector advanced APIs
+  JSValue QI_Eval(const JSObject &obj, const JSArgs &args);
+  JSValue QI_GetDOMTree(const JSObject &obj, const JSArgs &args);
+  JSValue QI_GetNodeRect(const JSObject &obj, const JSArgs &args);
+  void QI_StartPicker(const JSObject &obj, const JSArgs &args);
+  void QI_StopPicker(const JSObject &obj, const JSArgs &args);
+  void QI_HighlightSelector(const JSObject &obj, const JSArgs &args);
+  JSValue QI_GetComputedStyle(const JSObject &obj, const JSArgs &args);
+  JSValue QI_GetStorage(const JSObject &obj, const JSArgs &args);
+  JSValue QI_GetPerformance(const JSObject &obj, const JSArgs &args);
+  JSValue QI_GetOuterHTML(const JSObject &obj, const JSArgs &args);
+  void QI_SetAttribute(const JSObject &obj, const JSArgs &args);
+  void QI_RemoveAttribute(const JSObject &obj, const JSArgs &args);
+
+  // Page-bound events forwarded to inspector
+  void OnNetworkEvent(const JSObject &obj, const JSArgs &args);
+  void OnPickerHover(const JSObject &obj, const JSArgs &args);
+  void OnPickerSelect(const JSObject &obj, const JSArgs &args);
+
 protected:
   UI *ui_;
   RefPtr<Overlay> overlay_;

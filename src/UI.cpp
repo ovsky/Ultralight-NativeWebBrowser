@@ -26,6 +26,12 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
 
   // Load keyboard shortcuts mapping
   LoadShortcuts();
+
+  // Load popular sites for suggestions
+  LoadPopularSites();
+
+  // Load history from disk
+  LoadHistoryFromDisk();
 }
 
 // Compatibility overload: accepts optional ad/tracker blockers (ignored if not used)
@@ -46,10 +52,19 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
 
   // Load keyboard shortcuts mapping
   LoadShortcuts();
+
+  // Load popular sites for suggestions
+  LoadPopularSites();
+
+  // Load history from disk
+  LoadHistoryFromDisk();
 }
 
 UI::~UI()
 {
+  // Save history to disk before closing
+  SaveHistoryToDisk();
+
   view()->set_load_listener(nullptr);
   view()->set_view_listener(nullptr);
   g_ui = nullptr;
@@ -417,6 +432,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnOpenHistoryNewTab"] = BindJSCallback(&UI::OnOpenHistoryNewTab);
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
   global["OnAddressBarFocus"] = BindJSCallback(&UI::OnAddressBarFocus);
+  global["GetSuggestions"] = BindJSCallbackWithRetval(&UI::OnGetSuggestions);
 
   if (!is_menu_view && !is_ctx_view)
   {
@@ -747,6 +763,9 @@ void UI::RecordHistory(const String &url, const String &title)
   {
     history_.push_back({u, t, now_ms});
   }
+
+  // Save history to disk after recording
+  SaveHistoryToDisk();
 
   // If any tab is showing the History page, ask it to refresh now
   for (auto &it : tabs_)
@@ -1132,4 +1151,242 @@ void UI::RemoveDarkModeFromView(RefPtr<View> v)
     }catch(e){return false;}
   })())JS";
   v->EvaluateScript(js, nullptr);
+}
+
+// --- URL Suggestions Implementation ---
+
+void UI::LoadPopularSites()
+{
+  popular_sites_.clear();
+  std::ifstream in("assets/popular_sites.json", std::ios::in | std::ios::binary);
+  if (!in.is_open())
+    return;
+  
+  std::ostringstream ss;
+  ss << in.rdbuf();
+  std::string content = ss.str();
+  in.close();
+
+  // Simple JSON parser for array of strings
+  size_t start = content.find('[');
+  size_t end = content.rfind(']');
+  if (start == std::string::npos || end == std::string::npos)
+    return;
+
+  std::string sites_array = content.substr(start + 1, end - start - 1);
+  size_t pos = 0;
+  while (pos < sites_array.size())
+  {
+    size_t quote1 = sites_array.find('"', pos);
+    if (quote1 == std::string::npos)
+      break;
+    size_t quote2 = sites_array.find('"', quote1 + 1);
+    if (quote2 == std::string::npos)
+      break;
+    
+    std::string site = sites_array.substr(quote1 + 1, quote2 - quote1 - 1);
+    if (!site.empty())
+      popular_sites_.push_back(site);
+    
+    pos = quote2 + 1;
+  }
+}
+
+void UI::LoadHistoryFromDisk()
+{
+  std::ifstream in("data/history.json", std::ios::in | std::ios::binary);
+  if (!in.is_open())
+    return;
+
+  std::ostringstream ss;
+  ss << in.rdbuf();
+  std::string content = ss.str();
+  in.close();
+
+  // Parse JSON array of history entries
+  history_.clear();
+  size_t pos = 0;
+  while (pos < content.size())
+  {
+    size_t obj_start = content.find('{', pos);
+    if (obj_start == std::string::npos)
+      break;
+    size_t obj_end = content.find('}', obj_start);
+    if (obj_end == std::string::npos)
+      break;
+
+    std::string obj = content.substr(obj_start, obj_end - obj_start + 1);
+    
+    // Extract url
+    size_t url_key = obj.find("\"url\"");
+    std::string url;
+    if (url_key != std::string::npos)
+    {
+      size_t url_start = obj.find('"', url_key + 5);
+      if (url_start != std::string::npos)
+      {
+        size_t url_end = obj.find('"', url_start + 1);
+        if (url_end != std::string::npos)
+          url = obj.substr(url_start + 1, url_end - url_start - 1);
+      }
+    }
+
+    // Extract title
+    size_t title_key = obj.find("\"title\"");
+    std::string title;
+    if (title_key != std::string::npos)
+    {
+      size_t title_start = obj.find('"', title_key + 7);
+      if (title_start != std::string::npos)
+      {
+        size_t title_end = obj.find('"', title_start + 1);
+        if (title_end != std::string::npos)
+          title = obj.substr(title_start + 1, title_end - title_start - 1);
+      }
+    }
+
+    // Extract timestamp
+    size_t time_key = obj.find("\"time\"");
+    uint64_t timestamp = 0;
+    if (time_key != std::string::npos)
+    {
+      size_t colon = obj.find(':', time_key);
+      if (colon != std::string::npos)
+      {
+        size_t num_start = colon + 1;
+        while (num_start < obj.size() && (obj[num_start] == ' ' || obj[num_start] == '\t'))
+          num_start++;
+        size_t num_end = num_start;
+        while (num_end < obj.size() && std::isdigit(obj[num_end]))
+          num_end++;
+        if (num_end > num_start)
+          timestamp = std::stoull(obj.substr(num_start, num_end - num_start));
+      }
+    }
+
+    if (!url.empty())
+      history_.push_back({url, title, timestamp});
+
+    pos = obj_end + 1;
+  }
+}
+
+void UI::SaveHistoryToDisk()
+{
+  std::ofstream out("data/history.json", std::ios::out | std::ios::binary | std::ios::trunc);
+  if (!out.is_open())
+    return;
+
+  out << "[";
+  for (size_t i = 0; i < history_.size(); ++i)
+  {
+    if (i > 0)
+      out << ",";
+    const auto &entry = history_[i];
+    out << "{\"url\":\"" << jsonEscape(entry.url) 
+        << "\",\"title\":\"" << jsonEscape(entry.title)
+        << "\",\"time\":" << entry.timestamp_ms << "}";
+  }
+  out << "]";
+  out.close();
+}
+
+std::vector<std::string> UI::GetSuggestions(const std::string &input, int maxResults)
+{
+  std::vector<std::string> suggestions;
+  if (input.empty())
+    return suggestions;
+
+  std::string input_lower = input;
+  std::transform(input_lower.begin(), input_lower.end(), input_lower.begin(), ::tolower);
+
+  // Helper lambda to check if a URL matches the input
+  auto matches = [&input_lower](const std::string &url) -> bool {
+    std::string url_lower = url;
+    std::transform(url_lower.begin(), url_lower.end(), url_lower.begin(), ::tolower);
+    
+    // Check if input matches the beginning of the URL (after protocol)
+    size_t protocol_end = url_lower.find("://");
+    if (protocol_end != std::string::npos)
+    {
+      std::string domain_part = url_lower.substr(protocol_end + 3);
+      if (domain_part.find(input_lower) == 0)
+        return true;
+    }
+    
+    // Check if input appears anywhere in the URL
+    return url_lower.find(input_lower) != std::string::npos;
+  };
+
+  // First, add matching history entries (most recent first)
+  for (auto it = history_.rbegin(); it != history_.rend() && suggestions.size() < maxResults; ++it)
+  {
+    if (matches(it->url))
+    {
+      // Check for duplicates
+      bool duplicate = false;
+      for (const auto &existing : suggestions)
+      {
+        if (existing == it->url)
+        {
+          duplicate = true;
+          break;
+        }
+      }
+      if (!duplicate)
+        suggestions.push_back(it->url);
+    }
+  }
+
+  // Then, add matching popular sites
+  for (const auto &site : popular_sites_)
+  {
+    if (suggestions.size() >= maxResults)
+      break;
+    
+    if (matches(site))
+    {
+      // Check for duplicates
+      bool duplicate = false;
+      for (const auto &existing : suggestions)
+      {
+        if (existing == site)
+        {
+          duplicate = true;
+          break;
+        }
+      }
+      if (!duplicate)
+        suggestions.push_back(site);
+    }
+  }
+
+  return suggestions;
+}
+
+JSValue UI::OnGetSuggestions(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() < 1 || !args[0].IsString())
+    return JSValue();
+
+  auto input_str = args[0].ToString();
+  std::string input = input_str.utf8().data() ? input_str.utf8().data() : "";
+
+  int maxResults = 10;
+  if (args.size() >= 2 && args[1].IsNumber())
+    maxResults = (int)args[1].ToInteger();
+
+  auto suggestions = GetSuggestions(input, maxResults);
+
+  // Build JSON array
+  std::string json = "[";
+  for (size_t i = 0; i < suggestions.size(); ++i)
+  {
+    if (i > 0)
+      json += ",";
+    json += "\"" + jsonEscape(suggestions[i]) + "\"";
+  }
+  json += "]";
+
+  return JSValue(json.c_str());
 }
