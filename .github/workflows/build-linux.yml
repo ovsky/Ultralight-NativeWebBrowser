@@ -13,6 +13,10 @@ on:
       version:
         description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
         required: false
+      package_format:
+        description: "Package format(s) to produce via CPack (eg. TGZ, DEB, RPM or multi 'TGZ;DEB;RPM')"
+        required: false
+        default: TGZ
 
 jobs:
   build:
@@ -20,6 +24,7 @@ jobs:
     env:
       ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url }}
       ULTRALIGHT_VERSION: ${{ inputs.version }}
+      PACKAGE_GENERATORS: ${{ inputs.package_format || 'TGZ' }}
     steps:
       - name: 1. Checkout Code (with submodules)
         uses: actions/checkout@v4
@@ -211,6 +216,25 @@ jobs:
         if: steps.prep_sdk.outputs.present == 'true'
         run: ctest --test-dir build --output-on-failure
 
+      - name: 7.9 Install packaging toolchain (rpm if needed)
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if echo "${PACKAGE_GENERATORS:-}" | grep -q RPM; then
+            sudo apt-get update
+            sudo apt-get install -y rpm
+          fi
+
+      - name: 8. Package with CPack (Linux)
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gens="${PACKAGE_GENERATORS:-TGZ}"
+          echo "Using CPack generators: $gens"
+          cpack --config build/CPackConfig.cmake -C Release -G "$gens"
+
       - name: "7.5 Diagnostics: verify runtime contents"
         if: steps.prep_sdk.outputs.present == 'true'
         shell: bash
@@ -237,7 +261,7 @@ jobs:
           echo "Listing resources:"
           ls -la "$src"/assets/resources 2>/dev/null || true
 
-      - name: 8. Archive Artifacts
+      - name: 8.5 Archive Runtime Artifacts (zip)
         if: steps.prep_sdk.outputs.present == 'true'
         shell: bash
         run: |
@@ -261,9 +285,19 @@ jobs:
           rm -f "$dest" 2>/dev/null || true
           (cd "$src" && zip -r "$dest" .)
 
-      - name: 9. Upload Artifact
+      - name: 9. Upload Runtime Zip
         if: steps.prep_sdk.outputs.present == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ultralight-linux-build
           path: ultralight-linux.zip
+
+      - name: 9.5 Upload Packages (TGZ/DEB/RPM)
+        if: steps.prep_sdk.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-linux-packages
+          path: |
+            build/*.tar.gz
+            build/*.deb
+            build/*.rpm
