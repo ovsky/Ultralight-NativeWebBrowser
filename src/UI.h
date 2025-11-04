@@ -65,6 +65,8 @@ protected:
   void SetURL(const String &url);
   void SetCursor(Cursor cursor);
   void AdjustUIHeight(uint32_t new_height);
+  void ShowMenuOverlay();
+  void HideMenuOverlay();
 
   // Compute a best-effort favicon URL (origin + "/favicon.ico") for http/https URLs
   String GetFaviconURL(const String &page_url);
@@ -78,6 +80,7 @@ protected:
   int ui_height_;
   int base_ui_height_;
   int tab_height_;
+  RefPtr<Overlay> menu_overlay_;
   float scale_;
 
   std::map<uint64_t, std::unique_ptr<Tab>> tabs_;

@@ -167,15 +167,10 @@
             const menu = document.getElementById('menu-dropdown');
 
             function openMenu() {
-                if (!menu) return;
-                menu.classList.remove('hidden');
-                menu.setAttribute('aria-hidden', 'false');
+                // Use native overlay instead of inline dropdown
                 if (window.OnMenuOpen) OnMenuOpen();
             }
             function closeMenu() {
-                if (!menu) return;
-                menu.classList.add('hidden');
-                menu.setAttribute('aria-hidden', 'true');
                 if (window.OnMenuClose) OnMenuClose();
             }
             function isMenuOpen() {
@@ -185,39 +180,17 @@
             if (toggleBtn) {
                 toggleBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    if (isMenuOpen()) closeMenu(); else openMenu();
+                    openMenu();
                 });
             }
 
             // Handle menu item clicks
-            if (menu) {
-                menu.addEventListener('click', (e) => {
-                    const item = e.target.closest('.menu-item');
-                    if (!item) return;
-                    const action = item.getAttribute('data-action');
-                    switch (action) {
-                        case 'new-tab':
-                            if (window.OnRequestNewTab) OnRequestNewTab();
-                            break;
-                        case 'new-window':
-                            // Placeholder: open a new tab as "new window" is not implemented
-                            if (window.OnRequestNewTab) OnRequestNewTab();
-                            break;
-                        case 'history':
-                            if (window.OnRequestChangeURL) OnRequestChangeURL('file:///about.html');
-                            break;
-                        case 'downloads':
-                            if (window.OnRequestChangeURL) OnRequestChangeURL('file:///release_notes.html');
-                            break;
-                    }
-                    closeMenu();
-                });
-            }
+            // Inline menu is no longer used; actions handled by menu overlay
 
             // Close on outside click
             document.addEventListener('click', (e) => {
-                const within = e.target.closest('#menu-dropdown') || e.target.closest('#toggle-menu');
-                if (!within && isMenuOpen()) closeMenu();
+                const within = e.target.closest('#toggle-menu');
+                if (!within) closeMenu();
             });
 
             // Close on Escape
