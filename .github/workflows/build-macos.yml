@@ -4,8 +4,8 @@
 name: Build - macOS
 
 on:
-  push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -38,19 +38,17 @@ jobs:
           BASE_RAW="https://raw.githubusercontent.com/${{ github.repository }}/sdks/sdks"
           ARCH=$(uname -m)
           echo "Detected ULTRALIGHT_VERSION=$VERSION; ARCH=$ARCH; probing macOS SDK URLs under $BASE_RAW"
+          echo "Header path: $HEADER"
+          echo "Repository: ${{ github.repository }}"
+          echo "Commit: ${{ github.sha }}"
           candidates=()
           if [ "$ARCH" = "arm64" ]; then
             candidates+=(
               "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-arm64.7z"
-              "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-arm64.zip"
-              "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-universal.zip"
             )
           fi
           candidates+=(
             "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-x64.7z"
-            "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-x64.zip"
-            "$BASE_RAW/ultralight-free-sdk-$VERSION-macos-x64.zip"
-            "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-x64.tar.xz"
           )
           found=""
           for url in "${candidates[@]}"; do
@@ -66,6 +64,7 @@ jobs:
             echo "url=$found" >> "$GITHUB_OUTPUT"
           else
             echo "::error::Could not auto-detect a valid macOS SDK URL in sdks branch for version $VERSION."
+            echo "Tried candidates:"; printf ' - %s\n' "${candidates[@]}"
             exit 1
           fi
 
@@ -73,6 +72,7 @@ jobs:
         run: |
           brew update
           brew install 7zip || brew install p7zip
+          (7z -version || 7zz -version) 2>/dev/null || true
 
       - name: 4. Prepare Ultralight SDK (macOS)
         id: prep_sdk
@@ -91,19 +91,17 @@ jobs:
             mkdir -p "$RUNNER_TEMP/sdk"
             pkg="$RUNNER_TEMP/ultralight-sdk"
             curl -L "$ULTRALIGHT_SDK_URL" -o "$pkg"
+            echo "Downloaded SDK archive at: $pkg"; ls -lh "$pkg" || true
             mkdir -p "$RUNNER_TEMP/sdk-extract"
-            if echo "$ULTRALIGHT_SDK_URL" | grep -Ei '\\.(7z)$' >/dev/null; then
-              EXTRACTOR=""
-              if command -v 7z >/dev/null 2>&1; then EXTRACTOR=7z; elif command -v 7zz >/dev/null 2>&1; then EXTRACTOR=7zz; fi
-              if [ -z "$EXTRACTOR" ]; then echo "7zip extractor not found" >&2; exit 1; fi
-              "$EXTRACTOR" x -y -o"$RUNNER_TEMP/sdk-extract" "$pkg"
-            elif echo "$ULTRALIGHT_SDK_URL" | grep -Ei '\\.(tar\\.(xz|gz)|txz)$' >/dev/null; then
-              tar -xvf "$pkg" -C "$RUNNER_TEMP/sdk-extract"
-            elif echo "$ULTRALIGHT_SDK_URL" | grep -Ei '\\.zip$' >/dev/null; then
-              unzip -q "$pkg" -d "$RUNNER_TEMP/sdk-extract"
-            else
-              echo "Unknown SDK archive format for: $ULTRALIGHT_SDK_URL" >&2; exit 1
+            EXTRACTOR=""
+            if command -v 7z >/dev/null 2>&1; then EXTRACTOR=7z; elif command -v 7zz >/dev/null 2>&1; then EXTRACTOR=7zz; fi
+            if [ -z "$EXTRACTOR" ]; then echo "7zip extractor not found" >&2; exit 1; fi
+            if ! echo "$ULTRALIGHT_SDK_URL" | grep -Ei '\\.(7z)$' >/dev/null; then
+              echo "Expected a .7z SDK archive, got: $ULTRALIGHT_SDK_URL" >&2; exit 1
             fi
+            "$EXTRACTOR" x -y -o"$RUNNER_TEMP/sdk-extract" "$pkg"
+            echo "Extraction tree (depth 2):"
+            find "$RUNNER_TEMP/sdk-extract" -maxdepth 2 -type d -print | sed 's/^/  /'
             ROOT_FOUND=""
             while IFS= read -r -d '' dir; do
               if [ -d "$dir/include" ] && [ -d "$dir/lib" ]; then ROOT_FOUND="$dir"; break; fi
@@ -116,6 +114,9 @@ jobs:
           if [ "$present" = "true" ]; then
             echo "Using ULTRALIGHT_SDK_ROOT=$ROOT"
             echo "ULTRALIGHT_SDK_ROOT=$ROOT" >> "$GITHUB_ENV"
+            echo "Listing selected SDK include and lib:"
+            ls -la "$ROOT/include" | head -n 100 || true
+            ls -la "$ROOT/lib" || true
           else
             echo "::error::Ultralight macOS SDK not found. Ensure sdks branch contains a valid archive or set ULTRALIGHT_SDK_ROOT/ULTRALIGHT_SDK_URL."
             exit 1
@@ -123,11 +124,40 @@ jobs:
 
       - name: 5. Configure CMake (Xcode)
         if: steps.prep_sdk.outputs.present == 'true'
-        run: cmake -S . -B build -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT"
+        run: |
+          cmake --version
+          echo "Configuring with ULTRALIGHT_SDK_ROOT=$ULTRALIGHT_SDK_ROOT"
+          cmake -S . -B build -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT"
 
       - name: 6. Build Project (Release)
         if: steps.prep_sdk.outputs.present == 'true'
         run: cmake --build build --config Release --parallel
+
+      - name: "6.5 Diagnostics: verify runtime contents"
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates=(
+            "build/Release"
+            "build/bin/Release"
+            "build/Ultralight-WebBrowser/Release"
+            "build/samples/Ultralight-WebBrowser/Release"
+          )
+          src=""
+          for p in "${candidates[@]}"; do
+            if [ -d "$p" ]; then src="$p"; break; fi
+          done
+          if [ -z "$src" ]; then
+            echo "No expected output folder found for diagnostics. Checked: ${candidates[*]}" >&2
+            exit 1
+          fi
+          echo "Listing runtime directory: $src"
+          ls -la "$src" || true
+          echo "Listing dylibs:"
+          ls -la "$src"/*.dylib 2>/dev/null || true
+          echo "Listing resources:"
+          ls -la "$src"/assets/resources 2>/dev/null || true
 
       - name: 7. Archive Artifacts
         if: steps.prep_sdk.outputs.present == 'true'

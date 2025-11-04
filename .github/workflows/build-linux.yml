@@ -4,8 +4,7 @@
 name: Build - Linux
 
 on:
-  push:
-    branches: ["main", "dev"]
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -37,17 +36,19 @@ jobs:
             exit 0
           fi
           BASE_RAW="https://raw.githubusercontent.com/${{ github.repository }}/sdks/sdks"
-          echo "Detected ULTRALIGHT_VERSION=$VERSION; trying common Linux SDK URLs under $BASE_RAW"
+          echo "Detected ULTRALIGHT_VERSION=$VERSION; probing Linux SDK URLs under $BASE_RAW"
+          echo "Header path: $HEADER"
+          echo "Repository: ${{ github.repository }}"
+          echo "Commit: ${{ github.sha }}"
           candidates=(
             "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-x64.7z"
             "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-arm64.7z"
-            "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-x64.tar.xz"
-            "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-x64.tar.gz"
-            "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-x64.zip"
           )
           found=""
           for url in "${candidates[@]}"; do
-            if curl -fsI "$url" >/dev/null 2>&1; then
+            echo "Probing $url"
+            # Use GET (not HEAD) for reliability with raw endpoints
+            if curl -fLs -o /dev/null "$url"; then
               found="$url"; break
             fi
           done
@@ -57,6 +58,7 @@ jobs:
             echo "url=$found" >> "$GITHUB_OUTPUT"
           else
             echo "::error::Could not auto-detect a valid Linux SDK URL in sdks branch for version $VERSION."
+            echo "Tried candidates:"; printf ' - %s\n' "${candidates[@]}"
             exit 1
           fi
 
@@ -82,20 +84,18 @@ jobs:
             mkdir -p "$RUNNER_TEMP/sdk"
             pkg="$RUNNER_TEMP/ultralight-sdk"
             curl -L "$ULTRALIGHT_SDK_URL" -o "$pkg"
+            echo "Downloaded SDK archive at: $pkg"; ls -lh "$pkg" || true
             mkdir -p "$RUNNER_TEMP/sdk-extract"
-            if echo "$ULTRALIGHT_SDK_URL" | grep -Ei '\\.(7z)$' >/dev/null; then
-              # Use available 7zip binary (7z or 7zz)
-              EXTRACTOR=""
-              if command -v 7z >/dev/null 2>&1; then EXTRACTOR=7z; elif command -v 7zz >/dev/null 2>&1; then EXTRACTOR=7zz; fi
-              if [ -z "$EXTRACTOR" ]; then echo "7zip extractor not found" >&2; exit 1; fi
-              "$EXTRACTOR" x -y -o"$RUNNER_TEMP/sdk-extract" "$pkg"
-            elif echo "$ULTRALIGHT_SDK_URL" | grep -Ei '\\.(tar\\.(xz|gz)|txz)$' >/dev/null; then
-              tar -xvf "$pkg" -C "$RUNNER_TEMP/sdk-extract"
-            elif echo "$ULTRALIGHT_SDK_URL" | grep -Ei '\\.zip$' >/dev/null; then
-              unzip -q "$pkg" -d "$RUNNER_TEMP/sdk-extract"
-            else
-              echo "Unknown SDK archive format for: $ULTRALIGHT_SDK_URL" >&2; exit 1
+            # Enforce 7z format and extract with available 7z tool
+            if ! echo "$ULTRALIGHT_SDK_URL" | grep -Ei '\\.(7z)$' >/dev/null; then
+              echo "Expected a .7z SDK archive, got: $ULTRALIGHT_SDK_URL" >&2; exit 1
             fi
+            EXTRACTOR=""
+            if command -v 7z >/dev/null 2>&1; then EXTRACTOR=7z; elif command -v 7zz >/dev/null 2>&1; then EXTRACTOR=7zz; fi
+            if [ -z "$EXTRACTOR" ]; then echo "7zip extractor not found" >&2; exit 1; fi
+            "$EXTRACTOR" x -y -o"$RUNNER_TEMP/sdk-extract" "$pkg"
+            echo "Extraction tree (depth 2):"
+            find "$RUNNER_TEMP/sdk-extract" -maxdepth 2 -type d -print | sed 's/^/  /'
             ROOT_FOUND=""
             while IFS= read -r -d '' dir; do
               if [ -d "$dir/include" ] && [ -d "$dir/lib" ]; then ROOT_FOUND="$dir"; break; fi
@@ -108,6 +108,9 @@ jobs:
           if [ "$present" = "true" ]; then
             echo "Using ULTRALIGHT_SDK_ROOT=$ROOT"
             echo "ULTRALIGHT_SDK_ROOT=$ROOT" >> "$GITHUB_ENV"
+            echo "Listing selected SDK include and lib:"
+            ls -la "$ROOT/include" | head -n 100 || true
+            ls -la "$ROOT/lib" || true
           else
             echo "::error::Ultralight Linux SDK not found. Ensure sdks branch contains a valid archive or set ULTRALIGHT_SDK_ROOT/ULTRALIGHT_SDK_URL."
             exit 1
@@ -120,11 +123,40 @@ jobs:
 
       - name: 6. Configure CMake
         if: steps.prep_sdk.outputs.present == 'true'
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT"
+        run: |
+          cmake --version
+          echo "Configuring with ULTRALIGHT_SDK_ROOT=$ULTRALIGHT_SDK_ROOT"
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT"
 
       - name: 7. Build Project
         if: steps.prep_sdk.outputs.present == 'true'
-        run: cmake --build build --parallel
+        run: cmake --build build --parallel -- VERBOSE=1
+
+      - name: "7.5 Diagnostics: verify runtime contents"
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates=(
+            "build"
+            "build/bin"
+            "build/Ultralight-WebBrowser"
+            "build/samples/Ultralight-WebBrowser"
+          )
+          src=""
+          for p in "${candidates[@]}"; do
+            if [ -d "$p" ]; then src="$p"; break; fi
+          done
+          if [ -z "$src" ]; then
+            echo "No expected output folder found for diagnostics. Checked: ${candidates[*]}" >&2
+            exit 1
+          fi
+          echo "Listing runtime directory: $src"
+          ls -la "$src" || true
+          echo "Listing shared libs:"
+          ls -la "$src"/*.so 2>/dev/null || true
+          echo "Listing resources:"
+          ls -la "$src"/assets/resources 2>/dev/null || true
 
       - name: 8. Archive Artifacts
         if: steps.prep_sdk.outputs.present == 'true'

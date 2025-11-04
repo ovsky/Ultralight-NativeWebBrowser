@@ -18,6 +18,11 @@ if(NOT EXISTS "${ULTRALIGHT_SDK_ROOT}/include" OR NOT EXISTS "${ULTRALIGHT_SDK_R
   message(FATAL_ERROR "ULTRALIGHT_SDK_ROOT (\"${ULTRALIGHT_SDK_ROOT}\") does not look valid. Expected 'include' and 'lib' subfolders.")
 endif()
 
+# Sanity: warn if expected SDK headers are missing
+if(NOT EXISTS "${ULTRALIGHT_SDK_ROOT}/include/AppCore/AppCore.h")
+  message(WARNING "AppCore headers not found under ${ULTRALIGHT_SDK_ROOT}/include. Did you set ULTRALIGHT_SDK_ROOT correctly?")
+endif()
+
 # --- Include directories ---
 include_directories(
   "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -121,6 +126,27 @@ else()
   )
 endif()
 
+# --- Copy shared libraries next to the binary on macOS/Linux for portable runtime ---
+if(APPLE OR UNIX)
+  file(GLOB ULTRALIGHT_SHARED_LIBS
+    "${ULTRALIGHT_SDK_ROOT}/lib/*.dylib"
+    "${ULTRALIGHT_SDK_ROOT}/lib/*.so")
+  foreach(UL_LIB ${ULTRALIGHT_SHARED_LIBS})
+    add_custom_command(
+      TARGET Ultralight-WebBrowser POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy "${UL_LIB}" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/")
+  endforeach()
+  # Some SDK packages may place runtime libs under bin as well (non-Windows)
+  file(GLOB ULTRALIGHT_BIN_LIBS
+    "${ULTRALIGHT_SDK_ROOT}/bin/*.dylib"
+    "${ULTRALIGHT_SDK_ROOT}/bin/*.so")
+  foreach(UL_BIN_LIB ${ULTRALIGHT_BIN_LIBS})
+    add_custom_command(
+      TARGET Ultralight-WebBrowser POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy "${UL_BIN_LIB}" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/")
+  endforeach()
+endif()
+
 # --- Copy assets to the output directory ---
 add_custom_command(
   TARGET Ultralight-WebBrowser POST_BUILD
@@ -150,10 +176,38 @@ if(WIN32)
   )
 endif()
 
-# --- Copy inspector files ---
-add_custom_command(
-  TARGET Ultralight-WebBrowser POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_directory
-  "${ULTRALIGHT_SDK_ROOT}/inspector"
-  "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/inspector"
-)
+# --- Copy SDK resources for macOS/Linux if present (eg. cacert.pem, ICU data) ---
+if(APPLE OR UNIX)
+  if(EXISTS "${ULTRALIGHT_SDK_ROOT}/resources")
+    add_custom_command(
+      TARGET Ultralight-WebBrowser POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources"
+    )
+    add_custom_command(
+      TARGET Ultralight-WebBrowser POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_directory "${ULTRALIGHT_SDK_ROOT}/resources" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources"
+    )
+  else()
+    # Fallback for SDKs that ship ICU/cacert under bin/ICU (mirrors Windows layout)
+    if(EXISTS "${ULTRALIGHT_SDK_ROOT}/bin/ICU")
+      add_custom_command(
+        TARGET Ultralight-WebBrowser POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources"
+      )
+      add_custom_command(
+        TARGET Ultralight-WebBrowser POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${ULTRALIGHT_SDK_ROOT}/bin/ICU" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources"
+      )
+    endif()
+  endif()
+endif()
+
+# --- Copy inspector files if present ---
+if(EXISTS "${ULTRALIGHT_SDK_ROOT}/inspector")
+  add_custom_command(
+    TARGET Ultralight-WebBrowser POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${ULTRALIGHT_SDK_ROOT}/inspector"
+    "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/inspector"
+  )
+endif()
