@@ -72,6 +72,21 @@ public:
   JSValue OnHistoryGetData(const JSObject &obj, const JSArgs &args);
   void OnHistoryClear(const JSObject &obj, const JSArgs &args);
 
+  // General native JS bridge callbacks (exposed on window.__ul)
+  void JS_Back(const JSObject &obj, const JSArgs &args);
+  void JS_Forward(const JSObject &obj, const JSArgs &args);
+  void JS_Reload(const JSObject &obj, const JSArgs &args);
+  void JS_Stop(const JSObject &obj, const JSArgs &args);
+  void JS_Navigate(const JSObject &obj, const JSArgs &args);
+  void JS_NewTab(const JSObject &obj, const JSArgs &args);
+  void JS_CloseTab(const JSObject &obj, const JSArgs &args);
+  void JS_OpenHistory(const JSObject &obj, const JSArgs &args);
+  JSValue JS_GetHistory(const JSObject &obj, const JSArgs &args);
+  void JS_ClearHistory(const JSObject &obj, const JSArgs &args);
+  void JS_ToggleDarkMode(const JSObject &obj, const JSArgs &args);
+  JSValue JS_IsDarkModeEnabled(const JSObject &obj, const JSArgs &args);
+  JSValue JS_GetAppInfo(const JSObject &obj, const JSArgs &args);
+
 protected:
   UI *ui_;
   RefPtr<Overlay> overlay_;
