@@ -22,7 +22,11 @@ on:
         description: "Package format(s) for macOS/Linux (eg. TGZ;DMG or TGZ;DEB;RPM)"
         required: false
         type: string
-  pull_request:
+  # No pull_request here; only the full orchestrator should run on PR
+
+permissions:
+  contents: read
+  actions: write
 
 jobs:
   macos-arm64:
