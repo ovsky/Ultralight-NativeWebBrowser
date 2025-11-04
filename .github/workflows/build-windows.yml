@@ -118,8 +118,22 @@ jobs:
       - name: "3. Install 7zip"
         shell: pwsh
         run: |
-          choco install 7zip -y
-          7z -version | Out-Host
+          # Install 7-Zip and verify with a benign command that returns exit code 0
+          choco install 7zip -y --no-progress
+          $sevenZipExe = Join-Path $env:ProgramFiles '7-Zip/7z.exe'
+          if (Test-Path $sevenZipExe) {
+            # Make 7z available for subsequent steps in this job
+            (Split-Path $sevenZipExe) | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            & $sevenZipExe i | Out-Host
+          } else {
+            # Fallback to PATH if 7z is already present on the runner image
+            if (Get-Command 7z -ErrorAction SilentlyContinue) {
+              7z i | Out-Host
+            } else {
+              Write-Error "7z.exe not found after installation."
+              exit 1
+            }
+          }
 
       - name: "4. Prepare Ultralight SDK (Windows)"
         id: prep_sdk
