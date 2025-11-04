@@ -50,7 +50,6 @@ body {
 }
 
 .icon {
-     cursor: default;
      fill: rgba(200, 200, 200, 1.0);
      vertical-align: top;
      margin-top: -1px;
@@ -58,12 +57,17 @@ body {
      height: 22px;
 }
 
+/* Show hand cursor for clickable icons */
+.icon:not(.disabled) {
+     cursor: pointer;
+}
+
 #back {
      margin-left: 0px;
 }
 
 .icon.disabled {
-
+     cursor: default;
      fill: rgb(99 96 116);
 }
 
