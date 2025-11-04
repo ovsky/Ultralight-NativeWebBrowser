@@ -6,10 +6,20 @@ name: Build - macOS
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      sdk_url:
+        description: "Override ULTRALIGHT_SDK_URL (raw .7z in sdks branch)"
+        required: false
+      version:
+        description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
+        required: false
 
 jobs:
   build:
     runs-on: macos-latest
+    env:
+      ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url }}
+      ULTRALIGHT_VERSION: ${{ inputs.version }}
     steps:
       - name: 1. Checkout
         uses: actions/checkout@v4
@@ -46,14 +56,25 @@ jobs:
           echo "Repository: ${{ github.repository }}"
           echo "Commit: ${{ github.sha }}"
           candidates=()
+          prefixes=("ultralight-free-sdk" "ultralight-sdk")
+          macnames=("mac" "macos" "osx")
+          # Build an ordered list of candidates to probe, preferring arm64 when on arm64
           if [ "$ARCH" = "arm64" ]; then
-            candidates+=(
-              "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-arm64.7z"
-            )
+            for p in "${prefixes[@]}"; do
+              for m in "${macnames[@]}"; do
+                candidates+=(
+                  "$BASE_RAW/$p-$VERSION-$m-arm64.7z"
+                )
+              done
+            done
           fi
-          candidates+=(
-            "$BASE_RAW/ultralight-free-sdk-$VERSION-mac-x64.7z"
-          )
+          for p in "${prefixes[@]}"; do
+            for m in "${macnames[@]}"; do
+              candidates+=(
+                "$BASE_RAW/$p-$VERSION-$m-x64.7z"
+              )
+            done
+          done
           found=""
           for url in "${candidates[@]}"; do
             echo "Probing $url"
