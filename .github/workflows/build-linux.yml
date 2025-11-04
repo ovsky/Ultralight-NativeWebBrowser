@@ -26,14 +26,18 @@ jobs:
             exit 0
           fi
           HEADER="data/include/Ultralight/Defines.h"
-          if [ ! -f "$HEADER" ]; then
-            echo "Header not found at $HEADER, skipping auto-detect." >&2
-            exit 0
+          VERSION=""
+          if [ -f "$HEADER" ]; then
+            VERSION=$(sed -n 's/^#define[[:space:]]\+ULTRALIGHT_VERSION[[:space:]]\+"\([^"]\+\)".*/\1/p' "$HEADER" | head -n1)
           fi
-          VERSION=$(sed -n 's/^#define[[:space:]]\+ULTRALIGHT_VERSION[[:space:]]\+"\([^"]\+\)".*/\1/p' "$HEADER" | head -n1)
           if [ -z "$VERSION" ]; then
-            echo "Could not determine ULTRALIGHT_VERSION from $HEADER, skipping auto-detect."
-            exit 0
+            if [ -n "${ULTRALIGHT_VERSION:-}" ]; then
+              VERSION="$ULTRALIGHT_VERSION"
+              echo "ULTRALIGHT_VERSION provided via env: $VERSION"
+            else
+              VERSION="1.4.0"
+              echo "ULTRALIGHT_VERSION not found in header; defaulting to $VERSION"
+            fi
           fi
           BASE_RAW="https://raw.githubusercontent.com/${{ github.repository }}/sdks/sdks"
           echo "Detected ULTRALIGHT_VERSION=$VERSION; probing Linux SDK URLs under $BASE_RAW"

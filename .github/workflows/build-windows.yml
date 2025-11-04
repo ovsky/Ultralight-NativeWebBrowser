@@ -29,14 +29,14 @@ jobs:
             exit 0
           }
           $header = "data/include/Ultralight/Defines.h"
-          if (-not (Test-Path $header)) {
-            Write-Host "Header not found at $header, skipping auto-detect."
-            exit 0
+          $version = $null
+          if (Test-Path $header) {
+            $matchLine = Select-String -Path $header -Pattern '^#define\s+ULTRALIGHT_VERSION\s+"([^"]+)"' | Select-Object -First 1
+            if ($matchLine) { $version = $matchLine.Matches[0].Groups[1].Value }
           }
-          $version = (Select-String -Path $header -Pattern '^#define\s+ULTRALIGHT_VERSION\s+"([^"]+)"' | ForEach-Object { $_.Matches[0].Groups[1].Value } | Select-Object -First 1)
           if (-not $version) {
-            Write-Host "Could not determine ULTRALIGHT_VERSION from $header, skipping auto-detect."
-            exit 0
+            if ($env:ULTRALIGHT_VERSION) { $version = $env:ULTRALIGHT_VERSION; Write-Host "ULTRALIGHT_VERSION provided via env: $version" }
+            else { $version = '1.4.0'; Write-Host "ULTRALIGHT_VERSION not found in header; defaulting to $version" }
           }
           $baseRaw = "https://raw.githubusercontent.com/${{ github.repository }}/sdks/sdks"
           Write-Host "Detected ULTRALIGHT_VERSION=$version; probing Windows SDK URLs under $baseRaw"
