@@ -1,31 +1,28 @@
 
 
-# Ultralight - Native Web Browser 
+# Ultralight - Native Web Browser
 
-[![Build - Windows](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-windows.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-windows.yml)
 [![Build - Linux](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux.yml)
 [![Build - macOS](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos.yml)
+[![Build - Windows](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-windows.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-windows.yml)
 
-#### [Ultra-Fast + Ultra-Light + Ultra-Portable]
-ㅤ
+> Ultra‑fast • Ultra‑light • Ultra‑portable
 
 <img src="https://github.com/ultralight-ux/Ultralight/raw/master/media/logo.png" width="200">
 
-ㅤ
-
 **Have you ever thought about a browser being just... a browser?**
 
-No background services, no 2GB RAM usage for a single tab, no 5-second startup times? 
+No background services, no 2GB RAM usage for a single tab, no 5-second startup times?
 
 Here it is: **Ultralight - Web Browser**!
 
 ---
 
-This project is an fully open-source experimental exploration of the fully de-bloated and fastest possible browser idea.
+This project is a fully open-source exploration of a de‑bloated, fastest‑possible browser.
 
-It's a lightweight, native C++ web browser built using the [**Ultralight SDK**](https://ultralig.ht/ "null") for all HTML/CSS/JS rendering. It is not a commercial product but a powerful proof-of-concept demonstrating that high-performance, low-resource browsing is achievable today!
+It's a lightweight, native C++ web browser built with the [**Ultralight SDK**](https://ultralig.ht/) for all HTML/CSS/JS rendering. It is not a commercial product but a focused proof‑of‑concept demonstrating that high‑performance, low‑resource browsing is achievable today.
 
-![Ultralight Browser Preview](https://github.com/ovsky/Ultralight-NativeWebBrowser/blob/main/data/screenshots/preview.png)
+![Ultralight Browser Preview](./data/screenshots/preview.png)
 
 ---
 
@@ -41,7 +38,7 @@ This browser takes a different approach by using **Ultralight**, a next-generati
 
 ---
 | **Feature** | **Ultralight (This Browser)** | **Electron / CEF**  |
-|-- |--|--| 
+|-- |--|--|
 | **Performance** |  **Up to 6x faster** | Standard Chromium |
 | **Memory Usage** | **~1/10th the RAM** | High (Full browser instance) |
 | **Startup Time** | Near-instant (<1 sec) | Noticeable delay (3+ sec) |
@@ -56,127 +53,194 @@ By leveraging Ultralight's high-performance, GPU-accelerated renderer, this appl
 
 This repository serves as a practical, open-source example for developers. The primary goals are:
 
--   **Speed:** Demonstrate near-instant application startup and fluid, responsive rendering.
-    
--   **Efficiency:** Showcase the minimal resource footprint (RAM/CPU) of the Ultralight engine in a real-world use case.
-    
--   **Integration:** Provide a clear C++ example of how to embed a web renderer into a native application (using GLFW/OpenGL) and build a tabbed UI around it.
-    
--   **Simplicity:** Keep the browser's own C++ code minimal and readable, focusing on the _integration_ rather than bolting on complex, non-essential features.
-    
+
+
+
 
 ## ✨ Features
 
+## 📥 Get the App
+
+### You can download the latest <b>official versions</b> from releases.
+
+<b>DOWNLOAD:</b>
+
+[**Ultralight Web Browser - Releases**](https://github.com/ovsky/Ultralight-WebBrowser/releases)
+
+ㅤ
+---
+
+You can also download prebuilt development packages from GitHub Actions Artifacts on the latest successful run:
+
+- Windows: ultralight-windows.zip (portable)
+- macOS: ultralight-macos-packages (TGZ or DMG)
+- Linux: ultralight-linux-packages (TGZ, DEB, RPM)
+
+Tip: Open the Actions tab, filter by your platform workflow (Build - Windows/Linux/macOS), open the latest green run, then scroll to “Artifacts”.
+
+### Quick links to latest builds
+
+| Platform | Packages produced | Latest run (dev) |
+|---|---|---|
+| Linux | TGZ, DEB, RPM | [Open runs](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux.yml?query=branch%3Adev) |
+| macOS | TGZ, DMG | [Open runs](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos.yml?query=branch%3Adev) |
+| Windows | ZIP (portable) | [Open runs](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-windows.yml?query=branch%3Adev) |
+
+Note: GitHub Actions artifacts are attached per-run. Click “Open runs,” select the latest successful run, then download the artifact(s) listed at the bottom.
+
+### Install on Windows
+- Download ultralight-windows.zip and extract.
+- Run `Ultralight-WebBrowser.exe`.
+
+### Install on macOS
+- TGZ: extract and run `Ultralight-WebBrowser` in the extracted folder.
+- DMG: mount and drag the folder to Applications (or any location), then run `Ultralight-WebBrowser`.
+
+### Install on Linux
+- DEB (Debian/Ubuntu):
+    ```bash
+    sudo apt install ./Ultralight-WebBrowser-*.deb
+    ultralight-webbrowser
+    ```
+- RPM (Fedora/RHEL/openSUSE):
+    ```bash
+    sudo dnf install Ultralight-WebBrowser-*.rpm
+    ultralight-webbrowser
+    ```
+- TGZ (portable, no root):
+    ```bash
+    tar -C "$HOME/.local/opt" -xzf Ultralight-WebBrowser-*.tar.gz
+    "$HOME/.local/opt/UltralightWebBrowser/Ultralight-WebBrowser"
+    ```
+
+Linux packages install a desktop entry and icon (Application Menu → Ultralight Web Browser) and a CLI launcher `ultralight-webbrowser`.
+
+---
+
 -   **Blazing Fast Rendering:** Thanks to the Ultralight core, pages load and respond quickly.
-    
+
 -   **Extremely Low Memory Footprint:** Browse more without your system grinding to a halt.
-    
+
 -   **Modern Web Support:** Renders HTML5, CSS3, and modern JavaScript (ES6+).
-    
+
 -   **Native C++ Core:** No JavaScript bridge, no Node.js backend. Just pure native speed for the UI and app logic.
-    
+
 -   **Core Browser UI:**
-    
+
     -   Multi-tab interface
-        
+
     -   Address bar with navigation (Go, Back, Forward, Reload)
-        
+
     -   Loading indicators and page title display
-        
+
     -   Responsive window resizing
-        
+
 
 ## 🛠️ Tech Stack
 
 -   **Core Renderer:** [Ultralight SDK](https://ultralig.ht/ "null")
-    
--   **Language:** C++17
-    
--   **Windowing & Input:** [GLFW](https://www.glfw.org/ "null")
-    
--   **Graphics:** OpenGL 3.3
-    
--   **Build System:** CMake
-    
 
-## 📦 Building from Source
+-   **Language:** C++17
+
+-   **Windowing & Input:** [GLFW](https://www.glfw.org/ "null")
+
+-   **Graphics:** OpenGL 3.3
+
+-   **Build System:** CMake
+
+
+## 🧑‍� Build from source
 
 ### Prerequisites
 
 1.  **CMake** (3.10 or higher)
-    
-2.  A C++17 compliant compiler (e.g., Visual Studio 2019+, GCC 9+, Clang 9+)
-    
-3.  **Ultralight SDK:**
-    
-    -   [Download the latest SDK](https://ultralig.ht/download/ "null") for your OS (e.g., Windows x64).
-        
-    -   Unzip the SDK to a stable location on your drive (e.g., `C:\dev\ultralight-sdk`).
-        
-    -   Create an environment variable named `ULTRALIGHT_SDK_DIR` and set its value to the path of the unzipped SDK folder.
-        
 
-### Build Steps
+2.  A C++17 compliant compiler (e.g., Visual Studio 2019+, GCC 9+, Clang 9+)
+
+3.  **Ultralight SDK (optional):**
+
+    The sample ships with a working SDK under `data/`, so you can build out‑of‑the‑box.
+
+    To use a different SDK, set the CMake cache variable `ULTRALIGHT_SDK_ROOT` during configure to the SDK root (it must contain `include/`, `lib/`, `bin/`).
+
+
+### Build steps
 
 ```bash
 # 1. Clone the repository
-git clone [https://github.com/ovsky/Ultralight-NativeWebBrowser.git](https://github.com/ovsky/Ultralight-NativeWebBrowser.git)
-cd Ultralight-NativeWebBrowser
+git clone https://github.com/ovsky/Ultralight-WebBrowser.git
+cd Ultralight-WebBrowser
 
-# 2. Initialize submodules (for GLFW)
-# If you cloned without --recursive, run this:
+# 2. (Optional) Initialize submodules if needed
 git submodule update --init --recursive
 
-# 3. Create a build directory
-mkdir build
-cd build
+# 3. Configure
+cmake -S . -B build \
+    -DULTRALIGHT_SDK_ROOT="/absolute/path/to/ultralight-sdk"   # optional override
 
-# 4. Configure with CMake
-# (Make sure ULTRALIGHT_SDK_DIR is set in your environment)
-cmake ..
+# 4. Build
+# On Windows (MSVC multi-config)
+cmake --build build --config Release
 
-# 5. Compile the project
-
-# On Windows (Visual Studio)
-cmake --build . --config Release
-
-# On MacOS/Linux
-cmake --build .
-
+# On macOS/Linux (single-config)
+cmake --build build --parallel
 ```
 
-The final executable will be located in the `build/bin/` (or `build/Release/`) directory.
+On Windows you can also use the helper scripts:
 
-## 🗺️ Future Ideas
+```powershell
+./build.bat    # configure + build (Release)
+./run.bat      # run the app from build\Release
+```
+
+The final executable is typically in `build/Release/` (Windows multi‑config) or `build/` (Unix Makefiles/Ninja).
+
+### Create packages locally (optional)
+We ship CPack rules for self‑contained packages:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+
+# Linux: any of TGZ / DEB / RPM
+cpack --config build/CPackConfig.cmake -C Release -G TGZ
+cpack --config build/CPackConfig.cmake -C Release -G DEB
+cpack --config build/CPackConfig.cmake -C Release -G RPM
+
+# macOS: TGZ (and DMG if enabled in workflow input)
+cpack --config build/CPackConfig.cmake -C Release -G TGZ
+```
+
+## 🗺️ Roadmap / ideas
 
 This is a proof-of-concept, but there's plenty of room for improvement. Pull requests are welcome!
 
 -   [ ] Bookmark System
-    
--   [ ] Local Browsing History
-    
--   [ ] Basic ad/tracker blocking (perhaps via a hosts file or filter list)
-    
--   [ ] Deeper integration with Ultralight's JS C++ bridge (expose native functions to JS)
-    
--   [ ] Improved UI/UX (a settings panel, right-click context menus)
-    
-    
 
-## 🤝 How to Contribute
+-   [ ] Local Browsing History
+
+-   [ ] Basic ad/tracker blocking (perhaps via a hosts file or filter list)
+
+-   [ ] Deeper integration with Ultralight's JS C++ bridge (expose native functions to JS)
+
+-   [ ] Improved UI/UX (a settings panel, right-click context menus)
+
+
+
+## 🤝 Contributing
 
 Contributions are what make the open-source community such an amazing place. Any contributions you make are **greatly appreciated**.
 
 1.  Fork the Project
-    
+
 2.  Create your Feature Branch (`git checkout -b feature/some-feature`)
-    
+
 3.  Commit your Changes (`git commit -m 'Add some feature'`)
-    
+
 4.  Push to the Branch (`git push origin feature/some-feature`)
-    
+
 5.  Open a Pull Request
-    
+
 
 ## 📄 License
 
@@ -185,5 +249,5 @@ Distributed under the MIT License. See `LICENSE` for more information.
 ## 🙏 Acknowledgements
 
 -   This project would be impossible without the incredible work of the [Ultralight](https://ultralig.ht/ "null") ❤ team.
-    
+
 -   [GLFW](https://www.glfw.org/ "null") for simple, cross-platform windowing and input.
