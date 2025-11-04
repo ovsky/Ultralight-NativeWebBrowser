@@ -552,10 +552,12 @@ void UI::CreateNewTab()
   if (tab_height < 1)
     tab_height = 1;
   tabs_[id].reset(new Tab(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_));
-  tabs_[id]->view()->LoadURL("https://www.google.com");
+  // Load local static start page
+  const char *kStartPage = "file:///static-sties/google-static.html";
+  tabs_[id]->view()->LoadURL(kStartPage);
 
   RefPtr<JSContext> lock(view()->LockJSContext());
-  addTab({id, "New Tab", GetFaviconURL("https://www.google.com"), tabs_[id]->view()->is_loading()});
+  addTab({id, "New Tab", GetFaviconURL(kStartPage), tabs_[id]->view()->is_loading()});
 }
 
 RefPtr<View> UI::CreateNewTabForChildView(const String &url)
@@ -578,6 +580,17 @@ void UI::UpdateTabTitle(uint64_t id, const ultralight::String &title)
   RefPtr<JSContext> lock(view()->LockJSContext());
   // Title changed; pass current page URL-derived favicon
   updateTab({id, title, GetFaviconURL(tabs_[id]->view()->url()), tabs_[id]->view()->is_loading()});
+
+  // If active tab is a local file, reflect title in the address bar instead of file URL
+  if (id == active_tab_id_)
+  {
+    auto url_u = tabs_[id]->view()->url().utf8();
+    const char *cur = url_u.data();
+    if (cur && strncmp(cur, "file://", 7) == 0)
+    {
+      updateURL({title});
+    }
+  }
 }
 
 void UI::UpdateTabURL(uint64_t id, const ultralight::String &url)
@@ -623,8 +636,25 @@ void UI::SetCanGoForward(bool can_go_forward)
 
 void UI::SetURL(const ultralight::String &url)
 {
+  // For local static pages (file:///...), prefer showing the page title in the address bar
+  ultralight::String display = url;
+  auto u8 = url.utf8();
+  const char *c_url = u8.data();
+  bool is_file = (c_url && strncmp(c_url, "file://", 7) == 0);
+  if (is_file && !tabs_.empty())
+  {
+    auto it = tabs_.find(active_tab_id_);
+    if (it != tabs_.end() && it->second && it->second->view())
+    {
+      auto title = it->second->view()->title();
+      auto t8 = title.utf8();
+      if (t8.data() && *t8.data())
+        display = title;
+    }
+  }
+
   RefPtr<JSContext> lock(view()->LockJSContext());
-  updateURL({url});
+  updateURL({display});
 }
 
 void UI::SetCursor(ultralight::Cursor cursor)
