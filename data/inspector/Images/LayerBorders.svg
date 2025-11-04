@@ -1,8 +1,1 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Copyright © 2014 Apple Inc. All rights reserved. -->
-<svg xmlns="http://www.w3.org/2000/svg" id="root" version="1.1" viewBox="0 0 13 13">
-    <rect fill="none" stroke="currentColor" x="0.5" y="0.5" width="5" height="5"/>
-    <rect fill="none" stroke="currentColor" x="0.5" y="7.5" width="5" height="5"/>
-    <rect fill="none" stroke="currentColor" x="7.5" y="0.5" width="5" height="5"/>
-    <rect fill="none" stroke="currentColor" x="7.5" y="7.5" width="5" height="5"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" id="root" version="1.1" viewBox="0 0 13 13"><rect width="5" height="5" x=".5" y=".5" fill="none" stroke="currentColor"/><rect width="5" height="5" x=".5" y="7.5" fill="none" stroke="currentColor"/><rect width="5" height="5" x="7.5" y=".5" fill="none" stroke="currentColor"/><rect width="5" height="5" x="7.5" y="7.5" fill="none" stroke="currentColor"/></svg>
