@@ -11,6 +11,50 @@
 				"$msCompile"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Build (auto-refresh history)",
+			"type": "shell",
+			"command": "cmake --build build --config Release",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build (record only on Enter)",
+			"type": "shell",
+			"command": "cmake --build build --config Release",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build (record on URL change/start)",
+			"type": "shell",
+			"command": "cmake --build build --config Release",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build (auto-refresh history page on change)",
+			"type": "shell",
+			"command": "cmake --build build --config Release",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "build"
 		}
 	]
 }
