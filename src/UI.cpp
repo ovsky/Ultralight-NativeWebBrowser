@@ -628,6 +628,61 @@ void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
     HideContextMenuOverlay();
     return;
   }
+  if (action == "cut")
+  {
+    // Hide overlay then try to cut selection in page
+    HideContextMenuOverlay();
+    if (active_tab())
+    {
+      const char *script = R"JS((function(){
+        try{
+          if (document.execCommand && document.execCommand('cut')) return true;
+          var selText = '';
+          try { selText = String(window.getSelection ? window.getSelection() : ''); } catch(_){ }
+          if (!selText) return false;
+          try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(selText); } catch(_){ }
+          // Delete selection
+          if (document.execCommand) { document.execCommand('delete'); return true; }
+          var el = document.activeElement;
+          if (el && (el.tagName==='INPUT'||el.tagName==='TEXTAREA')){
+            var s=el.selectionStart||0, e=el.selectionEnd||0, v=el.value||'';
+            if (e>s){ el.setRangeText('', s, e, 'start'); el.dispatchEvent(new Event('input',{bubbles:true})); return true; }
+          }
+        }catch(e){}
+        return false;
+      })())JS";
+      active_tab()->view()->EvaluateScript(script, nullptr);
+    }
+    return;
+  }
+  if (action == "paste-text" && args.size() >= 2)
+  {
+    // Hide overlay then insert text into focused element/contentEditable
+    ultralight::String text = args[1];
+    HideContextMenuOverlay();
+    if (active_tab())
+    {
+      auto utf8 = text.utf8();
+      std::string t = utf8.data() ? utf8.data() : "";
+      // Minimal JS string escape for quotes and backslashes and newlines
+      std::string esc; esc.reserve(t.size()+8);
+      for (char c : t) {
+        switch(c){
+          case '\\': esc += "\\\\"; break;
+          case '"': esc += "\\\""; break;
+          case '\n': esc += "\\n"; break;
+          case '\r': esc += "\\r"; break;
+          case '\t': esc += "\\t"; break;
+          default: esc += c; break;
+        }
+      }
+      std::string script = "(function(t){try{var el=document.activeElement; if(!el) return false;";
+      script += "if(el.isContentEditable){ document.execCommand && document.execCommand('insertText', false, t); return true;}";
+      script += "var tag=el.tagName; if(tag==='INPUT'||tag==='TEXTAREA'){ var s=el.selectionStart||0,e=el.selectionEnd||0; el.setRangeText(t, s, e, 'end'); el.dispatchEvent(new Event('input',{bubbles:true})); return true;} return false;}catch(e){return false;}})(\"" + esc + "\")";
+      active_tab()->view()->EvaluateScript(script.c_str(), nullptr);
+    }
+    return;
+  }
   // Default: just close
   HideContextMenuOverlay();
 }

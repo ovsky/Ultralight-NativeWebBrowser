@@ -45,9 +45,32 @@
       if (!disabled) {
         div.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
         div.addEventListener('click', async () => {
-          if (action === 'copy-text' && payload) {
+          if (action === 'copy-text' && (payload !== undefined)) {
             try { await navigator.clipboard.writeText(String(payload)); } catch(_) {}
             if (window.OnContextMenuAction) OnContextMenuAction('close');
+            return;
+          }
+          if (action === 'copy-image' && payload) {
+            try {
+              const resp = await fetch(String(payload));
+              const blob = await resp.blob();
+              if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+                const item = new ClipboardItem({ [blob.type]: blob });
+                await navigator.clipboard.write([item]);
+              } else {
+                // Fallback to copying URL if binary copy not supported
+                await navigator.clipboard.writeText(String(payload));
+              }
+            } catch (err) {
+              try { await navigator.clipboard.writeText(String(payload)); } catch(_) {}
+            }
+            if (window.OnContextMenuAction) OnContextMenuAction('close');
+            return;
+          }
+          if (action === 'paste') {
+            let text = '';
+            try { text = await navigator.clipboard.readText(); } catch(_) {}
+            if (window.OnContextMenuAction) OnContextMenuAction('paste-text', text || '');
             return;
           }
           if (window.OnContextMenuAction) OnContextMenuAction(action, payload || '');
@@ -66,6 +89,7 @@
       const hasLink = !!(info.linkURL);
       const hasImage = !!(info.imageURL);
       const hasSel = !!(info.selectionText && String(info.selectionText).trim().length);
+      const isEditable = !!info.isEditable;
 
       if (hasLink) {
         addItem(menu, 'Open link in new tab', 'open_tab', info.linkURL);
@@ -74,12 +98,13 @@
       if (hasImage) {
         addItem(menu, 'Open image in new tab', 'open_tab', info.imageURL);
         addItem(menu, 'Copy image address', 'copy-text', info.imageURL);
+        addItem(menu, 'Copy image', 'copy-image', info.imageURL);
       }
       if (hasLink || hasImage) menu.appendChild(Object.assign(document.createElement('div'), {className:'sep'}));
 
-      addItem(menu, 'Copy selection', 'copy-text', hasSel ? info.selectionText : '', !hasSel);
-      addItem(menu, 'Cut', 'cut', '', true);
-      addItem(menu, 'Paste', 'paste', '', true);
+      addItem(menu, 'Copy', 'copy-text', hasSel ? info.selectionText : '', !hasSel);
+      addItem(menu, 'Cut', 'cut', '', !isEditable);
+      addItem(menu, 'Paste', 'paste', '', !isEditable);
 
       // Positioning
       const vw = window.innerWidth, vh = window.innerHeight;
