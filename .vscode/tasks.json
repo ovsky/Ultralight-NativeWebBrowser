@@ -55,6 +55,17 @@
 				"$msCompile"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Build (shortcut map)",
+			"type": "shell",
+			"command": "cmake --build build --config Release",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "build"
 		}
 	]
 }
