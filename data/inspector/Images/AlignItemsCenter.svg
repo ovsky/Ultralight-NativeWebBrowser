@@ -1,6 +1,1 @@
-<!-- Copyright © 2021 Apple Inc. All rights reserved. -->
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" id="root">
-    <rect x="3" y="4" width="4" height="7" fill="currentColor"/>
-    <rect x="9" y="3" width="4" height="9" fill="currentColor"/>
-    <rect y="7" width="16" height="1" fill="currentColor"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" id="root" width="16" height="16" fill="none" viewBox="0 0 16 16"><rect width="4" height="7" x="3" y="4" fill="currentColor"/><rect width="4" height="9" x="9" y="3" fill="currentColor"/><rect width="16" height="1" y="7" fill="currentColor"/></svg>
