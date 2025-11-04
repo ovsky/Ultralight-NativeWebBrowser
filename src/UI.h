@@ -50,6 +50,7 @@ public:
   void OnActiveTabChange(const JSObject &obj, const JSArgs &args);
   void OnRequestChangeURL(const JSObject &obj, const JSArgs &args);
   void OnAddressBarBlur(const JSObject &obj, const JSArgs &args);
+  void OnAddressBarFocus(const JSObject &obj, const JSArgs &args);
   void OnMenuOpen(const JSObject &obj, const JSArgs &args);
   void OnMenuClose(const JSObject &obj, const JSArgs &args);
   void OnContextMenuAction(const JSObject &obj, const JSArgs &args);

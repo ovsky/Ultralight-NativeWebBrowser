@@ -5,6 +5,7 @@
   <title>Context Menu</title>
   <style>
     html, body { background: transparent; margin: 0; padding: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    html, body, #ctx-root, #ctx-menu { cursor: default; }
     #ctx-root { position: fixed; inset: 0; }
     #ctx-menu {
       position: absolute;
@@ -18,7 +19,7 @@
       padding: 6px 0;
     }
     .item { padding: 8px 12px; cursor: default; white-space: nowrap; font-size: 13px; }
-    .item:hover { background: #3a3a4d; }
+    .item:hover { background: #3a3a4d; cursor: pointer; }
     .item.disabled { opacity: .5; pointer-events: none; }
     .sep { height: 1px; background: rgba(255,255,255,0.08); margin: 6px 0; }
   </style>

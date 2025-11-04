@@ -24,7 +24,8 @@ body {
 }
 
 #address {
-     border-radius: 24px;
+     /* Pill shape and no default outline */
+     border-radius: 9999px;
      border: none;
      height: 32px;
      flex: 1;
@@ -38,11 +39,14 @@ body {
      margin-right: 9px;
      user-select: auto !important;
      -webkit-user-select: text !important;
+     outline: none;
 }
 
 #address:focus {
      background-color: #16151d;
      color: #FFF;
+     /* Rounded focus ring */
+     box-shadow: 0 0 0 2px #343446 inset;
 }
 
 .icon {
@@ -110,6 +114,7 @@ svg#icon_defs path {
 
 .menu-item:hover {
      background: #343446;
+     cursor: pointer;
 }
 
 .menu-separator {

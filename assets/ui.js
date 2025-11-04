@@ -38,6 +38,13 @@ document.getElementById('address').addEventListener('blur', () => {
 	}
 });
 
+// Notify native when the address bar gains focus (eg, via mouse click)
+document.getElementById('address').addEventListener('focus', () => {
+    if (window.OnAddressBarFocus) {
+        window.OnAddressBarFocus();
+    }
+});
+
 // Update AdBlock toggle visual state: when enabled, normal; when disabled, grey out
 function updateAdblockEnabled(enabled) {
 	const el = document.getElementById('toggle-adblock');

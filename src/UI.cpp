@@ -1,4 +1,4 @@
-#include "UI.h"
+#include "UI.h";
 #include <cstring>
 #include <cmath>
 #include <Ultralight/Renderer.h>
@@ -48,6 +48,11 @@ UI::~UI()
 void UI::OnAddressBarBlur(const JSObject &obj, const JSArgs &args)
 {
   address_bar_is_focused_ = false;
+}
+
+void UI::OnAddressBarFocus(const JSObject &obj, const JSArgs &args)
+{
+  address_bar_is_focused_ = true;
 }
 
 bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
@@ -119,6 +124,19 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
     return false;
   }
 
+  // If mouse is interacting within the UI overlay region, forward to UI view and consume
+  if (evt.y <= ui_height_)
+  {
+    // Ensure UI overlay has focus for typing in address bar
+    if (evt.type == MouseEvent::kType_MouseDown)
+    {
+      address_bar_is_focused_ = true;
+      view()->Focus();
+    }
+    view()->FireMouseEvent(evt);
+    return false;
+  }
+
   if (evt.type == MouseEvent::kType_MouseDown)
   {
     // Right-click: open our custom context menu overlay above everything
@@ -153,14 +171,11 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
       ShowContextMenuOverlay(evt.x, evt.y, json);
       return false; // consume
     }
-    // Check if the click is outside the UI overlay
-    if (evt.y > ui_height_)
+    // Click occurred outside the UI overlay (handled above), switch focus to page
+    address_bar_is_focused_ = false;
+    if (active_tab())
     {
-      address_bar_is_focused_ = false;
-      if (active_tab())
-      {
-        active_tab()->view()->Focus();
-      }
+      active_tab()->view()->Focus();
     }
   }
   if (active_tab() && active_tab()->IsInspectorShowing())
@@ -288,6 +303,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnActiveTabChange"] = BindJSCallback(&UI::OnActiveTabChange);
   global["OnRequestChangeURL"] = BindJSCallback(&UI::OnRequestChangeURL);
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
+  global["OnAddressBarFocus"] = BindJSCallback(&UI::OnAddressBarFocus);
 
   if (!is_menu_view && !is_ctx_view)
   {
@@ -578,6 +594,7 @@ void UI::ShowMenuOverlay()
   menu_overlay_->Show();
   menu_overlay_->Focus();
   view->set_load_listener(this);
+  view->set_view_listener(this);
   view->LoadURL("file:///menu.html");
 }
 
@@ -614,6 +631,7 @@ void UI::ShowContextMenuOverlay(int x, int y, const ultralight::String &json_inf
   context_menu_overlay_->Show();
   context_menu_overlay_->Focus();
   view->set_load_listener(this);
+  view->set_view_listener(this);
   // Make data available before loading so OnDOMReady can initialize immediately
   pending_ctx_position_ = {x, y};
   pending_ctx_info_json_ = json_info;
