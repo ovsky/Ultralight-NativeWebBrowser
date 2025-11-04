@@ -83,13 +83,15 @@
         })
 
         function addTab(id, title, faviconUrl, isLoading) {
-            chromeTabs.addTab({ id: id, title: title, favicon: defaultFavicon, loading: isLoading });
+            const icon = (typeof faviconUrl === 'string' && faviconUrl.length > 0) ? faviconUrl : defaultFavicon;
+            chromeTabs.addTab({ id: id, title: title, favicon: icon, loading: isLoading });
         }
 
         function updateTab(id, title, faviconUrl, isLoading) {
             const tab = document.querySelector("[data-tab-id='" + id + "']");
+            const icon = (typeof faviconUrl === 'string' && faviconUrl.length > 0) ? faviconUrl : defaultFavicon;
             if (tab)
-                chromeTabs.updateTab(tab, { title: title, favicon: defaultFavicon, loading: isLoading });
+                chromeTabs.updateTab(tab, { title: title, favicon: icon, loading: isLoading });
         }
 
         function closeTab(id) {

@@ -1,5 +1,6 @@
 #include "UI.h"
 #include <cstring>
+#include <cmath>
 
 static UI *g_ui = 0;
 
@@ -56,7 +57,8 @@ bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
     }
   }
 
-  if (address_bar_is_focused_) {
+  if (address_bar_is_focused_)
+  {
     view()->FireKeyEvent(evt);
     return false; // Consume the event
   }
@@ -71,19 +73,22 @@ bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
 
 bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
 {
-  if (evt.type == MouseEvent::kType_MouseDown) {
+  if (evt.type == MouseEvent::kType_MouseDown)
+  {
     // Check if the click is outside the UI overlay
-    if (evt.y > ui_height_) {
+    if (evt.y > ui_height_)
+    {
       address_bar_is_focused_ = false;
-      if (active_tab()) {
+      if (active_tab())
+      {
         active_tab()->view()->Focus();
       }
     }
   }
   if (active_tab() && active_tab()->IsInspectorShowing())
   {
-    float x_px = std::round(evt.x * window()->scale());
-    float y_px = std::round(evt.y * window()->scale());
+  int x_px = static_cast<int>(std::lround(evt.x * window()->scale()));
+  int y_px = static_cast<int>(std::lround(evt.y * window()->scale()));
 
     if (is_resizing_inspector_)
     {
@@ -101,7 +106,7 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
 
     IntRect drag_handle = active_tab()->GetInspectorResizeDragHandle();
 
-    bool over_drag_handle = drag_handle.Contains(Point(x_px, y_px));
+  bool over_drag_handle = drag_handle.Contains(Point(static_cast<float>(x_px), static_cast<float>(y_px)));
 
     if (over_drag_handle && !is_over_inspector_resize_drag_handle_)
     {
@@ -382,25 +387,39 @@ void UI::SetCursor(ultralight::Cursor cursor)
 String UI::GetFaviconURL(const String &page_url)
 {
   // Best-effort: use origin + "/favicon.ico" for http/https URLs.
+  // Cache by origin so multiple tabs/pages from the same site reuse it.
   auto utf8 = page_url.utf8();
-  const char* url = utf8.data();
+  const char *url = utf8.data();
   if (!url)
     return String("");
 
   if (strncmp(url, "http://", 7) != 0 && strncmp(url, "https://", 8) != 0)
     return String("");
 
-  const char* scheme_sep = strstr(url, "://");
+  const char *scheme_sep = strstr(url, "://");
   if (!scheme_sep)
     return String("");
-  const char* host_start = scheme_sep + 3;
-  const char* slash_after_host = strchr(host_start, '/');
+  const char *host_start = scheme_sep + 3;
+  const char *slash_after_host = strchr(host_start, '/');
+
+  // Compute origin as a std::string for cache key
+  std::string origin_str;
   if (!slash_after_host)
   {
-    return String(url) + String("/favicon.ico");
+    origin_str.assign(url);
+  }
+  else
+  {
+    origin_str.assign(url, (size_t)(slash_after_host - url));
   }
 
-  uint32_t origin_len = (uint32_t)(slash_after_host - url);
-  String origin(url, origin_len);
-  return origin + String("/favicon.ico");
+  auto it = favicon_cache_.find(origin_str);
+  if (it != favicon_cache_.end())
+  {
+    return String(it->second.c_str());
+  }
+
+  std::string favicon = origin_str + "/favicon.ico";
+  favicon_cache_[origin_str] = favicon;
+  return String(favicon.c_str());
 }

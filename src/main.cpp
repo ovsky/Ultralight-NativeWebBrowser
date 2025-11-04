@@ -1,3 +1,4 @@
+// Entry point for Windows; portable fallback for non-Windows.
 #include "Browser.h"
 
 #define ENABLE_PAUSE_FOR_DEBUGGER 0
