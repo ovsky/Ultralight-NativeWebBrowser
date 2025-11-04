@@ -207,13 +207,34 @@ jobs:
         # We specify the 'Release' config at build time
         run: cmake --build build --config Release --parallel
 
+      - name: "6.15 Install NSIS (for installer)"
+        if: ${{ inputs.create_installer == true }}
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          $nsisDir = Join-Path ${env:ProgramFiles(x86)} 'NSIS'
+          if (Test-Path (Join-Path $nsisDir 'makensis.exe')) {
+            # Ensure makensis is available in PATH for this and later steps
+            $nsisDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            & (Join-Path $nsisDir 'makensis.exe') /VERSION | Out-Host
+          } else {
+            Write-Warning "NSIS makensis.exe not found after install; CPack NSIS may not be available."
+          }
+
       - name: "6.2 Package (CPack installer)"
         if: ${{ inputs.create_installer == true }}
         shell: pwsh
         run: |
           Write-Host "Packaging with CPack (Release config)"
           pushd build
-          cpack -C Release
+          # Always produce a ZIP package for portability
+          cpack -C Release -G ZIP
+          # Produce NSIS installer only if makensis is available
+          if (Get-Command makensis -ErrorAction SilentlyContinue) {
+            cpack -C Release -G NSIS
+          } else {
+            Write-Warning "makensis not found in PATH; skipping NSIS installer generation."
+          }
           popd
           Write-Host "CPack outputs:"
           Get-ChildItem -Path build -Recurse -Include *.exe,*.msi,*.zip | Select-Object -Property FullName,Length | Format-Table -AutoSize
@@ -276,3 +297,11 @@ jobs:
           path: |
             build\*.exe
             build\*.msi
+
+      - name: "8.2 Upload CPack ZIP"
+        if: ${{ inputs.create_installer == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-windows-cpack-zip
+          path: |
+            build\*.zip
