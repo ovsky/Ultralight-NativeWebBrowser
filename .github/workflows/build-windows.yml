@@ -9,10 +9,20 @@ name: Build - Windows
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      sdk_url:
+        description: "Override ULTRALIGHT_SDK_URL (raw .7z in sdks branch)"
+        required: false
+      version:
+        description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
+        required: false
 
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url }}
+      ULTRALIGHT_VERSION: ${{ inputs.version }}
 
     steps:
       - name: "1. Checkout Code (with submodules)"
