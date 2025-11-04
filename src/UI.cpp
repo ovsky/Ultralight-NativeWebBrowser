@@ -6,8 +6,9 @@ static UI *g_ui = 0;
 
 #define UI_HEIGHT 80
 
-UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
-                                is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false)
+UI::UI(RefPtr<Window> window, ultralight::NetworkListener *net_listener) : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
+                                                                           is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false),
+                                                                           net_listener_(net_listener)
 {
   uint32_t window_width = window_->width();
   ui_height_ = (uint32_t)std::round(UI_HEIGHT * window_->scale());
@@ -16,6 +17,8 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
 
   view()->set_load_listener(this);
   view()->set_view_listener(this);
+  if (net_listener_)
+    view()->set_network_listener(net_listener_);
   view()->LoadURL("file:///ui.html");
 }
 
@@ -87,8 +90,8 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
   }
   if (active_tab() && active_tab()->IsInspectorShowing())
   {
-  int x_px = static_cast<int>(std::lround(evt.x * window()->scale()));
-  int y_px = static_cast<int>(std::lround(evt.y * window()->scale()));
+    int x_px = static_cast<int>(std::lround(evt.x * window()->scale()));
+    int y_px = static_cast<int>(std::lround(evt.y * window()->scale()));
 
     if (is_resizing_inspector_)
     {
@@ -106,7 +109,7 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
 
     IntRect drag_handle = active_tab()->GetInspectorResizeDragHandle();
 
-  bool over_drag_handle = drag_handle.Contains(Point(static_cast<float>(x_px), static_cast<float>(y_px)));
+    bool over_drag_handle = drag_handle.Contains(Point(static_cast<float>(x_px), static_cast<float>(y_px)));
 
     if (over_drag_handle && !is_over_inspector_resize_drag_handle_)
     {
@@ -303,6 +306,8 @@ void UI::CreateNewTab()
   if (tab_height < 1)
     tab_height = 1;
   tabs_[id].reset(new Tab(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_));
+  if (net_listener_)
+    tabs_[id]->view()->set_network_listener(net_listener_);
   tabs_[id]->view()->LoadURL("https://www.google.com");
 
   RefPtr<JSContext> lock(view()->LockJSContext());
@@ -317,6 +322,8 @@ RefPtr<View> UI::CreateNewTabForChildView(const String &url)
   if (tab_height < 1)
     tab_height = 1;
   tabs_[id].reset(new Tab(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_));
+  if (net_listener_)
+    tabs_[id]->view()->set_network_listener(net_listener_);
 
   RefPtr<JSContext> lock(view()->LockJSContext());
   addTab({id, "", GetFaviconURL(url), tabs_[id]->view()->is_loading()});

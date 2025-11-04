@@ -20,7 +20,7 @@ class UI : public WindowListener,
            public ViewListener
 {
 public:
-  UI(RefPtr<Window> window);
+  UI(RefPtr<Window> window, ultralight::NetworkListener *net_listener = nullptr);
   ~UI();
 
   // Inherited from WindowListener
@@ -75,6 +75,9 @@ protected:
   int ui_height_;
   int tab_height_;
   float scale_;
+
+  // Optional network listener for ad/tracker blocking applied to all Views we manage
+  ultralight::NetworkListener *net_listener_ = nullptr;
 
   std::map<uint64_t, std::unique_ptr<Tab>> tabs_;
   uint64_t active_tab_id_ = 0;
