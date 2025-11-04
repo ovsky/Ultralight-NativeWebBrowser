@@ -29,6 +29,8 @@
             <div class="menu-item" data-action="new-tab">New tab [Ctrl+T]</div>
             <div class="menu-item" data-action="new-window">New window [Ctrl+N]</div>
             <div class="menu-separator"></div>
+            <div class="menu-item" id="toggle-dark" data-action="toggle-dark">Dark theme: Toggle</div>
+            <div class="menu-separator"></div>
             <div class="menu-item" data-action="history">History</div>
             <div class="menu-item" data-action="downloads">Downloads</div>
         </div>
@@ -55,6 +57,16 @@
                 if (e.key === 'Escape') closeMenu();
             });
 
+            function refreshDarkLabel() {
+                try {
+                    if (window.GetDarkModeEnabled) {
+                        const on = !!GetDarkModeEnabled();
+                        const el = document.getElementById('toggle-dark');
+                        if (el) el.textContent = 'Dark theme: ' + (on ? 'On' : 'Off');
+                    }
+                } catch { }
+            }
+
             // Item clicks
             menu.addEventListener('click', (e) => {
                 const item = e.target.closest('.menu-item');
@@ -68,6 +80,9 @@
                         // Placeholder: open a new tab as "new window" is not implemented
                         if (window.OnRequestNewTab) OnRequestNewTab();
                         break;
+                    case 'toggle-dark':
+                        if (window.OnToggleDarkMode) OnToggleDarkMode();
+                        break;
                     case 'history':
                         if (window.OnRequestChangeURL) OnRequestChangeURL('file:///history.html');
                         break;
@@ -77,6 +92,9 @@
                 }
                 closeMenu();
             });
+
+            // Initialize labels
+            refreshDarkLabel();
         })();
     </script>
 </body>

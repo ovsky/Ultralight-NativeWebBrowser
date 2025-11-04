@@ -394,6 +394,8 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnToggleTools"] = BindJSCallback(&UI::OnToggleTools);
   global["OnMenuOpen"] = BindJSCallback(&UI::OnMenuOpen);
   global["OnMenuClose"] = BindJSCallback(&UI::OnMenuClose);
+  global["OnToggleDarkMode"] = BindJSCallback(&UI::OnToggleDarkMode);
+  global["GetDarkModeEnabled"] = BindJSCallbackWithRetval(&UI::OnGetDarkModeEnabled);
   if (is_ctx_view)
   {
     // context menu overlay actions
@@ -775,6 +777,29 @@ void UI::OnMenuClose(const JSObject &obj, const JSArgs &args)
   HideMenuOverlay();
 }
 
+void UI::OnToggleDarkMode(const JSObject &obj, const JSArgs &args)
+{
+  dark_mode_enabled_ = !dark_mode_enabled_;
+  // Apply/remove to all existing tabs
+  for (auto &p : tabs_)
+  {
+    if (!p.second)
+      continue;
+    auto v = p.second->view();
+    if (!v)
+      continue;
+    if (dark_mode_enabled_)
+      ApplyDarkModeToView(v);
+    else
+      RemoveDarkModeFromView(v);
+  }
+}
+
+ultralight::JSValue UI::OnGetDarkModeEnabled(const JSObject &obj, const JSArgs &args)
+{
+  return ultralight::JSValue(dark_mode_enabled_);
+}
+
 void UI::AdjustUIHeight(uint32_t new_height)
 {
   if (new_height == (uint32_t)ui_height_)
@@ -965,4 +990,95 @@ void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
   }
   // Default: just close
   HideContextMenuOverlay();
+}
+
+void UI::ApplyDarkModeToView(RefPtr<View> v)
+{
+  if (!v)
+    return;
+  const char *js = R"JS((function(){
+    try{
+      var sid='__ul_auto_dark';
+      // Remove any previous style to avoid duplicates/conflicts
+      var prev=document.getElementById(sid); if(prev) prev.remove();
+      var css = [
+        'html,body{background:#0e0e0f !important;color:#e0e0e0 !important;color-scheme:dark !important}',
+        // Make common large containers nearly black by default
+        'body > header, body > main, body > footer, body > nav, body > section, body > article{background:#0e0e0f !important}',
+        'div,section,main,article,aside,header,footer,nav{border-color:#333 !important}',
+        // Form controls
+        'input,textarea,select,button{background:#1a1b1c !important;color:#e6e6e6 !important;border-color:#333 !important}',
+        'input::placeholder,textarea::placeholder{color:#9aa0a6 !important}',
+        // Links
+        'a{color:#8ab4f8 !important}',
+        // Tables
+        'table{background:#0f0f10 !important}',
+        'thead,tbody,tr,th,td{background:transparent !important;border-color:#333 !important}',
+        // Code blocks
+        'pre,code,kbd,samp{background:#111215 !important;color:#e0e0e0 !important}',
+        // Shadows
+        '.card, .panel, .box{background:#111213 !important; border:1px solid #2a2b2d !important}'
+      ].join('\n');
+      var s=document.createElement('style'); s.id=sid; s.type='text/css'; s.appendChild(document.createTextNode(css));
+      (document.head||document.documentElement).appendChild(s);
+
+      // Heuristic: darken wide/large containers and backgrounds to near-black.
+      function parseRGB(c){
+        var m=(c||'').match(/rgba?\(([^)]+)\)/i); if(!m) return null; var p=m[1].split(',').map(function(x){return parseFloat(x)});
+        return {r:~~p[0], g:~~p[1], b:~~p[2], a:(p.length>3? p[3]:1)};
+      }
+      function luminance(r,g,b){ // sRGB relative luminance
+        function srgb(u){u/=255; return (u<=0.03928)? u/12.92: Math.pow((u+0.055)/1.055,2.4);}
+        var R=srgb(r), G=srgb(g), B=srgb(b); return 0.2126*R+0.7152*G+0.0722*B;
+      }
+      function isLight(bg){ var c=parseRGB(bg); if(!c) return true; return luminance(c.r,c.g,c.b) > 0.35; }
+
+      function darkenLarge(el){
+        if(!el || !el.getBoundingClientRect) return;
+        var r=el.getBoundingClientRect();
+        var area=r.width*r.height;
+        if (r.width>=600 || r.height>=300 || area>=120000) {
+          var cs=getComputedStyle(el);
+          var bg=cs.backgroundImage && cs.backgroundImage!=='none' ? null : cs.backgroundColor;
+          if (!bg || bg==='transparent' || bg==='rgba(0, 0, 0, 0)' || isLight(bg)){
+            try { el.style.setProperty('background-color', '#0e0e0f', 'important'); el.setAttribute('data-ul-dark','1'); } catch(e){}
+          }
+          // ensure text is readable
+          try { el.style.setProperty('color', '#e0e0e0', 'important'); } catch(e){}
+        }
+      }
+
+      function walk(root){
+        var nodes=root.querySelectorAll('div,section,main,article,aside,header,footer,nav,body,html');
+        for(var i=0;i<nodes.length;i++) darkenLarge(nodes[i]);
+      }
+
+      walk(document);
+      var pending=null;
+      var obs=new MutationObserver(function(){ if(pending) return; pending=requestAnimationFrame(function(){ pending=null; walk(document); }); });
+      obs.observe(document.documentElement||document.body,{childList:true,subtree:true});
+      window.__ul_dark_observer = obs;
+      return true;
+    }catch(e){return false;}
+  })())JS";
+  v->EvaluateScript(js, nullptr);
+}
+
+void UI::RemoveDarkModeFromView(RefPtr<View> v)
+{
+  if (!v)
+    return;
+  const char *js = R"JS((function(){
+    try{
+      var s=document.getElementById('__ul_auto_dark'); if(s) s.remove();
+      var obs=window.__ul_dark_observer; if (obs && obs.disconnect) obs.disconnect();
+      // Remove inline marks we added
+      var marked=document.querySelectorAll('[data-ul-dark="1"]');
+      for (var i=0;i<marked.length;i++){
+        try{ marked[i].style.removeProperty('background-color'); marked[i].style.removeProperty('color'); marked[i].removeAttribute('data-ul-dark'); }catch(e){}
+      }
+      return true;
+    }catch(e){return false;}
+  })())JS";
+  v->EvaluateScript(js, nullptr);
 }

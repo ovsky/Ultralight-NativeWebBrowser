@@ -224,11 +224,10 @@ void Tab::OnUpdateHistory(View *caller)
 
 void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const String &url)
 {
-  // Only install on main frame documents
-  if (!is_main_frame)
-    return;
+  // Install hooks for all frames (main and subframes)
 
-  // Bind a native JS callback that the page can call when right-click occurs
+  // Bind a native JS callback that the page can call when right-click occurs (main frame only)
+  if (is_main_frame)
   {
     RefPtr<JSContext> ctx = caller->LockJSContext();
     SetJSContext(ctx->ctx());
@@ -266,7 +265,8 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
       }
     })();
   )JS";
-  caller->EvaluateScript(script, nullptr);
+  if (is_main_frame)
+    caller->EvaluateScript(script, nullptr);
 
   // If this is our History page, expose native methods
   {
@@ -282,6 +282,13 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
       // Notify the page JS that native bridge is ready so it can refresh now
       caller->EvaluateScript("(function(){ if (window.__ul_history_ready) window.__ul_history_ready(); })();", nullptr);
     }
+  }
+
+  // Auto Dark Mode: if enabled, inject dark styling in this document
+  if (ui_ && ui_->dark_mode_enabled_)
+  {
+    // Reuse UI helpers via the view
+    ui_->ApplyDarkModeToView(caller);
   }
 }
 

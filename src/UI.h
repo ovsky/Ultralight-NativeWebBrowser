@@ -57,6 +57,8 @@ public:
   void OnMenuOpen(const JSObject &obj, const JSArgs &args);
   void OnMenuClose(const JSObject &obj, const JSArgs &args);
   void OnContextMenuAction(const JSObject &obj, const JSArgs &args);
+  void OnToggleDarkMode(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnGetDarkModeEnabled(const JSObject &obj, const JSArgs &args);
 
   RefPtr<Window> window() { return window_; }
 
@@ -142,6 +144,11 @@ protected:
   };
   std::vector<HistoryEntry> history_;
   // Always enabled (disable-history feature removed)
+
+  // Auto Dark Mode state
+  bool dark_mode_enabled_ = false;
+  void ApplyDarkModeToView(RefPtr<View> v);
+  void RemoveDarkModeFromView(RefPtr<View> v);
 
   // Shortcuts mapping (eg, "Ctrl+T" -> "new-tab") loaded from assets/shortcuts.json
   std::map<std::string, std::string> shortcuts_;
