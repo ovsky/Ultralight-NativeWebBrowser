@@ -67,8 +67,24 @@ jobs:
             curl -fL "$URL" -o "$RUNNER_TEMP/ultralight-sdk.7z"
             7z x -y -o"$RUNNER_TEMP/sdk-extract" "$RUNNER_TEMP/ultralight-sdk.7z"
             ROOT=""
-            while IFS= read -r -d '' dir; do if [ -d "$dir/include" ] && [ -d "$dir/lib" ]; then ROOT="$dir"; break; fi; done < <(find "$RUNNER_TEMP/sdk-extract" -mindepth 1 -maxdepth 3 -type d -print0)
-            if [ -z "$ROOT" ]; then echo "::error::ARM64 SDK root not found after extraction"; exit 1; fi
+            # Prefer a directory that has include and either lib or bin (Ultralight sometimes ships .so in bin)
+            while IFS= read -r -d '' dir; do
+              if [ -d "$dir/include" ] && { [ -d "$dir/lib" ] || [ -d "$dir/bin" ]; }; then
+                ROOT="$dir"; break
+              fi
+            done < <(find "$RUNNER_TEMP/sdk-extract" -mindepth 1 -maxdepth 4 -type d -print0)
+            if [ -z "$ROOT" ]; then
+              # Fallback: derive from include/Ultralight path
+              INC_PARENT=$(find "$RUNNER_TEMP/sdk-extract" -type d -path '*/include/Ultralight' -print -quit 2>/dev/null | xargs -I{} dirname {} | xargs -I{} dirname {}) || true
+              if [ -n "$INC_PARENT" ] && [ -d "$INC_PARENT/include" ] && { [ -d "$INC_PARENT/lib" ] || [ -d "$INC_PARENT/bin" ]; }; then
+                ROOT="$INC_PARENT"
+              fi
+            fi
+            if [ -z "$ROOT" ]; then
+              echo "::error::ARM64 SDK root not found after extraction";
+              echo "Extraction tree (depth 3):"; find "$RUNNER_TEMP/sdk-extract" -maxdepth 3 -type d -print | sed 's/^/  /'
+              exit 1
+            fi
             echo "Found SDK at: $ROOT"; ls -la "$ROOT/lib" || true
             echo "== ARM64: Configure & Build =="
             cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ROOT" -DBUILD_TESTING=OFF

@@ -54,12 +54,34 @@ jobs:
           if [ -n "$RESP" ]; then
             NAMES=$(printf "%s" "$RESP" | grep -oE '"name"\s*:\s*"[^"]+"' | sed -E 's/.*"name"\s*:\s*"([^"]+)".*/\1/')
             echo "Found files in sdks branch:"; printf ' - %s\n' $NAMES | sed 's/^/  /'
-            # Prefer arm64 for this workflow
-            MAC_LIST=$(for nm in $NAMES; do case "$nm" in ultralight*-sdk-*-mac*-arm64.7z|ultralight*-sdk-*-osx-arm64.7z) echo "$nm";; esac; done)
+            # Prefer arm64 for this workflow (support mac/macos/osx naming)
+            MAC_LIST=""
+            for nm in $NAMES; do
+              case "$nm" in
+                ultralight*-sdk-*-mac-arm64.7z|ultralight*-sdk-*-macos-arm64.7z|ultralight*-sdk-*-osx-arm64.7z)
+                  MAC_LIST="$MAC_LIST $nm"
+                  ;;
+              esac
+            done
             if [ -n "$MAC_LIST" ]; then
               BEST_VER=""; BEST_FILE=""
-              read_version() { local v="$1" a r b c; a="${v%%.*}"; r="${v#*.}"; b="${r%%.*}"; c="${r#*.}"; printf '%s %s %s' "${a:-0}" "${b:-0}" "${c:-0}"; }
-              ver_gt() { [ "$1" = "$2" ] && return 1; set -- $(read_version "$1") $(read_version "$2"); if [ $1 -gt $4 ]; then return 0; fi; if [ $1 -lt $4 ]; then return 1; fi; if [ $2 -gt $5 ]; then return 0; fi; if [ $2 -lt $5 ]; then return 1; fi; if [ $3 -gt $6 ]; then return 0; fi; return 1; }
+              read_version() {
+                local v="$1" a r b c
+                a="${v%%.*}"; r="${v#*.}"; b="${r%%.*}"; c="${r#*.}"
+                printf '%s %s %s' "${a:-0}" "${b:-0}" "${c:-0}"
+              }
+              ver_gt() {
+                # returns 0 (true) if $1 > $2 as semantic version x.y.z
+                [ "$1" = "$2" ] && return 1
+                set -- $(read_version "$1") $(read_version "$2")
+                local a1="$1" a2="$2" a3="$3" b1="$4" b2="$5" b3="$6"
+                if [ $((10#$a1)) -gt $((10#$b1)) ]; then return 0; fi
+                if [ $((10#$a1)) -lt $((10#$b1)) ]; then return 1; fi
+                if [ $((10#$a2)) -gt $((10#$b2)) ]; then return 0; fi
+                if [ $((10#$a2)) -lt $((10#$b2)) ]; then return 1; fi
+                if [ $((10#$a3)) -gt $((10#$b3)) ]; then return 0; fi
+                return 1
+              }
               for f in $MAC_LIST; do
                 v=$(echo "$f" | sed -E 's/^.*-([0-9]+\.[0-9]+\.[0-9]+)-(mac|macos|osx)-.*$/\1/')
                 if [ -n "$v" ]; then if [ -z "$BEST_VER" ] || ver_gt "$v" "$BEST_VER"; then BEST_VER="$v"; BEST_FILE="$f"; fi; fi
