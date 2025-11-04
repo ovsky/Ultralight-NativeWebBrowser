@@ -13,6 +13,10 @@ on:
       version:
         description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
         required: false
+      package_format:
+        description: "Package format(s) to produce via CPack (eg. TGZ or DMG or multi 'TGZ;DMG')"
+        required: false
+        default: DMG
 
 jobs:
   build:
@@ -20,6 +24,7 @@ jobs:
     env:
       ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url }}
       ULTRALIGHT_VERSION: ${{ inputs.version }}
+      PACKAGE_GENERATORS: ${{ inputs.package_format || 'TGZ' }}
     steps:
       - name: 1. Checkout
         uses: actions/checkout@v4
@@ -258,6 +263,44 @@ jobs:
         if: steps.prep_sdk.outputs.present == 'true'
         run: ctest --test-dir build -C Release --output-on-failure
 
+      - name: 6.9 Package with CPack (macOS)
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          outdir="${{ github.workspace }}/build"
+          mkdir -p "$outdir"
+          gens_raw="${PACKAGE_GENERATORS:-TGZ}"
+          # Split by semicolon, comma, or whitespace
+          IFS=$' ;,\t\n' read -r -a GEN_LIST <<< "$gens_raw"
+          echo "Requested package formats: ${GEN_LIST[*]}"
+          for g in "${GEN_LIST[@]}"; do
+            [ -z "$g" ] && continue
+            g_uc=$(echo "$g" | tr '[:lower:]' '[:upper:]')
+            gen="$g_uc"
+            # Map convenience names
+            case "$g_uc" in
+              DMG)
+                gen="DragNDrop";;
+              TGZ|ZIP)
+                gen="$g_uc";;
+              *)
+                # Allow passing exact CPack generator name (eg. DragNDrop)
+                gen="$g";;
+            esac
+            echo "Running CPack for generator: $gen"
+            cpack --config build/CPackConfig.cmake -C Release -G "$gen" -V -D CPACK_OUTPUT_FILE_PREFIX="$outdir"
+          done
+
+      - name: 7.1 List package outputs
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Listing build directory after CPack:"; ls -la "${{ github.workspace }}/build" || true
+          echo "Searching recursively for produced packages:"
+          find "${{ github.workspace }}" -maxdepth 4 -type f \( -name "*.tar.gz" -o -name "*.tgz" -o -name "*.dmg" \) -print || true
+
       - name: "6.5 Diagnostics: verify runtime contents"
         if: steps.prep_sdk.outputs.present == 'true'
         shell: bash
@@ -290,6 +333,19 @@ jobs:
           ls -la "$src"/*.dylib 2>/dev/null || true
           echo "Listing resources:"
           ls -la "$src"/assets/resources 2>/dev/null || true
+
+      - name: 7.2 Upload Packages (TGZ/DMG)
+        if: steps.prep_sdk.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-macos-packages
+          path: |
+            ${{ github.workspace }}/build/*.tar.gz
+            ${{ github.workspace }}/build/*.tgz
+            ${{ github.workspace }}/build/*.dmg
+            ${{ github.workspace }}/**/*.tar.gz
+            ${{ github.workspace }}/**/*.tgz
+            ${{ github.workspace }}/**/*.dmg
 
       - name: 7. Archive Artifacts
         if: steps.prep_sdk.outputs.present == 'true'
