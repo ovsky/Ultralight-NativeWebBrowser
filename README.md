@@ -234,6 +234,8 @@ This is a proof-of-concept, but there's plenty of room for improvement. Pull req
 
 -   [x] Universal Menu
 
+-   [x] Shortcut Map System
+
 -   [ ] Bookmark System
 
 -   [ ] Dark Theme
