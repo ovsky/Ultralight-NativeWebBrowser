@@ -195,10 +195,11 @@ bool UI::RunShortcutAction(const std::string &action)
   }
   if (action == "open-history")
   {
-    if (!tabs_.empty())
+    // Open History in a NEW tab instead of replacing current
+    RefPtr<View> child = CreateNewTabForChildView(String("file:///history.html"));
+    if (child)
     {
-      auto &tab = tabs_[active_tab_id_];
-      tab->view()->LoadURL("file:///history.html");
+      child->LoadURL("file:///history.html");
       return true;
     }
     return false;
@@ -413,6 +414,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnActiveTabChange"] = BindJSCallback(&UI::OnActiveTabChange);
   global["OnRequestChangeURL"] = BindJSCallback(&UI::OnRequestChangeURL);
   global["OnAddressBarNavigate"] = BindJSCallback(&UI::OnAddressBarNavigate);
+  global["OnOpenHistoryNewTab"] = BindJSCallback(&UI::OnOpenHistoryNewTab);
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
   global["OnAddressBarFocus"] = BindJSCallback(&UI::OnAddressBarFocus);
 
@@ -536,12 +538,21 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
   if (args.size() == 1)
   {
     ultralight::String url = args[0];
+    // Record immediately so History UI updates quickly (dedup inside RecordHistory)
+    RecordHistory(url, String(""));
     if (!tabs_.empty())
     {
       auto &tab = tabs_[active_tab_id_];
       tab->view()->LoadURL(url);
     }
   }
+}
+
+void UI::OnOpenHistoryNewTab(const JSObject &obj, const JSArgs &args)
+{
+  RefPtr<View> child = CreateNewTabForChildView(String("file:///history.html"));
+  if (child)
+    child->LoadURL("file:///history.html");
 }
 
 void UI::CreateNewTab()
@@ -725,7 +736,17 @@ void UI::RecordHistory(const String &url, const String &title)
   uint64_t now_ms = (uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
                         std::chrono::system_clock::now().time_since_epoch())
                         .count();
-  history_.push_back({u, t, now_ms});
+  // Coalesce consecutive identical URLs: update latest entry instead of pushing a duplicate
+  if (!history_.empty() && history_.back().url == u)
+  {
+    if (!t.empty())
+      history_.back().title = t; // fill in title when available
+    history_.back().timestamp_ms = now_ms;
+  }
+  else
+  {
+    history_.push_back({u, t, now_ms});
+  }
 
   // If any tab is showing the History page, ask it to refresh now
   for (auto &it : tabs_)

@@ -52,6 +52,8 @@ public:
   void OnRequestChangeURL(const JSObject &obj, const JSArgs &args);
   // Explicitly called when user pressed Enter in the address bar
   void OnAddressBarNavigate(const JSObject &obj, const JSArgs &args);
+  // Open History page in a new tab (used by menu button and shortcuts)
+  void OnOpenHistoryNewTab(const JSObject &obj, const JSArgs &args);
   void OnAddressBarBlur(const JSObject &obj, const JSArgs &args);
   void OnAddressBarFocus(const JSObject &obj, const JSArgs &args);
   void OnMenuOpen(const JSObject &obj, const JSArgs &args);

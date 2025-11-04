@@ -330,22 +330,26 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
 // --- General JS bridge implementations ---
 void Tab::JS_Back(const JSObject &obj, const JSArgs &args)
 {
-  if (view()) view()->GoBack();
+  if (view())
+    view()->GoBack();
 }
 
 void Tab::JS_Forward(const JSObject &obj, const JSArgs &args)
 {
-  if (view()) view()->GoForward();
+  if (view())
+    view()->GoForward();
 }
 
 void Tab::JS_Reload(const JSObject &obj, const JSArgs &args)
 {
-  if (view()) view()->Reload();
+  if (view())
+    view()->Reload();
 }
 
 void Tab::JS_Stop(const JSObject &obj, const JSArgs &args)
 {
-  if (view()) view()->Stop();
+  if (view())
+    view()->Stop();
 }
 
 void Tab::JS_Navigate(const JSObject &obj, const JSArgs &args)
@@ -359,12 +363,14 @@ void Tab::JS_Navigate(const JSObject &obj, const JSArgs &args)
 
 void Tab::JS_NewTab(const JSObject &obj, const JSArgs &args)
 {
-  if (!ui_) return;
+  if (!ui_)
+    return;
   if (args.size() >= 1)
   {
     ultralight::String url = args[0];
     RefPtr<View> child = ui_->CreateNewTabForChildView(url);
-    if (child) child->LoadURL(url);
+    if (child)
+      child->LoadURL(url);
   }
   else
   {
@@ -374,7 +380,8 @@ void Tab::JS_NewTab(const JSObject &obj, const JSArgs &args)
 
 void Tab::JS_CloseTab(const JSObject &obj, const JSArgs &args)
 {
-  if (!ui_) return;
+  if (!ui_)
+    return;
   // If an id is passed, close it, else close current tab
   uint64_t target = id_;
   if (args.size() >= 1)
@@ -382,34 +389,42 @@ void Tab::JS_CloseTab(const JSObject &obj, const JSArgs &args)
     // Clamp to uint64 from JS number
     target = static_cast<uint64_t>((double)args[0]);
   }
-  ui_->OnRequestTabClose({}, { (double)target });
+  ui_->OnRequestTabClose({}, {(double)target});
 }
 
 void Tab::JS_OpenHistory(const JSObject &obj, const JSArgs &args)
 {
-  if (view()) view()->LoadURL("file:///history.html");
+  if (!ui_)
+    return;
+  RefPtr<View> child = ui_->CreateNewTabForChildView(String("file:///history.html"));
+  if (child)
+    child->LoadURL("file:///history.html");
 }
 
 JSValue Tab::JS_GetHistory(const JSObject &obj, const JSArgs &args)
 {
-  if (!ui_) return JSValue();
+  if (!ui_)
+    return JSValue();
   return JSValue(ui_->GetHistoryJSON());
 }
 
 void Tab::JS_ClearHistory(const JSObject &obj, const JSArgs &args)
 {
-  if (ui_) ui_->ClearHistory();
+  if (ui_)
+    ui_->ClearHistory();
 }
 
 void Tab::JS_ToggleDarkMode(const JSObject &obj, const JSArgs &args)
 {
-  if (!ui_) return;
+  if (!ui_)
+    return;
   ui_->OnToggleDarkMode({}, {});
 }
 
 JSValue Tab::JS_IsDarkModeEnabled(const JSObject &obj, const JSArgs &args)
 {
-  if (!ui_) return JSValue(false);
+  if (!ui_)
+    return JSValue(false);
   return ui_->OnGetDarkModeEnabled({}, {});
 }
 

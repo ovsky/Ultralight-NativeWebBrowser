@@ -4,6 +4,10 @@
     <meta charset="utf-8" />
     <link rel="stylesheet" type="text/css" href="ui.css">
     <style>
+        * {
+            transition: all 0.2s ease-in-out;
+        }
+
         body {
             margin: 0;
             background: transparent;
@@ -84,7 +88,7 @@
                         if (window.OnToggleDarkMode) OnToggleDarkMode();
                         break;
                     case 'history':
-                        if (window.OnRequestChangeURL) OnRequestChangeURL('file:///history.html');
+                        if (window.OnOpenHistoryNewTab) OnOpenHistoryNewTab();
                         break;
                     case 'downloads':
                         if (window.OnRequestChangeURL) OnRequestChangeURL('file:///release_notes.html');
