@@ -222,6 +222,10 @@ jobs:
         run: |
           set -euo pipefail
           gens_uc=$(echo "${PACKAGE_GENERATORS:-}" | tr '[:lower:]' '[:upper:]' | tr -d ' ')
+          # Treat MULTI/ALL as shorthand for a common set on Linux
+          if [ "$gens_uc" = "MULTI" ] || [ "$gens_uc" = "ALL" ]; then
+            gens_uc="TGZ;DEB;RPM"
+          fi
           if echo "$gens_uc" | grep -q RPM; then
             sudo apt-get update
             sudo apt-get install -y rpm
@@ -240,6 +244,11 @@ jobs:
           set -x
           gens_raw="${PACKAGE_GENERATORS:-TGZ}"
           gens_uc=$(echo "$gens_raw" | tr '[:lower:]' '[:upper:]')
+          # Expand shorthand like 'multi' or 'all' to a supported set
+          case "$gens_uc" in
+            MULTI|ALL)
+              gens_uc="TGZ;DEB;RPM" ;;
+          esac
           # Split by semicolon, comma, or whitespace
           IFS=$' ;,\t\n' read -r -a GEN_LIST <<< "$gens_uc"
           echo "Using CPack generators: ${GEN_LIST[*]}"

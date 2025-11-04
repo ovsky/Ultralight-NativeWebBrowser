@@ -16,6 +16,11 @@ on:
       version:
         description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
         required: false
+      create_installer:
+        description: "Create Windows installer via CPack (NSIS)"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -23,6 +28,7 @@ jobs:
     env:
       ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url }}
       ULTRALIGHT_VERSION: ${{ inputs.version }}
+      CREATE_INSTALLER: ${{ inputs.create_installer }}
 
     steps:
       - name: "1. Checkout Code (with submodules)"
@@ -191,11 +197,47 @@ jobs:
         run: |
           cmake --version
           Write-Host "Configuring with ULTRALIGHT_SDK_ROOT=$env:ULTRALIGHT_SDK_ROOT"
-          cmake -S . -B build -DULTRALIGHT_SDK_ROOT="${{ env.ULTRALIGHT_SDK_ROOT }}" -DBUILD_TESTING=ON
+          $createInstaller = "$env:CREATE_INSTALLER"
+          if ($createInstaller -eq '' -or $null -eq $createInstaller) { $createInstaller = 'false' }
+          $installerFlag = if ($createInstaller -match '^(true|1|on)$') { 'ON' } else { 'OFF' }
+          Write-Host "CREATE_INSTALLER=$createInstaller -> -DCREATE_INSTALLER=$installerFlag"
+          cmake -S . -B build -DULTRALIGHT_SDK_ROOT="${{ env.ULTRALIGHT_SDK_ROOT }}" -DBUILD_TESTING=ON -DCREATE_INSTALLER=$installerFlag
 
       - name: "6. Build Project"
         # We specify the 'Release' config at build time
         run: cmake --build build --config Release --parallel
+
+      - name: "6.15 Install NSIS (for installer)"
+        if: ${{ inputs.create_installer == true }}
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          $nsisDir = Join-Path ${env:ProgramFiles(x86)} 'NSIS'
+          if (Test-Path (Join-Path $nsisDir 'makensis.exe')) {
+            # Ensure makensis is available in PATH for this and later steps
+            $nsisDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            & (Join-Path $nsisDir 'makensis.exe') /VERSION | Out-Host
+          } else {
+            Write-Warning "NSIS makensis.exe not found after install; CPack NSIS may not be available."
+          }
+
+      - name: "6.2 Package (CPack installer)"
+        if: ${{ inputs.create_installer == true }}
+        shell: pwsh
+        run: |
+          Write-Host "Packaging with CPack (Release config)"
+          pushd build
+          # Always produce a ZIP package for portability
+          cpack -C Release -G ZIP
+          # Produce NSIS installer only if makensis is available
+          if (Get-Command makensis -ErrorAction SilentlyContinue) {
+            cpack -C Release -G NSIS
+          } else {
+            Write-Warning "makensis not found in PATH; skipping NSIS installer generation."
+          }
+          popd
+          Write-Host "CPack outputs:"
+          Get-ChildItem -Path build -Recurse -Include *.exe,*.msi,*.zip | Select-Object -Property FullName,Length | Format-Table -AutoSize
 
       - name: "6.8 Run tests (ctest)"
         run: ctest --test-dir build -C Release --output-on-failure
@@ -246,3 +288,20 @@ jobs:
         with:
           name: ultralight-windows-build
           path: ultralight-windows.zip
+
+      - name: "8.1 Upload Installer"
+        if: ${{ inputs.create_installer == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-windows-installer
+          path: |
+            build\*.exe
+            build\*.msi
+
+      - name: "8.2 Upload CPack ZIP"
+        if: ${{ inputs.create_installer == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-windows-cpack-zip
+          path: |
+            build\*.zip
