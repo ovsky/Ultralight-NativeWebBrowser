@@ -226,15 +226,30 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y rpm
           fi
+          if echo "$gens_uc" | grep -q DEB; then
+            # Ensure basic build tools are present (usually on ubuntu-latest already)
+            sudo apt-get update
+            sudo apt-get install -y fakeroot
+          fi
 
       - name: 8. Package with CPack (Linux)
         if: steps.prep_sdk.outputs.present == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          gens=$(echo "${PACKAGE_GENERATORS:-TGZ}" | tr '[:lower:]' '[:upper:]' | tr -d ' ')
-          echo "Using CPack generators: $gens"
-          cpack --config build/CPackConfig.cmake -C Release -G "$gens"
+          gens_raw="${PACKAGE_GENERATORS:-TGZ}"
+          gens_uc=$(echo "$gens_raw" | tr '[:lower:]' '[:upper:]')
+          # Split by semicolon, comma, or whitespace
+          IFS=$' ;,\t\n' read -r -a GEN_LIST <<< "$gens_uc"
+          echo "Using CPack generators: ${GEN_LIST[*]}"
+          # Ensure output goes to the build directory in all cases
+          export CPACK_OUTPUT_FILE_PREFIX="${{ github.workspace }}/build"
+          for g in "${GEN_LIST[@]}"; do
+            if [ -n "$g" ]; then
+              echo "Running CPack for generator: $g"
+              cpack --config build/CPackConfig.cmake -C Release -G "$g"
+            fi
+          done
 
       - name: 8.2 List package outputs
         if: steps.prep_sdk.outputs.present == 'true'
@@ -308,5 +323,6 @@ jobs:
           name: ultralight-linux-packages
           path: |
             ${{ github.workspace }}/build/*.tar.gz
+            ${{ github.workspace }}/build/*.tgz
             ${{ github.workspace }}/build/*.deb
             ${{ github.workspace }}/build/*.rpm
