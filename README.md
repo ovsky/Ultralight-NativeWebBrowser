@@ -284,12 +284,15 @@ This is a proof-of-concept, but there's plenty of room for improvement. Pull req
 
  -  [x] Deeper integration with Ultralight's JS C++ bridge (expose native functions to JS)
 
+ -  [x] Favicon Support
+
+ -  [ ] Autosuggestion / Autocompletion 
+
 -   [ ] Bookmark System
 
 -   [ ] Downloads
 
 -   [ ] Plugins Support (Scripts?)
-
 
 -   [ ] Improved UI/UX (a settings panel, right-click context menus)
 
