@@ -346,17 +346,31 @@ if(WIN32)
   # Windows installer settings (NSIS/WiX)
   set(CPACK_PACKAGE_INSTALL_DIRECTORY "Ultralight Web Browser")
   set(CPACK_NSIS_DISPLAY_NAME "Ultralight Web Browser")
-  set(CPACK_PACKAGE_EXECUTABLES "Ultralight-WebBrowser;Ultralight Web Browser")
-  set(CPACK_CREATE_DESKTOP_LINKS "Ultralight-WebBrowser")
-  set(CPACK_NSIS_MUI_FINISHPAGE_RUN "Ultralight-WebBrowser.exe")
+  # The executable and assets are installed under a subfolder (${INSTALL_DIR_NAME}).
+  # Default NSIS shortcuts assume executables live in $INSTDIR (or bin), so we create
+  # proper shortcuts pointing to our nested path and adjust the FinishPage runner.
+  # Avoid default shortcut generation to prevent broken links.
+  set(CPACK_PACKAGE_EXECUTABLES "")
+  set(CPACK_CREATE_DESKTOP_LINKS "")
+  set(CPACK_NSIS_MUI_FINISHPAGE_RUN "${INSTALL_DIR_NAME}\\Ultralight-WebBrowser.exe")
   if(APP_ICON_ICO)
     # NSIS UI and product icons
     set(CPACK_NSIS_MUI_ICON "${APP_ICON_ICO}")
     set(CPACK_NSIS_MUI_UNIICON "${APP_ICON_ICO}")
-    set(CPACK_NSIS_INSTALLED_ICON_NAME "Ultralight-WebBrowser.exe")
+    set(CPACK_NSIS_INSTALLED_ICON_NAME "${INSTALL_DIR_NAME}\\Ultralight-WebBrowser.exe")
     # WiX product icon (if WIX generator is used explicitly by user)
     set(CPACK_WIX_PRODUCT_ICON "${APP_ICON_ICO}")
   endif()
+
+  # Create Start Menu and Desktop shortcuts pointing to the correct nested path
+  set(CPACK_NSIS_CREATE_ICONS_EXTRA
+      "CreateShortCut \"$SMPROGRAMS\\$STARTMENU_FOLDER\\Ultralight Web Browser.lnk\" \"$INSTDIR\\${INSTALL_DIR_NAME}\\Ultralight-WebBrowser.exe\""
+      "CreateShortCut \"$DESKTOP\\Ultralight Web Browser.lnk\" \"$INSTDIR\\${INSTALL_DIR_NAME}\\Ultralight-WebBrowser.exe\""
+  )
+  set(CPACK_NSIS_DELETE_ICONS_EXTRA
+      "Delete \"$SMPROGRAMS\\$STARTMENU_FOLDER\\Ultralight Web Browser.lnk\""
+      "Delete \"$DESKTOP\\Ultralight Web Browser.lnk\""
+  )
 else()
   # Default non-Windows generator
   if(NOT DEFINED CPACK_GENERATOR)
