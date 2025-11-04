@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 using ultralight::JSArgs;
 using ultralight::JSFunction;
@@ -75,6 +76,13 @@ protected:
   void ShowContextMenuOverlay(int x, int y, const ultralight::String &json_info);
   void HideContextMenuOverlay();
 
+  // History management
+  void RecordHistory(const String &url, const String &title);
+  String GetHistoryJSON();
+  void ClearHistory();
+  void SetHistoryEnabled(bool enabled) { history_enabled_ = enabled; }
+  bool history_enabled() const { return history_enabled_; }
+
   // Compute a best-effort favicon URL (origin + "/favicon.ico") for http/https URLs
   String GetFaviconURL(const String &page_url);
 
@@ -124,6 +132,16 @@ protected:
   // Cache favicon URL per site origin so multiple tabs/pages reuse it
   // Key: origin string (eg, https://example.com), Value: favicon URL
   std::map<std::string, std::string> favicon_cache_;
+
+  // Simple in-memory history
+  struct HistoryEntry
+  {
+    std::string url;
+    std::string title;
+    uint64_t timestamp_ms;
+  };
+  std::vector<HistoryEntry> history_;
+  bool history_enabled_ = true;
 
   friend class Tab;
 };

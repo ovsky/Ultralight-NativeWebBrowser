@@ -185,6 +185,10 @@ void Tab::OnBeginLoading(View *caller, uint64_t frame_id, bool is_main_frame, co
 void Tab::OnFinishLoading(View *caller, uint64_t frame_id, bool is_main_frame, const String &url)
 {
   ui_->UpdateTabNavigation(id_, caller->is_loading(), caller->CanGoBack(), caller->CanGoForward());
+  if (is_main_frame && ui_)
+  {
+    ui_->RecordHistory(url, caller->title());
+  }
 }
 
 void Tab::OnFailLoading(View *caller, uint64_t frame_id, bool is_main_frame, const String &url,
@@ -262,6 +266,21 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
     })();
   )JS";
   caller->EvaluateScript(script, nullptr);
+
+  // If this is our History page, expose native methods
+  {
+    auto url_u = url.utf8();
+    const char *c = url_u.data();
+    if (c && std::strstr(c, "history.html"))
+    {
+      RefPtr<JSContext> ctx = caller->LockJSContext();
+      SetJSContext(ctx->ctx());
+      JSObject global = JSGlobalObject();
+      global["NativeGetHistory"] = BindJSCallbackWithRetval(&Tab::OnHistoryGetData);
+      global["NativeClearHistory"] = BindJSCallback(&Tab::OnHistoryClear);
+      global["NativeSetHistoryEnabled"] = BindJSCallback(&Tab::OnHistorySetEnabled);
+    }
+  }
 }
 
 void Tab::OnOpenContextMenu(const JSObject &obj, const JSArgs &args)
@@ -283,4 +302,32 @@ void Tab::OnOpenContextMenu(const JSObject &obj, const JSArgs &args)
   {
     ui_->ShowContextMenuOverlay(win_x, win_y, json);
   }
+}
+
+// --- History page JS bridge ---
+JSValue Tab::OnHistoryGetData(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_)
+    return JSValue();
+  return JSValue(ui_->GetHistoryJSON());
+}
+
+void Tab::OnHistoryClear(const JSObject &obj, const JSArgs &args)
+{
+  if (ui_)
+    ui_->ClearHistory();
+}
+
+void Tab::OnHistorySetEnabled(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_)
+    return;
+  bool enabled = true;
+  if (args.size() >= 1)
+  {
+    // We pass 1 for enabled, 0 for disabled
+    double v = args[0];
+    enabled = (v != 0.0);
+  }
+  ui_->SetHistoryEnabled(enabled);
 }

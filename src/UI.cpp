@@ -2,6 +2,7 @@
 #include <cstring>
 #include <cmath>
 #include <Ultralight/Renderer.h>
+#include <chrono>
 
 static UI *g_ui = 0;
 
@@ -547,6 +548,86 @@ String UI::GetFaviconURL(const String &page_url)
   std::string favicon = origin_str + "/favicon.ico";
   favicon_cache_[origin_str] = favicon;
   return String(favicon.c_str());
+}
+
+// --- History helpers ---
+void UI::RecordHistory(const String &url, const String &title)
+{
+  if (!history_enabled_)
+    return;
+
+  auto url_u = url.utf8();
+  const char *c_url = url_u.data();
+  if (!c_url)
+    return;
+
+  // Only record http(s)
+  if (strncmp(c_url, "http://", 7) != 0 && strncmp(c_url, "https://", 8) != 0)
+    return;
+
+  // Basic cap to avoid unbounded growth
+  if (history_.size() >= 500)
+    history_.erase(history_.begin());
+
+  auto title_u = title.utf8();
+  std::string t = title_u.data() ? title_u.data() : "";
+  std::string u = c_url;
+  uint64_t now_ms = (uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::system_clock::now().time_since_epoch())
+                        .count();
+  history_.push_back({u, t, now_ms});
+}
+
+static std::string jsonEscape(const std::string &s)
+{
+  std::string out;
+  out.reserve(s.size() + 8);
+  for (char c : s)
+  {
+    switch (c)
+    {
+    case '\\':
+      out += "\\\\";
+      break;
+    case '"':
+      out += "\\\"";
+      break;
+    case '\n':
+      out += "\\n";
+      break;
+    case '\r':
+      out += "\\r";
+      break;
+    case '\t':
+      out += "\\t";
+      break;
+    default:
+      out += c;
+      break;
+    }
+  }
+  return out;
+}
+
+String UI::GetHistoryJSON()
+{
+  // Serialize as { enabled: bool, items: [ {url,title,time}, ... ] }
+  std::string json = std::string("{\"enabled\":") + (history_enabled_ ? "true" : "false") + ",\"items\":[";
+  // Newest first
+  for (size_t i = 0; i < history_.size(); ++i)
+  {
+    const auto &e = history_[history_.size() - 1 - i];
+    if (i)
+      json += ",";
+    json += "{\"url\":\"" + jsonEscape(e.url) + "\",\"title\":\"" + jsonEscape(e.title) + "\",\"time\":" + std::to_string(e.timestamp_ms) + "}";
+  }
+  json += "]}";
+  return String(json.c_str());
+}
+
+void UI::ClearHistory()
+{
+  history_.clear();
 }
 
 void UI::OnMenuOpen(const JSObject &obj, const JSArgs &args)
