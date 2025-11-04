@@ -8,7 +8,7 @@ static UI *g_ui = 0;
 #define UI_HEIGHT 80
 
 UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
-                                 is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false)
+                                is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false)
 {
   uint32_t window_width = window_->width();
   ui_height_ = (uint32_t)std::round(UI_HEIGHT * window_->scale());
@@ -22,7 +22,7 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
 }
 
 // Compatibility overload: accepts optional ad/tracker blockers (ignored if not used)
-UI::UI(RefPtr<Window> window, AdBlocker* adblock, AdBlocker* tracker)
+UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
     : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
       is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false),
       adblock_(adblock), trackerblock_(tracker)
@@ -98,6 +98,7 @@ bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
   if (active_tab())
   {
     active_tab()->view()->FireKeyEvent(evt);
+    return false; // Consume to avoid double-dispatch to focused view
   }
 
   return true;
@@ -127,8 +128,8 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
       bool on_ui = evt.y <= ui_height_;
       char script_buf[512];
       std::snprintf(script_buf, sizeof(script_buf),
-        "(function(x,y){try{var t=document.elementFromPoint(x,y);var a=t&&t.closest?t.closest('a[href]'):null;var img=t&&t.closest?t.closest('img[src]'):null;var sel='';try{sel=String(window.getSelection?window.getSelection():'');}catch(_){}var info={linkURL:a&&a.href?a.href:'',imageURL:img&&img.src?img.src:'',selectionText:sel||'',isEditable:!!(t&&(t.isContentEditable||(t.tagName==='INPUT'||t.tagName==='TEXTAREA')))};return JSON.stringify(info);}catch(e){return '{}';}})(%d,%d)",
-        on_ui ? evt.x : evt.x, on_ui ? evt.y : (evt.y - ui_height_ < 0 ? 0 : evt.y - ui_height_));
+                    "(function(x,y){try{var t=document.elementFromPoint(x,y);var a=t&&t.closest?t.closest('a[href]'):null;var img=t&&t.closest?t.closest('img[src]'):null;var sel='';try{sel=String(window.getSelection?window.getSelection():'');}catch(_){}var info={linkURL:a&&a.href?a.href:'',imageURL:img&&img.src?img.src:'',selectionText:sel||'',isEditable:!!(t&&(t.isContentEditable||(t.tagName==='INPUT'||t.tagName==='TEXTAREA')))};return JSON.stringify(info);}catch(e){return '{}';}})(%d,%d)",
+                    on_ui ? evt.x : evt.x, on_ui ? evt.y : (evt.y - ui_height_ < 0 ? 0 : evt.y - ui_height_));
 
       ultralight::String json;
       if (on_ui)
@@ -260,7 +261,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     closeTab = global["closeTab"];
     focusAddressBar = global["focusAddressBar"];
     isAddressBarFocused = global["isAddressBarFocused"];
-  // (no adblock in this build)
+    // (no adblock in this build)
   }
 
   global["OnBack"] = BindJSCallback(&UI::OnBack);
@@ -323,7 +324,6 @@ void UI::OnToggleTools(const JSObject &obj, const JSArgs &args)
   if (active_tab())
     active_tab()->ToggleInspector();
 }
-
 
 void UI::OnRequestNewTab(const JSObject &obj, const JSArgs &args)
 {
@@ -426,7 +426,6 @@ RefPtr<View> UI::CreateNewTabForChildView(const String &url)
   if (tab_height < 1)
     tab_height = 1;
   tabs_[id].reset(new Tab(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_));
-  
 
   RefPtr<JSContext> lock(view()->LockJSContext());
   addTab({id, "", GetFaviconURL(url), tabs_[id]->view()->is_loading()});
@@ -697,15 +696,30 @@ void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
       auto utf8 = text.utf8();
       std::string t = utf8.data() ? utf8.data() : "";
       // Minimal JS string escape for quotes and backslashes and newlines
-      std::string esc; esc.reserve(t.size()+8);
-      for (char c : t) {
-        switch(c){
-          case '\\': esc += "\\\\"; break;
-          case '"': esc += "\\\""; break;
-          case '\n': esc += "\\n"; break;
-          case '\r': esc += "\\r"; break;
-          case '\t': esc += "\\t"; break;
-          default: esc += c; break;
+      std::string esc;
+      esc.reserve(t.size() + 8);
+      for (char c : t)
+      {
+        switch (c)
+        {
+        case '\\':
+          esc += "\\\\";
+          break;
+        case '"':
+          esc += "\\\"";
+          break;
+        case '\n':
+          esc += "\\n";
+          break;
+        case '\r':
+          esc += "\\r";
+          break;
+        case '\t':
+          esc += "\\t";
+          break;
+        default:
+          esc += c;
+          break;
         }
       }
       std::string script = "(function(t){try{var el=document.activeElement; if(!el) return false;";
