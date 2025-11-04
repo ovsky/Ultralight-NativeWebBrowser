@@ -21,6 +21,23 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
   view()->LoadURL("file:///ui.html");
 }
 
+// Compatibility overload: accepts optional ad/tracker blockers (ignored if not used)
+UI::UI(RefPtr<Window> window, AdBlocker* adblock, AdBlocker* tracker)
+    : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
+      is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false),
+      adblock_(adblock), trackerblock_(tracker)
+{
+  uint32_t window_width = window_->width();
+  ui_height_ = (uint32_t)std::round(UI_HEIGHT * window_->scale());
+  base_ui_height_ = ui_height_;
+  overlay_ = Overlay::Create(window_, window_width, ui_height_, 0, 0);
+  g_ui = this;
+
+  view()->set_load_listener(this);
+  view()->set_view_listener(this);
+  view()->LoadURL("file:///ui.html");
+}
+
 UI::~UI()
 {
   view()->set_load_listener(nullptr);
