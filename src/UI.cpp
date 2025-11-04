@@ -275,10 +275,11 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     // context menu overlay actions
     global["OnContextMenuAction"] = BindJSCallback(&UI::OnContextMenuAction);
     setupContextMenu = global["setupContextMenu"];
-    // If we have pending data, initialize menu now
-    if (setupContextMenu && !pending_ctx_info_json_.empty())
+    // Initialize menu now (use '{}' if pending JSON is empty)
+    if (setupContextMenu)
     {
-      setupContextMenu({(double)pending_ctx_position_.first, (double)pending_ctx_position_.second, pending_ctx_info_json_});
+      ultralight::String info = pending_ctx_info_json_.empty() ? ultralight::String("{}") : pending_ctx_info_json_;
+      setupContextMenu({(double)pending_ctx_position_.first, (double)pending_ctx_position_.second, info});
     }
   }
   global["OnRequestNewTab"] = BindJSCallback(&UI::OnRequestNewTab);
@@ -614,12 +615,11 @@ void UI::ShowContextMenuOverlay(int x, int y, const ultralight::String &json_inf
   context_menu_overlay_->Show();
   context_menu_overlay_->Focus();
   view->set_load_listener(this);
-  // Store desired initial state via URL hash, actual init via setupContextMenu after DOMReady
-  view->LoadURL("file:///contextmenu.html");
-
-  // After DOM ready we will call setupContextMenu; defer data by storing in a temporary string
+  // Make data available before loading so OnDOMReady can initialize immediately
   pending_ctx_position_ = {x, y};
   pending_ctx_info_json_ = json_info;
+  // Load overlay document; we'll invoke setupContextMenu in OnDOMReady
+  view->LoadURL("file:///contextmenu.html");
 }
 
 void UI::HideContextMenuOverlay()
