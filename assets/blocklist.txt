@@ -1,0 +1,47 @@
+# Basic ad/tracker blocklist (sample)
+# Format:
+#  - example.com               (block domain + subdomains)
+#  - 0.0.0.0 example.com       (hosts-style)
+#  - ||example.com^            (adblock-style domain rule)
+#  - ads.js                    (simple URL substring)
+#  - lines starting with # are comments
+
+# Popular ad/tracker domains (tiny sample)
+0.0.0.0 doubleclick.net
+0.0.0.0 www.googleadservices.com
+0.0.0.0 googleads.g.doubleclick.net
+0.0.0.0 pagead2.googlesyndication.com
+0.0.0.0 adservice.google.com
+0.0.0.0 adservice.google.de
+0.0.0.0 adservice.google.co.uk
+0.0.0.0 adservice.google.fr
+0.0.0.0 adservice.google.it
+0.0.0.0 googletagservices.com
+0.0.0.0 googletagmanager.com
+0.0.0.0 securepubads.g.doubleclick.net
+0.0.0.0 tpc.googlesyndication.com
+0.0.0.0 www.googletagmanager.com
+0.0.0.0 www.googletagservices.com
+
+0.0.0.0 connect.facebook.net
+0.0.0.0 static.xx.fbcdn.net
+0.0.0.0 graph.facebook.com
+
+0.0.0.0 ads.yahoo.com
+0.0.0.0 analytics.yahoo.com
+
+0.0.0.0 cdn.taboola.com
+0.0.0.0 trc.taboola.com
+
+0.0.0.0 s.amazon-adsystem.com
+0.0.0.0 aax.amazon-adsystem.com
+
+0.0.0.0 ad.doubleclick.net
+0.0.0.0 adclick.g.doubleclick.net
+
+# Simple URL substring examples
+/ads.js
+/adserver/
+/adscript
+
+# You can add your own entries below...

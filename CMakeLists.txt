@@ -76,6 +76,8 @@ endfunction()
 # --- Original project definition ---
 set(SOURCES "src/Browser.h"
             "src/Browser.cpp"
+            "src/AdBlocker.h"
+            "src/AdBlocker.cpp"
             "src/Tab.h"
             "src/Tab.cpp"
             "src/UI.h"

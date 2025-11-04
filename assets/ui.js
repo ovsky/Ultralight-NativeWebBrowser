@@ -1,19 +1,19 @@
 function updateBack(enable) {
-    if (enable)
+	if (enable)
 		document.getElementById("back").classList.remove("disabled");
 	else
 		document.getElementById("back").classList.add("disabled");
 }
 
 function updateForward(enable) {
-    if (enable)
+	if (enable)
 		document.getElementById("forward").classList.remove("disabled");
 	else
 		document.getElementById("forward").classList.add("disabled");
 }
 
 function updateLoading(is_loading) {
-    if (is_loading) {
+	if (is_loading) {
 		document.getElementById("refresh").style.display = "none";
 		document.getElementById("stop").style.display = "inline-block";
 	} else {
@@ -27,13 +27,21 @@ function updateURL(url) {
 }
 
 function focusAddressBar() {
-    let address = document.getElementById('address');
-    address.focus();
-    address.select();
+	let address = document.getElementById('address');
+	address.focus();
+	address.select();
 }
 
 document.getElementById('address').addEventListener('blur', () => {
-  if (window.OnAddressBarBlur) {
-    window.OnAddressBarBlur();
-  }
+	if (window.OnAddressBarBlur) {
+		window.OnAddressBarBlur();
+	}
 });
+
+// Update AdBlock toggle visual state: when enabled, normal; when disabled, grey out
+function updateAdblockEnabled(enabled) {
+	const el = document.getElementById('toggle-adblock');
+	if (!el) return;
+	if (enabled) el.classList.remove('disabled');
+	else el.classList.add('disabled');
+}

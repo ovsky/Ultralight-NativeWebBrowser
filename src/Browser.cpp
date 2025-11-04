@@ -3,6 +3,9 @@
 #include <Ultralight/platform/Platform.h>
 #include <Ultralight/platform/Config.h>
 #include <Ultralight/Renderer.h>
+#include <memory>
+
+#include "AdBlocker.h"
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -53,7 +56,13 @@ Browser::Browser()
 #endif
 
   // Create the UI
-  ui_.reset(new UI(window_));
+  // Initialize ad/tracker blocker with default blocklist and additional filters
+  adblock_ = std::make_unique<AdBlocker>();
+  adblock_->Clear();
+  adblock_->LoadBlocklist("assets/blocklist.txt", true);
+  adblock_->LoadBlocklistsInDirectory("assets/filters");
+
+  ui_.reset(new UI(window_, adblock_.get(), adblock_.get()));
   window_->set_listener(ui_.get());
 }
 
