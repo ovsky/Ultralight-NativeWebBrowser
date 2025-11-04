@@ -28,6 +28,41 @@ jobs:
             Write-Host "ULTRALIGHT_SDK_URL already provided: $env:ULTRALIGHT_SDK_URL"
             exit 0
           }
+          # First attempt: Use GitHub API to list sdks branch and pick latest Windows SDK (x64)
+          $api = "https://api.github.com/repos/${{ github.repository }}/contents/sdks?ref=sdks"
+          $headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = "application/vnd.github+json" }
+          Write-Host "Querying GitHub API for SDK files: $api"
+          try { $resp = Invoke-RestMethod -Uri $api -Headers $headers -Method Get -UseBasicParsing } catch { $resp = $null }
+          if ($resp) {
+            $names = @($resp | Where-Object { $_.type -eq 'file' } | ForEach-Object { $_.name })
+            if ($names.Count -gt 0) {
+              Write-Host "Found files in sdks branch:"; $names | ForEach-Object { Write-Host "  $_" }
+              $candidates = @()
+              foreach ($n in $names) {
+                if ($n -match '^ultralight(-free)?-sdk-([0-9]+\.[0-9]+\.[0-9]+)-(win|windows)-x64\.7z$') { $candidates += $n }
+              }
+              if ($candidates.Count -gt 0) {
+                $best = $null
+                foreach ($f in $candidates) {
+                  $m = [regex]::Match($f, '([0-9]+\.[0-9]+\.[0-9]+)')
+                  if ($m.Success) {
+                    $ver = [version]$m.Groups[1].Value
+                    if (-not $best -or $ver -gt $best.Version) { $best = [pscustomobject]@{ Version=$ver; File=$f } }
+                  }
+                }
+                if ($best) {
+                  $baseRaw = "https://raw.githubusercontent.com/${{ github.repository }}/sdks/sdks"
+                  $url = "$baseRaw/$($best.File)"
+                  Write-Host "Auto-detected latest Windows SDK URL=$url"
+                  "ULTRALIGHT_SDK_URL=$url" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+                  "ULTRALIGHT_VERSION=$($best.Version.ToString())" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+                  "url=$url" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+                  "version=$($best.Version.ToString())" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+                  exit 0
+                }
+              }
+            }
+          }
           $header = "data/include/Ultralight/Defines.h"
           $version = $null
           if (Test-Path $header) {

@@ -35,6 +35,80 @@ jobs:
             echo "ULTRALIGHT_SDK_URL already provided: $ULTRALIGHT_SDK_URL"
             exit 0
           fi
+          # First attempt: query GitHub API for latest macOS SDK in sdks branch and pick highest version
+          API="https://api.github.com/repos/${{ github.repository }}/contents/sdks?ref=sdks"
+          echo "Querying GitHub API for SDK files: $API"
+          RESP=$(curl -fLs -H "Authorization: Bearer ${GITHUB_TOKEN:-}" -H "Accept: application/vnd.github+json" "$API" || true)
+          if [ -n "$RESP" ]; then
+            echo "Parsing SDK filenames from API response..."
+            # Extract all file names from the JSON (without jq)
+            NAMES=$(printf "%s" "$RESP" | grep -oE '"name"\s*:\s*"[^"]+"' | sed -E 's/.*"name"\s*:\s*"([^"]+)".*/\1/')
+            echo "Found files in sdks branch:"; printf ' - %s\n' $NAMES | sed 's/^/  /'
+            ARCH=$(uname -m)
+            # Build a filtered list of macOS archives (supporting various naming conventions)
+            MAC_LIST=""
+            for nm in $NAMES; do
+              case "$nm" in
+                ultralight*-sdk-*-mac-*.7z|ultralight*-sdk-*-macos-*.7z|ultralight*-sdk-*-osx-*.7z)
+                  MAC_LIST="$MAC_LIST $nm" ;;
+              esac
+            done
+            if [ -n "$MAC_LIST" ]; then
+              echo "macOS SDK candidates:"; for f in $MAC_LIST; do echo "  $f"; done
+              # Prefer runner arch (arm64 first when on arm64), then x64
+              PREF_ARCHES="x64"
+              if [ "$ARCH" = "arm64" ]; then PREF_ARCHES="arm64 x64"; fi
+              CHOSEN_FILE=""
+              CHOSEN_VER=""
+              read_version() {
+                local v="$1" a r b c
+                a="${v%%.*}"; r="${v#*.}"; b="${r%%.*}"; c="${r#*.}"
+                printf '%s %s %s' "${a:-0}" "${b:-0}" "${c:-0}"
+              }
+              ver_gt() {
+                # returns 0 (true) if $1 > $2 as semantic version x.y.z
+                [ "$1" = "$2" ] && return 1
+                set -- $(read_version "$1") $(read_version "$2")
+                local a1="$1" a2="$2" a3="$3" b1="$4" b2="$5" b3="$6"
+                if [ $((10#$a1)) -gt $((10#$b1)) ]; then return 0; fi
+                if [ $((10#$a1)) -lt $((10#$b1)) ]; then return 1; fi
+                if [ $((10#$a2)) -gt $((10#$b2)) ]; then return 0; fi
+                if [ $((10#$a2)) -lt $((10#$b2)) ]; then return 1; fi
+                if [ $((10#$a3)) -gt $((10#$b3)) ]; then return 0; fi
+                return 1
+              }
+              for PA in $PREF_ARCHES; do
+                LIST_FOR_ARCH=$(for f in $MAC_LIST; do echo "$f"; done | grep -E "-$PA\.7z$" || true)
+                if [ -n "$LIST_FOR_ARCH" ]; then
+                  BEST_VER=""; BEST_FILE=""
+                  for f in $LIST_FOR_ARCH; do
+                    v=$(echo "$f" | sed -E 's/^.*-([0-9]+\.[0-9]+\.[0-9]+)-(mac|macos|osx)-.*$/\1/')
+                    if [ -n "$v" ]; then
+                      if [ -z "$BEST_VER" ] || ver_gt "$v" "$BEST_VER"; then
+                        BEST_VER="$v"; BEST_FILE="$f"
+                      fi
+                    fi
+                  done
+                  if [ -n "$BEST_FILE" ]; then
+                    CHOSEN_VER="$BEST_VER"
+                    CHOSEN_FILE="$BEST_FILE"
+                    echo "Selected latest for arch=$PA: version=$CHOSEN_VER file=$CHOSEN_FILE"
+                    break
+                  fi
+                fi
+              done
+              if [ -n "$CHOSEN_FILE" ]; then
+                BASE_RAW="https://raw.githubusercontent.com/${{ github.repository }}/sdks/sdks"
+                URL="$BASE_RAW/$CHOSEN_FILE"
+                echo "Auto-detected latest macOS SDK URL=$URL"
+                echo "ULTRALIGHT_SDK_URL=$URL" >> "$GITHUB_ENV"
+                echo "ULTRALIGHT_VERSION=$CHOSEN_VER" >> "$GITHUB_ENV"
+                echo "url=$URL" >> "$GITHUB_OUTPUT"
+                echo "version=$CHOSEN_VER" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+          fi
           HEADER="data/include/Ultralight/Defines.h"
           VERSION=""
           if [ -f "$HEADER" ]; then

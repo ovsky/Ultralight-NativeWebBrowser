@@ -25,6 +25,47 @@ jobs:
             echo "ULTRALIGHT_SDK_URL already provided: $ULTRALIGHT_SDK_URL"
             exit 0
           fi
+          # First attempt: auto-detect latest Linux SDK by listing sdks branch via GitHub API
+          API="https://api.github.com/repos/${{ github.repository }}/contents/sdks?ref=sdks"
+          echo "Querying GitHub API for SDK files: $API"
+          RESP=$(curl -fLs -H "Authorization: Bearer ${GITHUB_TOKEN:-}" -H "Accept: application/vnd.github+json" "$API" || true)
+          if [ -n "$RESP" ]; then
+            echo "Parsing SDK filenames from API response..."
+            NAMES=$(printf "%s" "$RESP" | grep -oE '"name"\s*:\s*"[^"]+"' | sed -E 's/.*"name"\s*:\s*"([^"]+)".*/\1/')
+            echo "Found files in sdks branch:"; printf ' - %s\n' $NAMES | sed 's/^/  /'
+            ARCH=$(uname -m)
+            PREF_ARCH="x64"; if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then PREF_ARCH="arm64"; fi
+            # Filter linux archives
+            LINUX_LIST=$(for nm in $NAMES; do case "$nm" in ultralight*-sdk-*-linux-*.7z) echo "$nm";; esac; done)
+            if [ -n "$LINUX_LIST" ]; then
+              read_version() { local v="$1" a r b c; a="${v%%.*}"; r="${v#*.}"; b="${r%%.*}"; c="${r#*.}"; printf '%s %s %s' "${a:-0}" "${b:-0}" "${c:-0}"; }
+              ver_gt() { [ "$1" = "$2" ] && return 1; set -- $(read_version "$1") $(read_version "$2"); local a1="$1" a2="$2" a3="$3" b1="$4" b2="$5" b3="$6"; if [ $((10#$a1)) -gt $((10#$b1)) ]; then return 0; fi; if [ $((10#$a1)) -lt $((10#$b1)) ]; then return 1; fi; if [ $((10#$a2)) -gt $((10#$b2)) ]; then return 0; fi; if [ $((10#$a2)) -lt $((10#$b2)) ]; then return 1; fi; if [ $((10#$a3)) -gt $((10#$b3)) ]; then return 0; fi; return 1; }
+              BEST_VER=""; BEST_FILE=""
+              for f in $LINUX_LIST; do
+                case "$f" in *-linux-$PREF_ARCH.7z) : ;; *) continue;; esac
+                v=$(echo "$f" | sed -E 's/^.*-([0-9]+\.[0-9]+\.[0-9]+)-linux-.*$/\1/')
+                if [ -n "$v" ]; then if [ -z "$BEST_VER" ] || ver_gt "$v" "$BEST_VER"; then BEST_VER="$v"; BEST_FILE="$f"; fi; fi
+              done
+              if [ -z "$BEST_FILE" ] && [ "$PREF_ARCH" = "arm64" ]; then
+                # Fallback to x64 if no arm64 archive present
+                for f in $LINUX_LIST; do
+                  case "$f" in *-linux-x64.7z) : ;; *) continue;; esac
+                  v=$(echo "$f" | sed -E 's/^.*-([0-9]+\.[0-9]+\.[0-9]+)-linux-.*$/\1/')
+                  if [ -n "$v" ]; then if [ -z "$BEST_VER" ] || ver_gt "$v" "$BEST_VER"; then BEST_VER="$v"; BEST_FILE="$f"; fi; fi
+                done
+              fi
+              if [ -n "$BEST_FILE" ]; then
+                BASE_RAW="https://raw.githubusercontent.com/${{ github.repository }}/sdks/sdks"
+                URL="$BASE_RAW/$BEST_FILE"
+                echo "Auto-detected latest Linux SDK URL=$URL"
+                echo "ULTRALIGHT_SDK_URL=$URL" >> "$GITHUB_ENV"
+                echo "ULTRALIGHT_VERSION=$BEST_VER" >> "$GITHUB_ENV"
+                echo "url=$URL" >> "$GITHUB_OUTPUT"
+                echo "version=$BEST_VER" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+          fi
           HEADER="data/include/Ultralight/Defines.h"
           VERSION=""
           if [ -f "$HEADER" ]; then
