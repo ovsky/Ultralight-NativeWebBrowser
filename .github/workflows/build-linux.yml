@@ -221,7 +221,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if echo "${PACKAGE_GENERATORS:-}" | grep -q RPM; then
+          gens_uc=$(echo "${PACKAGE_GENERATORS:-}" | tr '[:lower:]' '[:upper:]' | tr -d ' ')
+          if echo "$gens_uc" | grep -q RPM; then
             sudo apt-get update
             sudo apt-get install -y rpm
           fi
@@ -231,9 +232,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gens="${PACKAGE_GENERATORS:-TGZ}"
+          gens=$(echo "${PACKAGE_GENERATORS:-TGZ}" | tr '[:lower:]' '[:upper:]' | tr -d ' ')
           echo "Using CPack generators: $gens"
           cpack --config build/CPackConfig.cmake -C Release -G "$gens"
+
+      - name: 8.2 List package outputs
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Listing build directory after CPack:"
+          ls -la "${{ github.workspace }}/build" || true
 
       - name: "7.5 Diagnostics: verify runtime contents"
         if: steps.prep_sdk.outputs.present == 'true'
@@ -298,6 +307,6 @@ jobs:
         with:
           name: ultralight-linux-packages
           path: |
-            build/*.tar.gz
-            build/*.deb
-            build/*.rpm
+            ${{ github.workspace }}/build/*.tar.gz
+            ${{ github.workspace }}/build/*.deb
+            ${{ github.workspace }}/build/*.rpm
