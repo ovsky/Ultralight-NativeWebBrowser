@@ -6,6 +6,23 @@ name: Build - macOS (x64)
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      sdk_url:
+        description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
+        required: false
+        type: string
+      version:
+        description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
+        required: false
+        type: string
+      webbrowser_version:
+        description: "Override build version name (default 'dev')"
+        required: false
+        type: string
+      package_format:
+        description: "Package format(s) to produce via CPack (eg. TGZ or DMG or multi 'TGZ;DMG')"
+        required: false
+        type: string
   workflow_call:
     inputs:
       sdk_url:
@@ -14,6 +31,10 @@ on:
         type: string
       version:
         description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
+        required: false
+        type: string
+      webbrowser_version:
+        description: "Override build version name (default 'dev')"
         required: false
         type: string
       package_format:
@@ -29,11 +50,17 @@ jobs:
       contents: read
       actions: write
     env:
-      ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url }}
-      ULTRALIGHT_VERSION: ${{ inputs.version }}
-      PACKAGE_GENERATORS: ${{ inputs.package_format || 'TGZ' }}
+      ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url || github.event.inputs.sdk_url }}
+      ULTRALIGHT_VERSION: ${{ inputs.version || github.event.inputs.version }}
+      WEBBROWSER_VERSION: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}
+      PACKAGE_GENERATORS: ${{ inputs.package_format || github.event.inputs.package_format || 'TGZ' }}
       TARGET_ARCH: x64
     steps:
+      - name: 0. Configure Git (longpaths, autocrlf=false)
+        run: |
+          git config --global core.longpaths true
+          git config --global core.autocrlf false
+
       - name: 1. Checkout
         uses: actions/checkout@v4
         with:
@@ -261,7 +288,7 @@ jobs:
         run: |
           cmake --version
           echo "Configuring with ULTRALIGHT_SDK_ROOT=$ULTRALIGHT_SDK_ROOT"
-          cmake -S . -B build -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT" -DBUILD_TESTING=ON
+          cmake -S . -B build -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT" -DBUILD_TESTING=ON -DWEBBROWSER_VERSION="$WEBBROWSER_VERSION"
 
       - name: 6. Build Project (Release)
         if: steps.prep_sdk.outputs.present == 'true'

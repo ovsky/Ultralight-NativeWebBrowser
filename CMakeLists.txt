@@ -306,7 +306,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 endif()
 
 # --- Packaging via CPack ---
-# Try to extract Ultralight SDK version from header for package version; fallback to 1.4.0
+# Try to extract Ultralight SDK version from header for reference; fallback to 1.4.0
 set(ULTRALIGHT_VERSION_STR "1.4.0")
 if(EXISTS "${ULTRALIGHT_SDK_ROOT}/include/Ultralight/Defines.h")
   file(READ "${ULTRALIGHT_SDK_ROOT}/include/Ultralight/Defines.h" _UL_DEFINES)
@@ -316,9 +316,16 @@ if(EXISTS "${ULTRALIGHT_SDK_ROOT}/include/Ultralight/Defines.h")
   endif()
 endif()
 
+# Allow overriding the package version with a browser-specific version (defaults to "dev")
+set(WEBBROWSER_VERSION "dev" CACHE STRING "WebBrowser version to use in package names (defaults to 'dev')")
+
 set(CPACK_PACKAGE_NAME "Ultralight-WebBrowser")
 set(CPACK_PACKAGE_VENDOR "Ultralight")
-set(CPACK_PACKAGE_VERSION "${ULTRALIGHT_VERSION_STR}")
+if(WEBBROWSER_VERSION)
+  set(CPACK_PACKAGE_VERSION "${WEBBROWSER_VERSION}")
+else()
+  set(CPACK_PACKAGE_VERSION "${ULTRALIGHT_VERSION_STR}")
+endif()
 set(CPACK_PACKAGE_CONTACT "noreply@example.com")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set(CPACK_OUTPUT_FILE_PREFIX "${CMAKE_BINARY_DIR}")

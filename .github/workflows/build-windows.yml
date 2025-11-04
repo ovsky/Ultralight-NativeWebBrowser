@@ -9,6 +9,23 @@ name: Build - Windows
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      sdk_url:
+        description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
+        required: false
+        type: string
+      version:
+        description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
+        required: false
+        type: string
+      webbrowser_version:
+        description: "Override build version name (default 'dev')"
+        required: false
+        type: string
+      create_installer:
+        description: "Create Windows installer via CPack (NSIS)"
+        required: false
+        type: boolean
   workflow_call:
     inputs:
       sdk_url:
@@ -17,6 +34,10 @@ on:
         type: string
       version:
         description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
+        required: false
+        type: string
+      webbrowser_version:
+        description: "Override build version name (default 'dev')"
         required: false
         type: string
       create_installer:
@@ -31,9 +52,16 @@ jobs:
     env:
       ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url || github.event.inputs.sdk_url }}
       ULTRALIGHT_VERSION: ${{ inputs.version || github.event.inputs.version }}
+      WEBBROWSER_VERSION: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}
       CREATE_INSTALLER: ${{ inputs.create_installer || github.event.inputs.create_installer }}
 
     steps:
+      - name: "0. Configure Git (longpaths, autocrlf=false)"
+        shell: pwsh
+        run: |
+          git config --global core.longpaths true
+          git config --global core.autocrlf false
+
       - name: "1. Checkout Code (with submodules)"
         uses: actions/checkout@v4
         with:
@@ -204,7 +232,7 @@ jobs:
           if ($createInstaller -eq '' -or $null -eq $createInstaller) { $createInstaller = 'false' }
           $installerFlag = if ($createInstaller -match '^(true|1|on)$') { 'ON' } else { 'OFF' }
           Write-Host "CREATE_INSTALLER=$createInstaller -> -DCREATE_INSTALLER=$installerFlag"
-          cmake -S . -B build -DULTRALIGHT_SDK_ROOT="${{ env.ULTRALIGHT_SDK_ROOT }}" -DBUILD_TESTING=ON -DCREATE_INSTALLER=$installerFlag
+          cmake -S . -B build -DULTRALIGHT_SDK_ROOT="${{ env.ULTRALIGHT_SDK_ROOT }}" -DBUILD_TESTING=ON -DCREATE_INSTALLER=$installerFlag -DWEBBROWSER_VERSION="$env:WEBBROWSER_VERSION"
 
       - name: "6. Build Project"
         # We specify the 'Release' config at build time
@@ -241,6 +269,20 @@ jobs:
           popd
           Write-Host "CPack outputs:"
           Get-ChildItem -Path build -Recurse -Include *.exe,*.msi,*.zip | Select-Object -Property FullName,Length | Format-Table -AutoSize
+
+      - name: "6.3 Rename Windows installer"
+        if: ${{ inputs.create_installer == true }}
+        shell: pwsh
+        run: |
+          $version = "$env:WEBBROWSER_VERSION"
+          $desired = "Ultralight-WebBrowser-$version-Windows-Installer.exe"
+          $exe = Get-ChildItem -Path build -Filter *.exe -File -Recurse | Select-Object -First 1
+          if ($exe) {
+            Write-Host "Renaming installer: $($exe.FullName) -> $desired"
+            Move-Item -Force $exe.FullName (Join-Path $exe.DirectoryName $desired)
+          } else {
+            Write-Warning "No NSIS installer .exe found to rename."
+          }
 
       - name: "6.8 Run tests (ctest)"
         run: ctest --test-dir build -C Release --output-on-failure
@@ -284,13 +326,15 @@ jobs:
             throw "No expected output folder found. Checked: $($candidates -join ', ')"
           }
           Write-Host "Archiving from: $src"
-          Compress-Archive -Path (Join-Path $src '*') -DestinationPath ultralight-windows.zip -Force
+          $version = "$env:WEBBROWSER_VERSION"
+          $outName = "Ultralight-WebBrowser-$version-Windows-Portable.zip"
+          Compress-Archive -Path (Join-Path $src '*') -DestinationPath $outName -Force
 
       - name: "8. Upload Artifact"
         uses: actions/upload-artifact@v4
         with:
           name: ultralight-windows-build
-          path: ultralight-windows.zip
+          path: Ultralight-WebBrowser-*-Windows-Portable.zip
 
       - name: "8.1 Upload Installer"
         if: ${{ inputs.create_installer == true }}
@@ -298,7 +342,7 @@ jobs:
         with:
           name: ultralight-windows-installer
           path: |
-            build\*.exe
+            build\Ultralight-WebBrowser-*-Windows-Installer.exe
             build\*.msi
 
       - name: "8.2 Upload CPack ZIP"

@@ -5,25 +5,63 @@ name: Build - All (x64 + ARM64)
 
 on:
   workflow_dispatch:
+    inputs:
+      sdk_url:
+        description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
+        required: false
+        type: string
+      version:
+        description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
+        required: false
+        type: string
+      webbrowser_version:
+        description: "Override build version name (default 'dev')"
+        required: false
+        type: string
+      package_format:
+        description: "Package format(s) for macOS/Linux (eg. TGZ;DMG or TGZ;DEB;RPM)"
+        required: false
+        type: string
   pull_request:
 
 jobs:
   windows:
     uses: ./.github/workflows/build-windows.yml
     secrets: inherit
+    with:
+      sdk_url: ${{ inputs.sdk_url }}
+      version: ${{ inputs.version }}
+      webbrowser_version: ${{ inputs.webbrowser_version }}
 
   macos-x64:
     uses: ./.github/workflows/build-macos.yml
     secrets: inherit
+    with:
+      sdk_url: ${{ inputs.sdk_url }}
+      version: ${{ inputs.version }}
+      webbrowser_version: ${{ inputs.webbrowser_version }}
+      package_format: ${{ inputs.package_format }}
 
   macos-arm64:
     uses: ./.github/workflows/build-macos-arm64.yml
     secrets: inherit
+    with:
+      sdk_url: ${{ inputs.sdk_url }}
+      version: ${{ inputs.version }}
+      webbrowser_version: ${{ inputs.webbrowser_version }}
+      package_format: ${{ inputs.package_format }}
 
   linux-x64:
     uses: ./.github/workflows/build-linux.yml
     secrets: inherit
+    with:
+      sdk_url: ${{ inputs.sdk_url }}
+      version: ${{ inputs.version }}
+      webbrowser_version: ${{ inputs.webbrowser_version }}
+      package_format: ${{ inputs.package_format }}
 
   linux-arm64:
     uses: ./.github/workflows/build-linux-arm64.yml
     secrets: inherit
+    with:
+      webbrowser_version: ${{ inputs.webbrowser_version }}
