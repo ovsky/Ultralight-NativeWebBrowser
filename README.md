@@ -132,6 +132,20 @@ Linux packages install a desktop entry and icon (Application Menu → Ultralight
 
     -   Responsive window resizing
 
+-   **Ad/Tracker Blocking (lightweight):**
+
+        - Domain-based rules, URL substrings, and simple wildcard patterns.
+        - Default rules in `assets/blocklist.txt` plus extra lists under `assets/filters/` (all `.txt` files are loaded).
+        - Supported formats per line:
+            - `example.com` (blocks domain + subdomains)
+            - `0.0.0.0 example.com` (hosts-style)
+            - `||example.com^` (adblock-style domain rule)
+            - `/ads.js` (simple URL substring)
+            - `*://*/*analytics*.js` (simple glob; `*` and `?` supported)
+        - Notes:
+            - Local `file://` and `data:` URLs are always allowed.
+            - Network interception depends on SDK capabilities. If your Ultralight build does not expose network interception, rules may be ignored at runtime.
+
 
 ## 🛠️ Tech Stack
 

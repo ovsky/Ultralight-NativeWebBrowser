@@ -71,3 +71,10 @@ svg#icon_defs path {
      background-color: #343446;
      border-radius: 100%;
 }
+
+/* AdBlock toggle coloring: enabled => purple-blue, disabled => grey (inherited) */
+#toggle-adblock:not(.disabled) {
+     color: #6C63FF;
+     /* purple-blue */
+     fill: #6C63FF;
+}
