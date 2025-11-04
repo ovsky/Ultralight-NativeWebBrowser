@@ -61,6 +61,11 @@ public:
   void OnContextMenuAction(const JSObject &obj, const JSArgs &args);
   void OnToggleDarkMode(const JSObject &obj, const JSArgs &args);
   ultralight::JSValue OnGetDarkModeEnabled(const JSObject &obj, const JSArgs &args);
+  // Suggestions callback (address bar autocomplete)
+  ultralight::JSValue OnGetSuggestions(const JSObject &obj, const JSArgs &args);
+  // Adjust UI overlay height for suggestions dropdown
+  void OnSuggestOpen(const JSObject &obj, const JSArgs &args);
+  void OnSuggestClose(const JSObject &obj, const JSArgs &args);
 
   RefPtr<Window> window() { return window_; }
 
@@ -81,14 +86,40 @@ protected:
   void HideMenuOverlay();
   void ShowContextMenuOverlay(int x, int y, const ultralight::String &json_info);
   void HideContextMenuOverlay();
+  // Suggestions overlay (above all UI)
+  void ShowSuggestionsOverlay(int x, int y, int width, const ultralight::String &json_items);
+  void HideSuggestionsOverlay();
 
   // History management
   void RecordHistory(const String &url, const String &title);
   String GetHistoryJSON();
   void ClearHistory();
 
+  // Suggestions / persistence helpers
+  void LoadPopularSites();
+  void LoadHistoryFromDisk();
+  void SaveHistoryToDisk();
+  std::vector<std::string> GetSuggestions(const std::string &input, int maxResults);
+  // JS bridge to open/close suggestions overlay and pick
+  void OnOpenSuggestionsOverlay(const JSObject &obj, const JSArgs &args);
+  void OnCloseSuggestionsOverlay(const JSObject &obj, const JSArgs &args);
+  void OnSuggestionPick(const JSObject &obj, const JSArgs &args);
+  // Paste a suggestion URL into the address bar without navigating
+  void OnSuggestionPaste(const JSObject &obj, const JSArgs &args);
+  // Receive favicon image data (as data URL) from suggestions overlay and persist cache
+  void OnFaviconReady(const JSObject &obj, const JSArgs &args);
+
   // Compute a best-effort favicon URL (origin + "/favicon.ico") for http/https URLs
   String GetFaviconURL(const String &page_url);
+  // Get origin string (scheme+host+optional port)
+  static std::string GetOriginStringFromURL(const std::string &url);
+  // Favicon disk cache
+  void LoadFaviconDiskCache();
+  void SaveFaviconDiskCache();
+  std::string EnsureFaviconCacheDir();
+  static std::string Base64Decode(const std::string &in);
+  double GetOriginScore(const std::string &origin);
+  void PruneFaviconDiskCacheToLimit();
 
   Tab *active_tab() { return tabs_.empty() ? nullptr : tabs_[active_tab_id_].get(); }
 
@@ -101,6 +132,7 @@ protected:
   int tab_height_;
   RefPtr<Overlay> menu_overlay_;
   RefPtr<Overlay> context_menu_overlay_;
+  RefPtr<Overlay> suggestions_overlay_;
   float scale_;
   // Optional ad/tracker blocker references (may be unused in this build)
   AdBlocker *adblock_ = nullptr;
@@ -110,6 +142,10 @@ protected:
   ultralight::String pending_ctx_info_json_;
   // Which view the context menu operates on (0=none,1=UI overlay,2=page/tab)
   int ctx_target_ = 0;
+  // Transient suggestions state
+  std::pair<int, int> pending_sugg_position_ = {0, 0};
+  int pending_sugg_width_ = 0;
+  ultralight::String pending_sugg_json_;
 
   std::map<uint64_t, std::unique_ptr<Tab>> tabs_;
   uint64_t active_tab_id_ = 0;
@@ -132,10 +168,14 @@ protected:
   JSFunction isAddressBarFocused;
   // Context menu setup function in overlay view
   JSFunction setupContextMenu;
+  JSFunction setupSuggestions;
 
   // Cache favicon URL per site origin so multiple tabs/pages reuse it
   // Key: origin string (eg, https://example.com), Value: favicon URL
   std::map<std::string, std::string> favicon_cache_;
+  // Disk-persisted favicon file cache (origin -> file path)
+  std::map<std::string, std::string> favicon_file_cache_;
+  size_t favicon_cache_limit_ = 128;
 
   // Simple in-memory history
   struct HistoryEntry
@@ -143,9 +183,17 @@ protected:
     std::string url;
     std::string title;
     uint64_t timestamp_ms;
+    uint32_t visit_count;
   };
   std::vector<HistoryEntry> history_;
   // Always enabled (disable-history feature removed)
+
+  // Popular sites loaded from assets/popular_sites.json
+  std::vector<std::string> popular_sites_;
+
+  // Suggestions favicons toggle (read from assets/suggestions_favicons.txt: on/off)
+  bool suggestion_favicons_enabled_ = true;
+  void LoadSuggestionsFaviconsFlag();
 
   // Auto Dark Mode state
   bool dark_mode_enabled_ = false;

@@ -1,4 +1,4 @@
-#include "UI.h";
+#include "UI.h"
 #include <cstring>
 #include <cmath>
 #include <Ultralight/Renderer.h>
@@ -6,6 +6,15 @@
 #include <fstream>
 #include <sstream>
 #include <cctype>
+#include <algorithm>
+#include <unordered_set>
+#include <cstdio>
+#ifdef _WIN32
+#include <direct.h> // _mkdir, _getcwd
+#else
+#include <sys/stat.h> // mkdir
+#include <unistd.h>   // getcwd
+#endif
 
 static UI *g_ui = 0;
 
@@ -29,6 +38,10 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
 
   // Load popular sites for suggestions
   LoadPopularSites();
+  // Load suggestions favicons flag
+  LoadSuggestionsFaviconsFlag();
+  // Load favicon disk cache
+  LoadFaviconDiskCache();
 
   // Load history from disk
   LoadHistoryFromDisk();
@@ -55,6 +68,10 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
 
   // Load popular sites for suggestions
   LoadPopularSites();
+  // Load suggestions favicons flag
+  LoadSuggestionsFaviconsFlag();
+  // Load favicon disk cache
+  LoadFaviconDiskCache();
 
   // Load history from disk
   LoadHistoryFromDisk();
@@ -92,6 +109,21 @@ bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
   if (context_menu_overlay_ && context_menu_overlay_->view())
   {
     context_menu_overlay_->view()->FireKeyEvent(evt);
+    return false;
+  }
+  // If suggestions overlay is open, route navigation keys to it, others to UI overlay (address bar)
+  if (suggestions_overlay_ && suggestions_overlay_->view())
+  {
+    // Virtual key codes: use evt.virtual_key_code values for arrows/enter/escape
+    int vk = evt.virtual_key_code;
+    bool isNavKey = (vk == 0x26 /*UP*/ || vk == 0x28 /*DOWN*/ || vk == 0x0D /*ENTER*/ || vk == 0x1B /*ESC*/ || vk == 0x09 /*TAB*/);
+    if (isNavKey)
+    {
+      suggestions_overlay_->view()->FireKeyEvent(evt);
+      return false;
+    }
+    // Otherwise send to UI overlay so address bar receives typing
+    view()->FireKeyEvent(evt);
     return false;
   }
 
@@ -247,6 +279,45 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
     context_menu_overlay_->view()->FireMouseEvent(evt);
     return false;
   }
+  // If suggestions overlay is active, route mouse to it and consume
+  if (suggestions_overlay_ && suggestions_overlay_->view())
+  {
+    suggestions_overlay_->view()->FireMouseEvent(evt);
+    return false;
+  }
+
+  // Handle right-clicks globally (both navbar/UI and page content)
+  if (evt.type == MouseEvent::kType_MouseDown && evt.button == MouseEvent::kButton_Right)
+  {
+    bool on_ui = evt.y <= ui_height_;
+    // Build a small script to collect context info at the click point
+    char script_buf[512];
+    std::snprintf(script_buf, sizeof(script_buf),
+                  "(function(x,y){try{var t=document.elementFromPoint(x,y);var a=t&&t.closest?t.closest('a[href]'):null;var img=t&&t.closest?t.closest('img[src]'):null;var sel='';try{sel=String(window.getSelection?window.getSelection():'');}catch(_){ }var info={linkURL:a&&a.href?a.href:'',imageURL:img&&img.src?img.src:'',selectionText:sel||'',isEditable:!!(t&&(t.isContentEditable||(t.tagName==='INPUT'||t.tagName==='TEXTAREA')))};return JSON.stringify(info);}catch(e){return '{}';}})(%d,%d)",
+                  on_ui ? evt.x : evt.x,
+                  on_ui ? evt.y : (evt.y - ui_height_ < 0 ? 0 : evt.y - ui_height_));
+
+    ultralight::String json;
+    if (on_ui)
+    {
+      RefPtr<View> uiView = view();
+      json = uiView->EvaluateScript(script_buf, nullptr);
+      ctx_target_ = 1;
+    }
+    else if (active_tab())
+    {
+      json = active_tab()->view()->EvaluateScript(script_buf, nullptr);
+      ctx_target_ = 2;
+    }
+    else
+    {
+      ctx_target_ = 0;
+      json = "{}";
+    }
+
+    ShowContextMenuOverlay(evt.x, evt.y, json);
+    return false; // consume right-click
+  }
 
   // If mouse is interacting within the UI overlay region, forward to UI view and consume
   if (evt.y <= ui_height_)
@@ -263,38 +334,6 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
 
   if (evt.type == MouseEvent::kType_MouseDown)
   {
-    // Right-click: open our custom context menu overlay above everything
-    if (evt.button == MouseEvent::kButton_Right)
-    {
-      // Determine if click is on UI overlay (navbar) or page content
-      bool on_ui = evt.y <= ui_height_;
-      char script_buf[512];
-      std::snprintf(script_buf, sizeof(script_buf),
-                    "(function(x,y){try{var t=document.elementFromPoint(x,y);var a=t&&t.closest?t.closest('a[href]'):null;var img=t&&t.closest?t.closest('img[src]'):null;var sel='';try{sel=String(window.getSelection?window.getSelection():'');}catch(_){}var info={linkURL:a&&a.href?a.href:'',imageURL:img&&img.src?img.src:'',selectionText:sel||'',isEditable:!!(t&&(t.isContentEditable||(t.tagName==='INPUT'||t.tagName==='TEXTAREA')))};return JSON.stringify(info);}catch(e){return '{}';}})(%d,%d)",
-                    on_ui ? evt.x : evt.x, on_ui ? evt.y : (evt.y - ui_height_ < 0 ? 0 : evt.y - ui_height_));
-
-      ultralight::String json;
-      if (on_ui)
-      {
-        // Query UI overlay document
-        RefPtr<View> uiView = view();
-        json = uiView->EvaluateScript(script_buf, nullptr);
-        ctx_target_ = 1;
-      }
-      else if (active_tab())
-      {
-        json = active_tab()->view()->EvaluateScript(script_buf, nullptr);
-        ctx_target_ = 2;
-      }
-      else
-      {
-        ctx_target_ = 0;
-        json = "{}";
-      }
-
-      ShowContextMenuOverlay(evt.x, evt.y, json);
-      return false; // consume
-    }
     // Click occurred outside the UI overlay (handled above), switch focus to page
     address_bar_is_focused_ = false;
     if (active_tab())
@@ -387,8 +426,9 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   auto url_utf8 = url.utf8();
   bool is_menu_view = url_utf8.data() && std::strstr(url_utf8.data(), "menu.html") != nullptr;
   bool is_ctx_view = url_utf8.data() && std::strstr(url_utf8.data(), "contextmenu.html") != nullptr;
+  bool is_sugg_view = url_utf8.data() && std::strstr(url_utf8.data(), "suggestions.html") != nullptr;
 
-  if (!is_menu_view && !is_ctx_view)
+  if (!is_menu_view && !is_ctx_view && !is_sugg_view)
   {
     // Only main UI view has these functions
     updateBack = global["updateBack"];
@@ -424,6 +464,19 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
       setupContextMenu({(double)pending_ctx_position_.first, (double)pending_ctx_position_.second, info});
     }
   }
+  if (is_sugg_view)
+  {
+    // suggestions overlay actions
+    global["OnSuggestionPick"] = BindJSCallback(&UI::OnSuggestionPick);
+    global["OnSuggestionPaste"] = BindJSCallback(&UI::OnSuggestionPaste);
+    global["OnFaviconReady"] = BindJSCallback(&UI::OnFaviconReady);
+    setupSuggestions = global["setupSuggestions"];
+    if (setupSuggestions)
+    {
+      ultralight::String items = pending_sugg_json_.empty() ? ultralight::String("[]") : pending_sugg_json_;
+      setupSuggestions({(double)pending_sugg_position_.first, (double)pending_sugg_position_.second, (double)pending_sugg_width_, items});
+    }
+  }
   global["OnRequestNewTab"] = BindJSCallback(&UI::OnRequestNewTab);
   global["OnRequestTabClose"] = BindJSCallback(&UI::OnRequestTabClose);
   global["OnActiveTabChange"] = BindJSCallback(&UI::OnActiveTabChange);
@@ -433,8 +486,12 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
   global["OnAddressBarFocus"] = BindJSCallback(&UI::OnAddressBarFocus);
   global["GetSuggestions"] = BindJSCallbackWithRetval(&UI::OnGetSuggestions);
+  global["OpenSuggestionsOverlay"] = BindJSCallback(&UI::OnOpenSuggestionsOverlay);
+  global["CloseSuggestionsOverlay"] = BindJSCallback(&UI::OnCloseSuggestionsOverlay);
+  global["OnSuggestOpen"] = BindJSCallback(&UI::OnSuggestOpen);
+  global["OnSuggestClose"] = BindJSCallback(&UI::OnSuggestClose);
 
-  if (!is_menu_view && !is_ctx_view)
+  if (!is_menu_view && !is_ctx_view && !is_sugg_view)
   {
     CreateNewTab();
   }
@@ -742,26 +799,41 @@ void UI::RecordHistory(const String &url, const String &title)
   if (strncmp(c_url, "http://", 7) != 0 && strncmp(c_url, "https://", 8) != 0)
     return;
 
-  // Basic cap to avoid unbounded growth
-  if (history_.size() >= 500)
-    history_.erase(history_.begin());
-
+  // Basic cap to avoid unbounded growth later (we'll prune oldest when exceeding)
   auto title_u = title.utf8();
   std::string t = title_u.data() ? title_u.data() : "";
   std::string u = c_url;
   uint64_t now_ms = (uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
                         std::chrono::system_clock::now().time_since_epoch())
                         .count();
-  // Coalesce consecutive identical URLs: update latest entry instead of pushing a duplicate
-  if (!history_.empty() && history_.back().url == u)
+
+  // Find existing entry by URL and update; otherwise push new
+  bool found = false;
+  for (auto &e : history_)
   {
-    if (!t.empty())
-      history_.back().title = t; // fill in title when available
-    history_.back().timestamp_ms = now_ms;
+    if (e.url == u)
+    {
+      if (!t.empty()) e.title = t;
+      e.timestamp_ms = now_ms;
+      e.visit_count = (e.visit_count + 1);
+      found = true;
+      break;
+    }
   }
-  else
+  if (!found)
   {
-    history_.push_back({u, t, now_ms});
+    history_.push_back({u, t, now_ms, 1});
+  }
+
+  // Cap to 500 by removing oldest (by timestamp)
+  if (history_.size() > 500)
+  {
+    // Find oldest
+    size_t idx = 0; uint64_t oldest = UINT64_MAX; size_t oldest_i = 0;
+    for (idx = 0; idx < history_.size(); ++idx) {
+      if (history_[idx].timestamp_ms < oldest) { oldest = history_[idx].timestamp_ms; oldest_i = idx; }
+    }
+    history_.erase(history_.begin() + oldest_i);
   }
 
   // Save history to disk after recording
@@ -881,6 +953,16 @@ void UI::AdjustUIHeight(uint32_t new_height)
   overlay_->Resize(window_->width(), ui_height_);
 
   // Note: Do NOT move or resize tabs here; we only enlarge the UI overlay canvas.
+}
+
+void UI::OnSuggestOpen(const JSObject &obj, const JSArgs &args)
+{
+  // No-op: suggestions are shown in a top overlay; do not move layout.
+}
+
+void UI::OnSuggestClose(const JSObject &obj, const JSArgs &args)
+{
+  // No-op.
 }
 
 void UI::ShowMenuOverlay()
@@ -1161,7 +1243,7 @@ void UI::LoadPopularSites()
   std::ifstream in("assets/popular_sites.json", std::ios::in | std::ios::binary);
   if (!in.is_open())
     return;
-  
+
   std::ostringstream ss;
   ss << in.rdbuf();
   std::string content = ss.str();
@@ -1183,11 +1265,11 @@ void UI::LoadPopularSites()
     size_t quote2 = sites_array.find('"', quote1 + 1);
     if (quote2 == std::string::npos)
       break;
-    
+
     std::string site = sites_array.substr(quote1 + 1, quote2 - quote1 - 1);
     if (!site.empty())
       popular_sites_.push_back(site);
-    
+
     pos = quote2 + 1;
   }
 }
@@ -1216,7 +1298,7 @@ void UI::LoadHistoryFromDisk()
       break;
 
     std::string obj = content.substr(obj_start, obj_end - obj_start + 1);
-    
+
     // Extract url
     size_t url_key = obj.find("\"url\"");
     std::string url;
@@ -1264,8 +1346,25 @@ void UI::LoadHistoryFromDisk()
       }
     }
 
+    // Extract count (optional)
+    size_t count_key = obj.find("\"count\"");
+    uint32_t count = 1;
+    if (count_key != std::string::npos)
+    {
+      size_t colon2 = obj.find(':', count_key);
+      if (colon2 != std::string::npos)
+      {
+        size_t num_start = colon2 + 1;
+        while (num_start < obj.size() && (obj[num_start] == ' ' || obj[num_start] == '\t')) num_start++;
+        size_t num_end = num_start;
+        while (num_end < obj.size() && std::isdigit(obj[num_end])) num_end++;
+        if (num_end > num_start)
+          count = (uint32_t)std::stoul(obj.substr(num_start, num_end - num_start));
+      }
+    }
+
     if (!url.empty())
-      history_.push_back({url, title, timestamp});
+      history_.push_back({url, title, timestamp, count});
 
     pos = obj_end + 1;
   }
@@ -1283,9 +1382,10 @@ void UI::SaveHistoryToDisk()
     if (i > 0)
       out << ",";
     const auto &entry = history_[i];
-    out << "{\"url\":\"" << jsonEscape(entry.url) 
-        << "\",\"title\":\"" << jsonEscape(entry.title)
-        << "\",\"time\":" << entry.timestamp_ms << "}";
+  out << "{\"url\":\"" << jsonEscape(entry.url)
+    << "\",\"title\":\"" << jsonEscape(entry.title)
+    << "\",\"time\":" << entry.timestamp_ms
+    << ",\"count\":" << entry.visit_count << "}";
   }
   out << "]";
   out.close();
@@ -1294,8 +1394,59 @@ void UI::SaveHistoryToDisk()
 std::vector<std::string> UI::GetSuggestions(const std::string &input, int maxResults)
 {
   std::vector<std::string> suggestions;
+  if (maxResults <= 0)
+    maxResults = 10;
+
+  // We'll build (url, score) pairs, then sort by score
+  struct Scored { std::string url; double score; };
+  std::vector<Scored> scored;
+  auto push_scored = [&](const std::string &u, double s){ scored.push_back({u,s}); };
+
+  auto now_ms = (uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count();
+
+  auto score_history = [&](const std::string &u, const HistoryEntry &e, const std::string &q)->double{
+    std::string ul = u, ql = q;
+    std::transform(ul.begin(), ul.end(), ul.begin(), ::tolower);
+    std::transform(ql.begin(), ql.end(), ql.begin(), ::tolower);
+    double prefix = 0.0, contains = 0.0;
+    // check domain part prefix
+    size_t proto = ul.find("://"); size_t start = (proto==std::string::npos? 0: proto+3);
+    if (ul.find(ql, start) == start) prefix = 1.0; // strong boost for prefix
+    if (ul.find(ql) != std::string::npos) contains = 0.5;
+    // recency: within ~30 days fades to 0
+    double age_days = std::max<double>(0.0, (double)(now_ms - e.timestamp_ms) / (1000.0*60.0*60.0*24.0));
+    double recency = std::max(0.0, 1.0 - (age_days / 30.0));
+    // frequency: log scale
+    double freq = std::log(1.0 + (double)std::max<uint32_t>(1, e.visit_count)) / std::log(10.0);
+    return 2.0*prefix + 1.0*contains + 2.0*recency + 2.0*freq;
+  };
+
+  // If no input, suggest top by recency/frequency
   if (input.empty())
+  {
+    std::unordered_set<std::string> seen;
+    // History candidates
+    for (const auto &e : history_)
+    {
+      double s = score_history(e.url, e, std::string());
+      if (seen.insert(e.url).second) push_scored(e.url, s);
+    }
+    // Sort by score desc
+    std::sort(scored.begin(), scored.end(), [](const Scored&a,const Scored&b){return a.score>b.score;});
+    for (const auto &p : scored)
+    {
+      if ((int)suggestions.size() >= maxResults) break;
+      suggestions.push_back(p.url);
+    }
+    // Fill with popular sites
+    for (const auto &site : popular_sites_)
+    {
+      if ((int)suggestions.size() >= maxResults) break;
+      if (std::find(suggestions.begin(), suggestions.end(), site) == suggestions.end()) suggestions.push_back(site);
+    }
     return suggestions;
+  }
 
   std::string input_lower = input;
   std::transform(input_lower.begin(), input_lower.end(), input_lower.begin(), ::tolower);
@@ -1304,7 +1455,7 @@ std::vector<std::string> UI::GetSuggestions(const std::string &input, int maxRes
   auto matches = [&input_lower](const std::string &url) -> bool {
     std::string url_lower = url;
     std::transform(url_lower.begin(), url_lower.end(), url_lower.begin(), ::tolower);
-    
+
     // Check if input matches the beginning of the URL (after protocol)
     size_t protocol_end = url_lower.find("://");
     if (protocol_end != std::string::npos)
@@ -1313,54 +1464,44 @@ std::vector<std::string> UI::GetSuggestions(const std::string &input, int maxRes
       if (domain_part.find(input_lower) == 0)
         return true;
     }
-    
+
     // Check if input appears anywhere in the URL
     return url_lower.find(input_lower) != std::string::npos;
   };
 
-  // First, add matching history entries (most recent first)
-  for (auto it = history_.rbegin(); it != history_.rend() && suggestions.size() < maxResults; ++it)
+  // First, score matching history entries
   {
-    if (matches(it->url))
+    std::unordered_set<std::string> seen;
+    for (const auto &e : history_)
     {
-      // Check for duplicates
-      bool duplicate = false;
-      for (const auto &existing : suggestions)
+      if (matches(e.url))
       {
-        if (existing == it->url)
-        {
-          duplicate = true;
-          break;
-        }
+        double s = score_history(e.url, e, input);
+        if (seen.insert(e.url).second) push_scored(e.url, s);
       }
-      if (!duplicate)
-        suggestions.push_back(it->url);
     }
   }
 
-  // Then, add matching popular sites
+  // Then, add matching popular sites (lower score)
   for (const auto &site : popular_sites_)
   {
-    if (suggestions.size() >= maxResults)
-      break;
-    
     if (matches(site))
     {
-      // Check for duplicates
-      bool duplicate = false;
-      for (const auto &existing : suggestions)
-      {
-        if (existing == site)
-        {
-          duplicate = true;
-          break;
-        }
-      }
-      if (!duplicate)
-        suggestions.push_back(site);
+      // Low baseline score; small prefix boost
+      double s = 0.6; std::string sl = site, il = input; std::transform(sl.begin(),sl.end(),sl.begin(),::tolower); std::transform(il.begin(),il.end(),il.begin(),::tolower);
+      if (sl.find(il) == sl.find("://") + 3) s += 0.6;
+      push_scored(site, s);
     }
   }
 
+  // Sort by score and emit unique URLs
+  std::sort(scored.begin(), scored.end(), [](const Scored&a,const Scored&b){return a.score>b.score;});
+  std::unordered_set<std::string> emitted;
+  for (const auto &p : scored)
+  {
+    if ((int)suggestions.size() >= maxResults) break;
+    if (emitted.insert(p.url).second) suggestions.push_back(p.url);
+  }
   return suggestions;
 }
 
@@ -1369,8 +1510,9 @@ JSValue UI::OnGetSuggestions(const JSObject &obj, const JSArgs &args)
   if (args.size() < 1 || !args[0].IsString())
     return JSValue();
 
-  auto input_str = args[0].ToString();
-  std::string input = input_str.utf8().data() ? input_str.utf8().data() : "";
+  ultralight::String input_ul = args[0];
+  auto input_ul8 = input_ul.utf8();
+  std::string input = input_ul8.data() ? input_ul8.data() : "";
 
   int maxResults = 10;
   if (args.size() >= 2 && args[1].IsNumber())
@@ -1378,15 +1520,373 @@ JSValue UI::OnGetSuggestions(const JSObject &obj, const JSArgs &args)
 
   auto suggestions = GetSuggestions(input, maxResults);
 
-  // Build JSON array
+  // Build JSON array (strings or objects with favicon)
   std::string json = "[";
   for (size_t i = 0; i < suggestions.size(); ++i)
   {
-    if (i > 0)
-      json += ",";
-    json += "\"" + jsonEscape(suggestions[i]) + "\"";
+    if (i > 0) json += ",";
+    if (suggestion_favicons_enabled_)
+    {
+      std::string u = suggestions[i];
+      // Prefer disk-cached favicon if available
+      std::string origin = GetOriginStringFromURL(u);
+      std::string f;
+      auto itf = favicon_file_cache_.find(origin);
+      if (itf != favicon_file_cache_.end())
+      {
+        f = itf->second; // file:///... path
+      }
+      if (f.empty())
+      {
+        auto fav = GetFaviconURL(String(u.c_str()));
+        auto f8 = fav.utf8();
+        f = f8.data() ? f8.data() : "";
+      }
+      json += "{\"url\":\"" + jsonEscape(u) + "\"";
+      if (!f.empty()) json += ",\"favicon\":\"" + jsonEscape(f) + "\"";
+      json += "}";
+    }
+    else
+    {
+      json += "\"" + jsonEscape(suggestions[i]) + "\"";
+    }
   }
   json += "]";
 
   return JSValue(json.c_str());
+}
+
+// --- Favicon Disk Cache Helpers ---
+std::string UI::GetOriginStringFromURL(const std::string &url)
+{
+  // Extract scheme://host[:port]
+  size_t scheme = url.find("://");
+  if (scheme == std::string::npos) return std::string();
+  size_t host_start = scheme + 3;
+  size_t slash = url.find('/', host_start);
+  if (slash == std::string::npos) return url; // whole string is origin
+  return url.substr(0, slash);
+}
+
+std::string UI::EnsureFaviconCacheDir()
+{
+  // Windows-style path acceptable; assets live under working dir.
+  // Use data/favicons for persisted favicons
+  std::string dir = "data/favicons";
+  // Create directories if missing (best-effort)
+  // We can't use std::filesystem here reliably; try to create via C runtime
+#ifdef _WIN32
+  _mkdir("data");
+  _mkdir("data\\favicons");
+#else
+  mkdir("data", 0755);
+  mkdir("data/favicons", 0755);
+#endif
+  return dir;
+}
+
+// simple base64 decoder (RFC 4648) for PNG payloads
+std::string UI::Base64Decode(const std::string &in)
+{
+  static const int T[256] = {
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,62,-1,-1,-1,63,
+    52,53,54,55,56,57,58,59,60,61,-1,-1,-1, 0,-1,-1,
+    -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,
+    15,16,17,18,19,20,21,22,23,24,25,-1,-1,-1,-1,-1,
+    -1,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
+    41,42,43,44,45,46,47,48,49,50,51,-1,-1,-1,-1,-1,
+    // rest -1
+  };
+  std::string out; out.reserve(in.size()*3/4);
+  int val=0, valb=-8;
+  for (unsigned char c : in) {
+    int d = -1;
+    if (c < 128) d = T[c];
+    if (d == -1) { if (c=='=') break; else continue; }
+    val = (val<<6) + d; valb += 6;
+    if (valb>=0) { out.push_back(char((val>>valb)&0xFF)); valb-=8; }
+  }
+  return out;
+}
+
+void UI::LoadFaviconDiskCache()
+{
+  favicon_file_cache_.clear();
+  // Ensure directory exists
+  EnsureFaviconCacheDir();
+  std::ifstream in("data/favicons/index.json", std::ios::in | std::ios::binary);
+  if (!in.is_open()) return;
+  std::ostringstream ss; ss << in.rdbuf(); std::string txt = ss.str(); in.close();
+  // Parse simple object { "origin": "file:///...", ... }
+  size_t pos = 0;
+  while (true) {
+    size_t k1 = txt.find('"', pos); if (k1==std::string::npos) break;
+    size_t k2 = txt.find('"', k1+1); if (k2==std::string::npos) break;
+    std::string key = txt.substr(k1+1, k2-k1-1);
+    size_t c = txt.find(':', k2+1); if (c==std::string::npos) break;
+    size_t v1 = txt.find('"', c+1); if (v1==std::string::npos) break;
+    size_t v2 = txt.find('"', v1+1); if (v2==std::string::npos) break;
+    std::string val = txt.substr(v1+1, v2-v1-1);
+    if (!key.empty() && !val.empty()) favicon_file_cache_[key] = val;
+    pos = v2+1;
+    if (favicon_file_cache_.size() > favicon_cache_limit_) break;
+  }
+  if (favicon_file_cache_.size() > favicon_cache_limit_) {
+    PruneFaviconDiskCacheToLimit();
+    SaveFaviconDiskCache();
+  }
+}
+
+void UI::SaveFaviconDiskCache()
+{
+  EnsureFaviconCacheDir();
+  std::ofstream out("data/favicons/index.json", std::ios::out | std::ios::binary | std::ios::trunc);
+  if (!out.is_open()) return;
+  out << "{";
+  bool first = true;
+  for (auto &p : favicon_file_cache_) {
+    if (!first) out << ","; first=false;
+    out << "\"" << jsonEscape(p.first) << "\":\"" << jsonEscape(p.second) << "\"";
+  }
+  out << "}";
+  out.close();
+}
+
+void UI::OnFaviconReady(const JSObject &obj, const JSArgs &args)
+{
+  // args: url, dataUrl (data:image/png;base64,....)
+  if (args.size() < 2 || !args[0].IsString() || !args[1].IsString()) return;
+  if (!suggestion_favicons_enabled_) return;
+  ultralight::String url_ul = args[0].ToString();
+  ultralight::String data_ul = args[1].ToString();
+  auto u8 = url_ul.utf8(); std::string url = u8.data() ? u8.data() : "";
+  auto d8 = data_ul.utf8(); std::string data = d8.data() ? d8.data() : "";
+  if (url.empty() || data.empty()) return;
+  std::string origin = GetOriginStringFromURL(url);
+  if (origin.empty()) return;
+
+  // Respect cache size limit with smarter eviction based on origin score
+  double new_score = GetOriginScore(origin);
+  if (favicon_file_cache_.find(origin) == favicon_file_cache_.end() && favicon_file_cache_.size() >= favicon_cache_limit_) {
+    // Find the lowest-score existing origin
+    std::string worst_origin; double worst_score = 1e18; bool found=false;
+    for (const auto &p : favicon_file_cache_) {
+      double s = GetOriginScore(p.first);
+      if (!found || s < worst_score) { worst_score = s; worst_origin = p.first; found=true; }
+    }
+    if (!found || new_score <= worst_score) {
+      // New origin is not better than the worst cached one; skip caching
+      return;
+    }
+    // Evict worst
+    auto itw = favicon_file_cache_.find(worst_origin);
+    if (itw != favicon_file_cache_.end()) {
+      // Try delete file on disk
+      std::string furl = itw->second;
+      std::string path;
+      const std::string prefix = "file:///";
+      if (furl.rfind(prefix, 0) == 0) {
+        path = furl.substr(prefix.size());
+#ifdef _WIN32
+        for (auto &ch : path) { if (ch=='/') ch='\\'; }
+#endif
+        std::remove(path.c_str());
+      }
+      favicon_file_cache_.erase(itw);
+    }
+  }
+
+  // Expect data URL like data:image/png;base64,....
+  size_t comma = data.find(","); if (comma == std::string::npos) return;
+  std::string b64 = data.substr(comma+1);
+  std::string bytes = Base64Decode(b64);
+  if (bytes.size() < 8) return;
+
+  std::string dir = EnsureFaviconCacheDir();
+  // Hash filename from origin
+  std::hash<std::string> hasher; size_t h = hasher(origin);
+  std::ostringstream path;
+  path << dir << "/" << std::hex << h << ".png";
+  std::string file = path.str();
+  // Write file
+  std::ofstream f(file, std::ios::out | std::ios::binary | std::ios::trunc);
+  if (!f.is_open()) return;
+  f.write(bytes.data(), (std::streamsize)bytes.size());
+  f.close();
+  // Store as file:/// absolute URL
+  char cwd_buf[1024] = {0};
+#ifdef _WIN32
+  _getcwd(cwd_buf, sizeof(cwd_buf));
+  std::string abs = std::string("file:///") + std::string(cwd_buf) + "/" + file;
+  // replace backslashes
+  for (auto &ch : abs) { if (ch=='\\') ch='/'; }
+#else
+  getcwd(cwd_buf, sizeof(cwd_buf));
+  std::string abs = std::string("file://") + std::string(cwd_buf) + "/" + file;
+#endif
+  favicon_file_cache_[origin] = abs;
+  SaveFaviconDiskCache();
+}
+
+double UI::GetOriginScore(const std::string &origin)
+{
+  // Combine recency and frequency across history entries that match this origin
+  if (origin.empty()) return 0.0;
+  auto now_ms = (uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count();
+  double total = 0.0;
+  for (const auto &e : history_) {
+    if (GetOriginStringFromURL(e.url) != origin) continue;
+    double age_days = std::max<double>(0.0, (double)(now_ms - e.timestamp_ms) / (1000.0*60.0*60.0*24.0));
+    double recency = std::max(0.0, 1.0 - (age_days / 30.0));
+    double freq = std::log(1.0 + (double)std::max<uint32_t>(1, e.visit_count)) / std::log(10.0);
+    total += (2.0*recency + 2.0*freq);
+  }
+  return total;
+}
+
+void UI::PruneFaviconDiskCacheToLimit()
+{
+  if (favicon_file_cache_.size() <= favicon_cache_limit_) return;
+  // Collect and sort by score desc
+  std::vector<std::pair<std::string,double>> arr; arr.reserve(favicon_file_cache_.size());
+  for (const auto &p : favicon_file_cache_) {
+    arr.emplace_back(p.first, GetOriginScore(p.first));
+  }
+  std::sort(arr.begin(), arr.end(), [](const auto &a, const auto &b){ return a.second > b.second; });
+  // Determine origins to keep
+  std::unordered_set<std::string> keep;
+  for (size_t i=0; i<arr.size() && i<favicon_cache_limit_; ++i) keep.insert(arr[i].first);
+  // Remove the rest (and try delete files)
+  for (auto it = favicon_file_cache_.begin(); it != favicon_file_cache_.end(); ) {
+    if (keep.find(it->first) != keep.end()) { ++it; continue; }
+    std::string furl = it->second;
+    const std::string prefix = "file:///";
+    if (furl.rfind(prefix, 0) == 0) {
+      std::string path = furl.substr(prefix.size());
+#ifdef _WIN32
+      for (auto &ch : path) { if (ch=='/') ch='\\'; }
+#endif
+      std::remove(path.c_str());
+    }
+    it = favicon_file_cache_.erase(it);
+  }
+}
+
+void UI::LoadSuggestionsFaviconsFlag()
+{
+  suggestion_favicons_enabled_ = true; // default
+  std::ifstream in("assets/suggestions_favicons.txt", std::ios::in | std::ios::binary);
+  if (!in.is_open()) return;
+  std::ostringstream ss; ss << in.rdbuf(); std::string txt = ss.str(); in.close();
+  // Normalize
+  std::string s; s.reserve(txt.size());
+  for (char c: txt){ if (!std::isspace((unsigned char)c)) s += (char)std::tolower((unsigned char)c); }
+  if (s == "off" || s == "0" || s == "false") suggestion_favicons_enabled_ = false;
+}
+
+void UI::ShowSuggestionsOverlay(int x, int y, int width, const ultralight::String &json_items)
+{
+  // Recreate each time for simplicity
+  if (suggestions_overlay_)
+    HideSuggestionsOverlay();
+
+  ultralight::ViewConfig cfg;
+  cfg.is_transparent = true;
+  cfg.initial_device_scale = window_->scale();
+  if (overlay_ && overlay_->view())
+  {
+    cfg.is_accelerated = overlay_->view()->is_accelerated();
+    cfg.display_id = overlay_->view()->display_id();
+  }
+  auto view = App::instance()->renderer()->CreateView(window_->width(), window_->height(), cfg, nullptr);
+  suggestions_overlay_ = Overlay::Create(window_, view, 0, 0);
+  suggestions_overlay_->Show();
+  // Do not steal focus from address bar; leave unfocused
+  view->set_load_listener(this);
+  view->set_view_listener(this);
+  pending_sugg_position_ = {x, y};
+  pending_sugg_width_ = width;
+  pending_sugg_json_ = json_items;
+  view->LoadURL("file:///suggestions.html");
+}
+
+void UI::HideSuggestionsOverlay()
+{
+  if (!suggestions_overlay_)
+    return;
+  suggestions_overlay_->Hide();
+  suggestions_overlay_->Unfocus();
+  suggestions_overlay_->view()->set_load_listener(nullptr);
+  suggestions_overlay_ = nullptr;
+  pending_sugg_json_ = "";
+}
+
+void UI::OnOpenSuggestionsOverlay(const JSObject &obj, const JSArgs &args)
+{
+  // args: x, y, width, items_json
+  if (args.size() < 4)
+    return;
+  int x = (int)args[0].ToInteger();
+  int y = (int)args[1].ToInteger();
+  int w = (int)args[2].ToInteger();
+  ultralight::String items = args[3].ToString();
+  ShowSuggestionsOverlay(x, y, w, items);
+}
+
+void UI::OnCloseSuggestionsOverlay(const JSObject &obj, const JSArgs &args)
+{
+  HideSuggestionsOverlay();
+}
+
+void UI::OnSuggestionPick(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() < 1 || !args[0].IsString())
+  {
+    HideSuggestionsOverlay();
+    return;
+  }
+  ultralight::String s = args[0].ToString();
+  HideSuggestionsOverlay();
+  // Navigate like pressing Enter on the address bar
+  std::string url = s.utf8().data() ? s.utf8().data() : "";
+  if (url.empty()) return;
+  // If second arg is "newtab", open in a new tab
+  bool open_new_tab = false;
+  if (args.size() >= 2 && args[1].IsString())
+  {
+    ultralight::String mode = args[1].ToString();
+    auto m8 = mode.utf8();
+    std::string m = m8.data() ? m8.data() : "";
+    open_new_tab = (m == "newtab");
+  }
+  if (open_new_tab)
+  {
+    RefPtr<View> child = CreateNewTabForChildView(s);
+    if (child) child->LoadURL(s);
+    return;
+  }
+  if (!tabs_.empty())
+  {
+    auto &tab = tabs_[active_tab_id_];
+    tab->view()->LoadURL(s);
+  }
+}
+
+void UI::OnSuggestionPaste(const JSObject &obj, const JSArgs &args)
+{
+  // args: url string to paste into address bar; no navigation
+  if (args.size() < 1 || !args[0].IsString())
+    return;
+  ultralight::String s = args[0].ToString();
+  // Update address bar text in main UI without navigating
+  if (updateURL)
+  {
+    RefPtr<JSContext> lock(view()->LockJSContext());
+    updateURL({s});
+  }
+  // keep focus on address bar for continued typing
+  address_bar_is_focused_ = true;
 }
