@@ -35,6 +35,9 @@ public:
                 
   void Resize(uint32_t width, uint32_t height);
 
+  // Move the tab's overlay to a new position (x, y)
+  void MoveTo(uint32_t x, uint32_t y);
+
   // Inherited from Listener::View
   virtual void OnChangeTitle(View* caller, const String& title) override;
   virtual void OnChangeURL(View* caller, const String& url) override;

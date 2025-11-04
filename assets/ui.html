@@ -170,11 +170,13 @@
                 if (!menu) return;
                 menu.classList.remove('hidden');
                 menu.setAttribute('aria-hidden', 'false');
+                if (window.OnMenuOpen) OnMenuOpen();
             }
             function closeMenu() {
                 if (!menu) return;
                 menu.classList.add('hidden');
                 menu.setAttribute('aria-hidden', 'true');
+                if (window.OnMenuClose) OnMenuClose();
             }
             function isMenuOpen() {
                 return menu && !menu.classList.contains('hidden');

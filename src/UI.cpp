@@ -1,4 +1,5 @@
 #include "UI.h"
+#include "AdBlocker.h"
 #include <cstring>
 #include <cmath>
 
@@ -6,16 +7,20 @@ static UI *g_ui = 0;
 
 #define UI_HEIGHT 80
 
-UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
-                                is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false)
+UI::UI(RefPtr<Window> window, ultralight::NetworkListener *net_listener, AdBlocker *adblocker) : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
+                                                                                                 is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false),
+                                                                                                 net_listener_(net_listener), adblocker_(adblocker)
 {
   uint32_t window_width = window_->width();
   ui_height_ = (uint32_t)std::round(UI_HEIGHT * window_->scale());
+  base_ui_height_ = ui_height_;
   overlay_ = Overlay::Create(window_, window_width, ui_height_, 0, 0);
   g_ui = this;
 
   view()->set_load_listener(this);
   view()->set_view_listener(this);
+  if (net_listener_)
+    view()->set_network_listener(net_listener_);
   view()->LoadURL("file:///ui.html");
 }
 
@@ -87,8 +92,8 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
   }
   if (active_tab() && active_tab()->IsInspectorShowing())
   {
-  int x_px = static_cast<int>(std::lround(evt.x * window()->scale()));
-  int y_px = static_cast<int>(std::lround(evt.y * window()->scale()));
+    int x_px = static_cast<int>(std::lround(evt.x * window()->scale()));
+    int y_px = static_cast<int>(std::lround(evt.y * window()->scale()));
 
     if (is_resizing_inspector_)
     {
@@ -106,7 +111,7 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
 
     IntRect drag_handle = active_tab()->GetInspectorResizeDragHandle();
 
-  bool over_drag_handle = drag_handle.Contains(Point(static_cast<float>(x_px), static_cast<float>(y_px)));
+    bool over_drag_handle = drag_handle.Contains(Point(static_cast<float>(x_px), static_cast<float>(y_px)));
 
     if (over_drag_handle && !is_over_inspector_resize_drag_handle_)
     {
@@ -171,12 +176,16 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   closeTab = global["closeTab"];
   focusAddressBar = global["focusAddressBar"];
   isAddressBarFocused = global["isAddressBarFocused"];
+  updateAdblockEnabled = global["updateAdblockEnabled"];
 
   global["OnBack"] = BindJSCallback(&UI::OnBack);
   global["OnForward"] = BindJSCallback(&UI::OnForward);
   global["OnRefresh"] = BindJSCallback(&UI::OnRefresh);
   global["OnStop"] = BindJSCallback(&UI::OnStop);
   global["OnToggleTools"] = BindJSCallback(&UI::OnToggleTools);
+  global["OnToggleAdblock"] = BindJSCallback(&UI::OnToggleAdblock);
+  global["OnMenuOpen"] = BindJSCallback(&UI::OnMenuOpen);
+  global["OnMenuClose"] = BindJSCallback(&UI::OnMenuClose);
   global["OnRequestNewTab"] = BindJSCallback(&UI::OnRequestNewTab);
   global["OnRequestTabClose"] = BindJSCallback(&UI::OnRequestTabClose);
   global["OnActiveTabChange"] = BindJSCallback(&UI::OnActiveTabChange);
@@ -184,6 +193,12 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
 
   CreateNewTab();
+
+  // Initialize adblock state indicator, if available
+  if (adblocker_ && updateAdblockEnabled)
+  {
+    updateAdblockEnabled({adblocker_->enabled()});
+  }
 }
 
 void UI::OnBack(const JSObject &obj, const JSArgs &args)
@@ -214,6 +229,19 @@ void UI::OnToggleTools(const JSObject &obj, const JSArgs &args)
 {
   if (active_tab())
     active_tab()->ToggleInspector();
+}
+
+void UI::OnToggleAdblock(const JSObject &obj, const JSArgs &args)
+{
+  if (!adblocker_)
+    return;
+  bool now = !adblocker_->enabled();
+  adblocker_->set_enabled(now);
+  if (updateAdblockEnabled)
+  {
+    RefPtr<JSContext> lock(view()->LockJSContext());
+    updateAdblockEnabled({now});
+  }
 }
 
 void UI::OnRequestNewTab(const JSObject &obj, const JSArgs &args)
@@ -303,6 +331,8 @@ void UI::CreateNewTab()
   if (tab_height < 1)
     tab_height = 1;
   tabs_[id].reset(new Tab(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_));
+  if (net_listener_)
+    tabs_[id]->view()->set_network_listener(net_listener_);
   tabs_[id]->view()->LoadURL("https://www.google.com");
 
   RefPtr<JSContext> lock(view()->LockJSContext());
@@ -317,6 +347,8 @@ RefPtr<View> UI::CreateNewTabForChildView(const String &url)
   if (tab_height < 1)
     tab_height = 1;
   tabs_[id].reset(new Tab(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_));
+  if (net_listener_)
+    tabs_[id]->view()->set_network_listener(net_listener_);
 
   RefPtr<JSContext> lock(view()->LockJSContext());
   addTab({id, "", GetFaviconURL(url), tabs_[id]->view()->is_loading()});
@@ -422,4 +454,42 @@ String UI::GetFaviconURL(const String &page_url)
   std::string favicon = origin_str + "/favicon.ico";
   favicon_cache_[origin_str] = favicon;
   return String(favicon.c_str());
+}
+
+void UI::OnMenuOpen(const JSObject &obj, const JSArgs &args)
+{
+  // Expand the UI overlay height to ensure dropdown can render over content.
+  // Use a reasonable extra height (eg. 260px) to cover the menu.
+  uint32_t expanded = base_ui_height_ + 260;
+  AdjustUIHeight(expanded);
+}
+
+void UI::OnMenuClose(const JSObject &obj, const JSArgs &args)
+{
+  // Restore to base height
+  AdjustUIHeight((uint32_t)base_ui_height_);
+}
+
+void UI::AdjustUIHeight(uint32_t new_height)
+{
+  if (new_height == (uint32_t)ui_height_)
+    return;
+
+  ui_height_ = (int)new_height;
+
+  // Resize top UI overlay
+  overlay_->Resize(window_->width(), ui_height_);
+
+  // Reposition and resize all tabs
+  int tab_height = window_->height() - ui_height_;
+  if (tab_height < 1)
+    tab_height = 1;
+
+  for (auto &tab : tabs_)
+  {
+    if (!tab.second)
+      continue;
+    tab.second->MoveTo(0, ui_height_);
+    tab.second->Resize(window_->width(), (uint32_t)tab_height);
+  }
 }

@@ -47,6 +47,8 @@ public:
   void OnActiveTabChange(const JSObject &obj, const JSArgs &args);
   void OnRequestChangeURL(const JSObject &obj, const JSArgs &args);
   void OnAddressBarBlur(const JSObject &obj, const JSArgs &args);
+  void OnMenuOpen(const JSObject &obj, const JSArgs &args);
+  void OnMenuClose(const JSObject &obj, const JSArgs &args);
 
   RefPtr<Window> window() { return window_; }
 
@@ -62,6 +64,7 @@ protected:
   void SetCanGoForward(bool can_go_forward);
   void SetURL(const String &url);
   void SetCursor(Cursor cursor);
+  void AdjustUIHeight(uint32_t new_height);
 
   // Compute a best-effort favicon URL (origin + "/favicon.ico") for http/https URLs
   String GetFaviconURL(const String &page_url);
@@ -73,6 +76,7 @@ protected:
   RefPtr<Window> window_;
   RefPtr<Overlay> overlay_;
   int ui_height_;
+  int base_ui_height_;
   int tab_height_;
   float scale_;
 

@@ -126,6 +126,13 @@ void Tab::Resize(uint32_t width, uint32_t height)
   }
 }
 
+void Tab::MoveTo(uint32_t x, uint32_t y)
+{
+  overlay_->MoveTo(x, y);
+  // Re-layout any inspector overlay relative to new content position
+  Resize(container_width_, container_height_);
+}
+
 void Tab::OnChangeTitle(View *caller, const String &title)
 {
   ui_->UpdateTabTitle(id_, title);
