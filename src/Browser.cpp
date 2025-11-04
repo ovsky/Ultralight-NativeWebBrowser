@@ -3,9 +3,10 @@
 #include <Ultralight/platform/Platform.h>
 #include <Ultralight/platform/Config.h>
 #include <Ultralight/Renderer.h>
-#include <windows.h>
 
 #if defined(_WIN32)
+#include <windows.h>
+
 #include <dwmapi.h>
 #pragma comment(lib, "dwmapi.lib")
 #endif
@@ -23,7 +24,8 @@ Browser::Browser()
 
 #if defined(_WIN32)
   HWND hwnd = (HWND)window_->native_handle();
-  if (hwnd) {
+  if (hwnd)
+  {
     BOOL use_dark_mode = TRUE;
     DwmSetWindowAttribute(hwnd, 20, &use_dark_mode, sizeof(use_dark_mode)); // DWMWA_USE_IMMERSIVE_DARK_MODE = 20
 
@@ -32,6 +34,7 @@ Browser::Browser()
   }
 #endif
 
+#if defined(_WIN32)
   // Set window icons using Win32 API
   HINSTANCE hInstance = GetModuleHandle(NULL);
 
@@ -46,7 +49,10 @@ Browser::Browser()
     // Set both icons
     SendMessage((HWND)window_->native_handle(), WM_SETICON, ICON_BIG, (LPARAM)hIconBig);
     SendMessage((HWND)window_->native_handle(), WM_SETICON, ICON_SMALL, (LPARAM)hIconSmall);
-  } // Create the UI
+  }
+#endif
+
+  // Create the UI
   ui_.reset(new UI(window_));
   window_->set_listener(ui_.get());
 }

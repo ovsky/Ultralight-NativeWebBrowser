@@ -1,0 +1,11 @@
+name: Disabled - Build - macOS (sdks)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  skip:
+    if: ${{ false }}
+    runs-on: macos-latest
+    steps:
+      - run: echo "This workflow is disabled (replaced by build-macos.yml)."

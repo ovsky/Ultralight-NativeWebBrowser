@@ -1,49 +1,339 @@
-# .github/workflows/linux-build.yml
-#
-# Builds the project on Ubuntu (Linux)
-# This uses a single-config generator (Makefiles), so CMAKE_BUILD_TYPE
-# is set during the configure step.
+# .github/workflows/build-linux.yml
+# Linux build using SDK archives hosted in the repo's base-sdk branch.
 
 name: Build - Linux
 
 on:
-  push:
-    branches: [ "main" ] # Triggers on push to main
-  workflow_dispatch:      # Allows manual triggering from the Actions tab
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      sdk_url:
+        description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
+        required: false
+      version:
+        description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
+        required: false
+      package_format:
+        description: "Package format(s) to produce via CPack (eg. TGZ, DEB, RPM or multi 'TGZ;DEB;RPM')"
+        required: false
+        default: TGZ
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    env:
+      ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url }}
+      ULTRALIGHT_VERSION: ${{ inputs.version }}
+      PACKAGE_GENERATORS: ${{ inputs.package_format || 'TGZ' }}
     steps:
-    - name: '1. Install Linux Dependencies'
-      # These are required by Ultralight for rendering
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libgtk-3-dev libnss3-dev libgdk-pixbuf2.0-dev libxtst-dev libxss-dev libdbus-glib-1-dev
+      - name: 1. Checkout Code (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-    - name: '2. Checkout Code (with submodules)'
-      uses: actions/checkout@v4
-      with:
-        submodules: 'recursive'
+      - name: 2. Detect ULTRALIGHT_SDK_URL from repo base-sdk branch (Linux)
+        id: detect_url
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${ULTRALIGHT_SDK_URL:-}" ]; then
+            echo "ULTRALIGHT_SDK_URL already provided: $ULTRALIGHT_SDK_URL"
+            exit 0
+          fi
+          # First attempt: auto-detect latest Linux SDK by listing sdks branch via GitHub API
+          API="https://api.github.com/repos/${{ github.repository }}/contents/sdks?ref=base-sdk"
+          echo "Querying GitHub API for SDK files: $API"
+          RESP=$(curl -fLs -H "Authorization: Bearer ${GITHUB_TOKEN:-}" -H "Accept: application/vnd.github+json" "$API" || true)
+          if [ -n "$RESP" ]; then
+            echo "Parsing SDK filenames from API response..."
+            NAMES=$(printf "%s" "$RESP" | grep -oE '"name"\s*:\s*"[^"]+"' | sed -E 's/.*"name"\s*:\s*"([^"]+)".*/\1/')
+            echo "Found files in sdks branch:"; printf ' - %s\n' $NAMES | sed 's/^/  /'
+            ARCH=$(uname -m)
+            PREF_ARCH="x64"; if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then PREF_ARCH="arm64"; fi
+            # Filter linux archives
+            LINUX_LIST=$(for nm in $NAMES; do case "$nm" in ultralight*-sdk-*-linux-*.7z) echo "$nm";; esac; done)
+            if [ -n "$LINUX_LIST" ]; then
+              read_version() { local v="$1" a r b c; a="${v%%.*}"; r="${v#*.}"; b="${r%%.*}"; c="${r#*.}"; printf '%s %s %s' "${a:-0}" "${b:-0}" "${c:-0}"; }
+              ver_gt() { [ "$1" = "$2" ] && return 1; set -- $(read_version "$1") $(read_version "$2"); local a1="$1" a2="$2" a3="$3" b1="$4" b2="$5" b3="$6"; if [ $((10#$a1)) -gt $((10#$b1)) ]; then return 0; fi; if [ $((10#$a1)) -lt $((10#$b1)) ]; then return 1; fi; if [ $((10#$a2)) -gt $((10#$b2)) ]; then return 0; fi; if [ $((10#$a2)) -lt $((10#$b2)) ]; then return 1; fi; if [ $((10#$a3)) -gt $((10#$b3)) ]; then return 0; fi; return 1; }
+              BEST_VER=""; BEST_FILE=""
+              for f in $LINUX_LIST; do
+                case "$f" in *-linux-$PREF_ARCH.7z) : ;; *) continue;; esac
+                v=$(echo "$f" | sed -E 's/^.*-([0-9]+\.[0-9]+\.[0-9]+)-linux-.*$/\1/')
+                if [ -n "$v" ]; then if [ -z "$BEST_VER" ] || ver_gt "$v" "$BEST_VER"; then BEST_VER="$v"; BEST_FILE="$f"; fi; fi
+              done
+              if [ -z "$BEST_FILE" ] && [ "$PREF_ARCH" = "arm64" ]; then
+                # Fallback to x64 if no arm64 archive present
+                for f in $LINUX_LIST; do
+                  case "$f" in *-linux-x64.7z) : ;; *) continue;; esac
+                  v=$(echo "$f" | sed -E 's/^.*-([0-9]+\.[0-9]+\.[0-9]+)-linux-.*$/\1/')
+                  if [ -n "$v" ]; then if [ -z "$BEST_VER" ] || ver_gt "$v" "$BEST_VER"; then BEST_VER="$v"; BEST_FILE="$f"; fi; fi
+                done
+              fi
+              if [ -n "$BEST_FILE" ]; then
+                BASE_RAW="https://raw.githubusercontent.com/${{ github.repository }}/base-sdk/sdks"
+                URL="$BASE_RAW/$BEST_FILE"
+                echo "Auto-detected latest Linux SDK URL=$URL"
+                echo "ULTRALIGHT_SDK_URL=$URL" >> "$GITHUB_ENV"
+                echo "ULTRALIGHT_VERSION=$BEST_VER" >> "$GITHUB_ENV"
+                echo "url=$URL" >> "$GITHUB_OUTPUT"
+                echo "version=$BEST_VER" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+          fi
+          HEADER="data/include/Ultralight/Defines.h"
+          VERSION=""
+          if [ -f "$HEADER" ]; then
+            VERSION=$(sed -n 's/^#define[[:space:]]\+ULTRALIGHT_VERSION[[:space:]]\+"\([^"]\+\)".*/\1/p' "$HEADER" | head -n1)
+          fi
+          if [ -z "$VERSION" ]; then
+            if [ -n "${ULTRALIGHT_VERSION:-}" ]; then
+              VERSION="$ULTRALIGHT_VERSION"
+              echo "ULTRALIGHT_VERSION provided via env: $VERSION"
+            else
+              VERSION="1.4.0"
+              echo "ULTRALIGHT_VERSION not found in header; defaulting to $VERSION"
+            fi
+          fi
+          BASE_RAW="https://raw.githubusercontent.com/${{ github.repository }}/base-sdk/sdks"
+          echo "Detected ULTRALIGHT_VERSION=$VERSION; probing Linux SDK URLs under $BASE_RAW"
+          echo "Header path: $HEADER"
+          echo "Repository: ${{ github.repository }}"
+          echo "Commit: ${{ github.sha }}"
+          candidates=(
+            "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-x64.7z"
+            "$BASE_RAW/ultralight-free-sdk-$VERSION-linux-arm64.7z"
+          )
+          found=""
+          for url in "${candidates[@]}"; do
+            echo "Probing $url"
+            # Use GET (not HEAD) for reliability with raw endpoints
+            if curl -fLs -o /dev/null "$url"; then
+              found="$url"; break
+            fi
+          done
+          if [ -n "$found" ]; then
+            echo "Auto-detected ULTRALIGHT_SDK_URL=$found"
+            echo "ULTRALIGHT_SDK_URL=$found" >> "$GITHUB_ENV"
+            echo "url=$found" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Could not auto-detect a valid Linux SDK URL in base-sdk branch for version $VERSION."
+            echo "Tried candidates:"; printf ' - %s\n' "${candidates[@]}"
+            exit 1
+          fi
 
-    - name: '3. Configure CMake'
-      # We set the build type here for single-config generators
-      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: 3. Install 7zip (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y p7zip-full
 
-    - name: '4. Build Project'
-      # No --config flag needed here, as it was set at configure time
-      run: cmake --build build --parallel
+      - name: 4. Prepare Ultralight SDK (Linux)
+        id: prep_sdk
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT_DEFAULT="${{ github.workspace }}/data"
+          ROOT="${ULTRALIGHT_SDK_ROOT:-}"
+          if [ -z "$ROOT" ]; then ROOT="$ROOT_DEFAULT"; fi
+          echo "Initial ULTRALIGHT_SDK_ROOT candidate: $ROOT"
+          present="false"
+          if [ -d "$ROOT/include" ] && ls "$ROOT/lib"/*.so >/dev/null 2>&1; then
+            present="true"
+          elif [ -n "${ULTRALIGHT_SDK_URL:-}" ]; then
+            # Normalize GitHub "blob" URLs to raw links if necessary
+            URL_DL="$ULTRALIGHT_SDK_URL"
+            if echo "$URL_DL" | grep -qE '^https://github.com/.+/blob/'; then
+              ORIG="$URL_DL"
+              URL_DL=$(echo "$URL_DL" | sed -E 's#https://github.com/([^/]+)/([^/]+)/blob/(.+)$#https://raw.githubusercontent.com/\1/\2/\3#')
+              echo "Normalized GitHub blob URL to raw: $ORIG -> $URL_DL"
+            fi
+            echo "Downloading Ultralight SDK from ULTRALIGHT_SDK_URL=$URL_DL"
+            mkdir -p "$RUNNER_TEMP/sdk"
+            pkg="$RUNNER_TEMP/ultralight-sdk"
+            echo "HTTP headers (HEAD):"; (curl -fsIL "$URL_DL" | head -n 20) || true
+            curl -L "$URL_DL" -o "$pkg"
+            echo "Downloaded SDK archive at: $pkg"; ls -lh "$pkg" || true
+            mkdir -p "$RUNNER_TEMP/sdk-extract"
+            # Extract with available 7z tool; validate archive by testing
+            EXTRACTOR=""
+            if command -v 7z >/dev/null 2>&1; then EXTRACTOR=7z; elif command -v 7zz >/dev/null 2>&1; then EXTRACTOR=7zz; fi
+            if [ -z "$EXTRACTOR" ]; then echo "7zip extractor not found" >&2; exit 1; fi
+            if ! "$EXTRACTOR" t -y "$pkg" >/dev/null 2>&1; then
+              echo "Downloaded file is not a valid 7z archive or is corrupted: $URL_DL" >&2
+              echo "file(1) output:"; (command -v file >/dev/null 2>&1 && file "$pkg") || echo "'file' not available"
+              exit 1
+            fi
+            "$EXTRACTOR" x -y -o"$RUNNER_TEMP/sdk-extract" "$pkg"
+            echo "Extraction tree (depth 2):"
+            find "$RUNNER_TEMP/sdk-extract" -maxdepth 2 -type d -print | sed 's/^/  /'
+            ROOT_FOUND=""
+            while IFS= read -r -d '' dir; do
+              if [ -d "$dir/include" ] && [ -d "$dir/lib" ]; then ROOT_FOUND="$dir"; break; fi
+            done < <(find "$RUNNER_TEMP/sdk-extract" -mindepth 1 -maxdepth 3 -type d -print0)
+            # Fallback: derive SDK root from any include/Ultralight path
+            if [ -z "$ROOT_FOUND" ]; then
+              INC_PARENT=$(find "$RUNNER_TEMP/sdk-extract" -type d -path '*/include/Ultralight' -print -quit 2>/dev/null | xargs -I{} dirname {} | xargs -I{} dirname {}) || true
+              if [ -n "$INC_PARENT" ] && [ -d "$INC_PARENT/include" ] && { [ -d "$INC_PARENT/lib" ] || [ -d "$INC_PARENT/bin" ]; }; then
+                ROOT_FOUND="$INC_PARENT"
+              fi
+            fi
+            if [ -n "$ROOT_FOUND" ]; then
+              ROOT="$ROOT_FOUND"; present="true"
+            else
+              echo "Could not infer ULTRALIGHT_SDK_ROOT from extraction. Showing deeper tree (depth 3):"
+              find "$RUNNER_TEMP/sdk-extract" -maxdepth 3 -type d -print | sed 's/^/  /'
+            fi
+          fi
+          echo "present=$present" >> "$GITHUB_OUTPUT"
+          if [ "$present" = "true" ]; then
+            echo "Using ULTRALIGHT_SDK_ROOT=$ROOT"
+            echo "ULTRALIGHT_SDK_ROOT=$ROOT" >> "$GITHUB_ENV"
+            echo "Listing selected SDK include and lib:"
+            ls -la "$ROOT/include" | head -n 100 || true
+            ls -la "$ROOT/lib" || true
+          else
+            echo "::error::Ultralight Linux SDK not found. Ensure base-sdk branch contains a valid archive or set ULTRALIGHT_SDK_ROOT/ULTRALIGHT_SDK_URL."
+            exit 1
+          fi
 
-    - name: '5. Archive Artifacts'
-      # The outputs for single-config are in 'build/bin'
-      # We 'cd' into the directory to zip its contents, not the folder itself
-      run: |
-        cd build/bin
-        zip -r ../../ultralight-linux.zip .
+      - name: 5. Install Linux Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libnss3-dev libgdk-pixbuf2.0-dev libxtst-dev libxss-dev libdbus-glib-1-dev
 
-    - name: '6. Upload Artifact'
-      uses: actions/upload-artifact@v4
-      with:
-        name: ultralight-linux-build
-        path: ultralight-linux.zip
+      - name: 6. Configure CMake
+        if: steps.prep_sdk.outputs.present == 'true'
+        run: |
+          cmake --version
+          echo "Configuring with ULTRALIGHT_SDK_ROOT=$ULTRALIGHT_SDK_ROOT"
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT" -DBUILD_TESTING=ON
+
+      - name: 7. Build Project
+        if: steps.prep_sdk.outputs.present == 'true'
+        run: cmake --build build --parallel -- VERBOSE=1
+
+      - name: 7.8 Run tests (ctest)
+        if: steps.prep_sdk.outputs.present == 'true'
+        run: ctest --test-dir build --output-on-failure
+
+      - name: 7.9 Install packaging toolchain (rpm if needed)
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gens_uc=$(echo "${PACKAGE_GENERATORS:-}" | tr '[:lower:]' '[:upper:]' | tr -d ' ')
+          if echo "$gens_uc" | grep -q RPM; then
+            sudo apt-get update
+            sudo apt-get install -y rpm
+          fi
+          if echo "$gens_uc" | grep -q DEB; then
+            # Ensure basic build tools are present (usually on ubuntu-latest already)
+            sudo apt-get update
+            sudo apt-get install -y fakeroot
+          fi
+
+      - name: 8. Package with CPack (Linux)
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -x
+          gens_raw="${PACKAGE_GENERATORS:-TGZ}"
+          gens_uc=$(echo "$gens_raw" | tr '[:lower:]' '[:upper:]')
+          # Split by semicolon, comma, or whitespace
+          IFS=$' ;,\t\n' read -r -a GEN_LIST <<< "$gens_uc"
+          echo "Using CPack generators: ${GEN_LIST[*]}"
+          # Ensure output goes to the build directory in all cases
+          outdir="${{ github.workspace }}/build"
+          mkdir -p "$outdir"
+          for g in "${GEN_LIST[@]}"; do
+            if [ -n "$g" ]; then
+              echo "Running CPack for generator: $g"
+              cpack --config build/CPackConfig.cmake -C Release -G "$g" -V \
+                -D CPACK_OUTPUT_FILE_PREFIX="$outdir" \
+                -D CPACK_PACKAGING_INSTALL_PREFIX="/usr"
+              echo "CPack completed for $g"
+            fi
+          done
+
+      - name: 8.2 List package outputs
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Listing build directory after CPack:"
+          ls -la "${{ github.workspace }}/build" || true
+          echo "Searching recursively for produced packages:"
+          find "${{ github.workspace }}" -maxdepth 4 -type f \( -name "*.rpm" -o -name "*.deb" -o -name "*.tar.gz" -o -name "*.tgz" \) -print || true
+
+      - name: "7.5 Diagnostics: verify runtime contents"
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates=(
+            "build"
+            "build/bin"
+            "build/Ultralight-WebBrowser"
+            "build/samples/Ultralight-WebBrowser"
+          )
+          src=""
+          for p in "${candidates[@]}"; do
+            if [ -d "$p" ]; then src="$p"; break; fi
+          done
+          if [ -z "$src" ]; then
+            echo "No expected output folder found for diagnostics. Checked: ${candidates[*]}" >&2
+            exit 1
+          fi
+          echo "Listing runtime directory: $src"
+          ls -la "$src" || true
+          echo "Listing shared libs:"
+          ls -la "$src"/*.so 2>/dev/null || true
+          echo "Listing resources:"
+          ls -la "$src"/assets/resources 2>/dev/null || true
+
+      - name: 8.5 Archive Runtime Artifacts (zip)
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates=(
+            "build"
+            "build/bin"
+            "build/Ultralight-WebBrowser"
+            "build/samples/Ultralight-WebBrowser"
+          )
+          src=""
+          for p in "${candidates[@]}"; do
+            if [ -d "$p" ]; then src="$p"; break; fi
+          done
+          if [ -z "$src" ]; then
+            echo "No expected output folder found. Checked: ${candidates[*]}" >&2
+            exit 1
+          fi
+          echo "Archiving from: $src"
+          dest="$GITHUB_WORKSPACE/ultralight-linux.zip"
+          rm -f "$dest" 2>/dev/null || true
+          (cd "$src" && zip -r "$dest" .)
+
+      - name: 9. Upload Runtime Zip
+        if: steps.prep_sdk.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-linux-build
+          path: ultralight-linux.zip
+
+      - name: 9.5 Upload Packages (TGZ/DEB/RPM)
+        if: steps.prep_sdk.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-linux-packages
+          path: |
+            ${{ github.workspace }}/build/*.tar.gz
+            ${{ github.workspace }}/build/*.tgz
+            ${{ github.workspace }}/build/*.deb
+            ${{ github.workspace }}/build/*.rpm
+            ${{ github.workspace }}/**/*.tar.gz
+            ${{ github.workspace }}/**/*.tgz
+            ${{ github.workspace }}/**/*.deb
+            ${{ github.workspace }}/**/*.rpm
