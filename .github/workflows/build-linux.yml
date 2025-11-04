@@ -237,17 +237,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          set -x
           gens_raw="${PACKAGE_GENERATORS:-TGZ}"
           gens_uc=$(echo "$gens_raw" | tr '[:lower:]' '[:upper:]')
           # Split by semicolon, comma, or whitespace
           IFS=$' ;,\t\n' read -r -a GEN_LIST <<< "$gens_uc"
           echo "Using CPack generators: ${GEN_LIST[*]}"
           # Ensure output goes to the build directory in all cases
-          export CPACK_OUTPUT_FILE_PREFIX="${{ github.workspace }}/build"
+          outdir="${{ github.workspace }}/build"
+          mkdir -p "$outdir"
           for g in "${GEN_LIST[@]}"; do
             if [ -n "$g" ]; then
               echo "Running CPack for generator: $g"
-              cpack --config build/CPackConfig.cmake -C Release -G "$g"
+              cpack --config build/CPackConfig.cmake -C Release -G "$g" -V -D CPACK_OUTPUT_FILE_PREFIX="$outdir"
+              echo "CPack completed for $g"
             fi
           done
 
@@ -258,6 +261,8 @@ jobs:
           set -euo pipefail
           echo "Listing build directory after CPack:"
           ls -la "${{ github.workspace }}/build" || true
+          echo "Searching recursively for produced packages:"
+          find "${{ github.workspace }}" -maxdepth 4 -type f \( -name "*.rpm" -o -name "*.deb" -o -name "*.tar.gz" -o -name "*.tgz" \) -print || true
 
       - name: "7.5 Diagnostics: verify runtime contents"
         if: steps.prep_sdk.outputs.present == 'true'
@@ -326,3 +331,7 @@ jobs:
             ${{ github.workspace }}/build/*.tgz
             ${{ github.workspace }}/build/*.deb
             ${{ github.workspace }}/build/*.rpm
+            ${{ github.workspace }}/**/*.tar.gz
+            ${{ github.workspace }}/**/*.tgz
+            ${{ github.workspace }}/**/*.deb
+            ${{ github.workspace }}/**/*.rpm
