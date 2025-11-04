@@ -332,6 +332,8 @@ include(CPack)
 
 # --- Linux desktop integration (DEB/RPM friendly) ---
 if(UNIX AND NOT APPLE)
+  # Install system packages under /usr for distro-standard paths
+  set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
   set(APP_ID "ultralight-webbrowser")
   # Wrapper in /usr/local/bin (or /usr/bin if CMAKE_INSTALL_PREFIX=/usr)
   install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/packaging/ultralight-webbrowser.sh"
@@ -350,10 +352,11 @@ if(UNIX AND NOT APPLE)
 
   # Icon (try to reuse existing project image)
   set(APP_ICON_SOURCE "")
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/data/screenshots/preview.png")
-    set(APP_ICON_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/data/screenshots/preview.png")
-  elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon.png")
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon.png")
     set(APP_ICON_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon.png")
+  elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/data/screenshots/preview.png")
+    # Fallback to preview if a dedicated icon is not provided
+    set(APP_ICON_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/data/screenshots/preview.png")
   endif()
   if(APP_ICON_SOURCE)
     install(FILES "${APP_ICON_SOURCE}" DESTINATION share/pixmaps RENAME ${APP_ID}.png)

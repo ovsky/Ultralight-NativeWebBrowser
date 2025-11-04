@@ -249,7 +249,9 @@ jobs:
           for g in "${GEN_LIST[@]}"; do
             if [ -n "$g" ]; then
               echo "Running CPack for generator: $g"
-              cpack --config build/CPackConfig.cmake -C Release -G "$g" -V -D CPACK_OUTPUT_FILE_PREFIX="$outdir"
+              cpack --config build/CPackConfig.cmake -C Release -G "$g" -V \
+                -D CPACK_OUTPUT_FILE_PREFIX="$outdir" \
+                -D CPACK_PACKAGING_INSTALL_PREFIX="/usr"
               echo "CPack completed for $g"
             fi
           done
