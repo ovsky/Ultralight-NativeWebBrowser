@@ -2,6 +2,7 @@
 #include "AdBlocker.h"
 #include <cstring>
 #include <cmath>
+#include <Ultralight/Renderer.h>
 
 static UI *g_ui = 0;
 
@@ -13,6 +14,7 @@ UI::UI(RefPtr<Window> window, ultralight::NetworkListener *net_listener, AdBlock
 {
   uint32_t window_width = window_->width();
   ui_height_ = (uint32_t)std::round(UI_HEIGHT * window_->scale());
+  base_ui_height_ = ui_height_;
   overlay_ = Overlay::Create(window_, window_width, ui_height_, 0, 0);
   g_ui = this;
 
@@ -37,6 +39,13 @@ void UI::OnAddressBarBlur(const JSObject &obj, const JSArgs &args)
 
 bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
 {
+  // If menu overlay is active, route all key events to it and consume
+  if (menu_overlay_ && menu_overlay_->view())
+  {
+    menu_overlay_->view()->FireKeyEvent(evt);
+    return false;
+  }
+
   if (evt.type == KeyEvent::kType_RawKeyDown && (evt.modifiers & KeyEvent::kMod_CtrlKey))
   {
     switch (evt.virtual_key_code)
@@ -77,6 +86,13 @@ bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
 
 bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
 {
+  // If menu overlay is active, route mouse events to it and consume
+  if (menu_overlay_ && menu_overlay_->view())
+  {
+    menu_overlay_->view()->FireMouseEvent(evt);
+    return false;
+  }
+
   if (evt.type == MouseEvent::kType_MouseDown)
   {
     // Check if the click is outside the UI overlay
@@ -152,6 +168,9 @@ void UI::OnResize(ultralight::Window *window, uint32_t width, uint32_t height)
 
   overlay_->Resize(window->width(), ui_height_);
 
+  if (menu_overlay_)
+    menu_overlay_->Resize(window->width(), window->height());
+
   for (auto &tab : tabs_)
   {
     if (tab.second)
@@ -161,21 +180,28 @@ void UI::OnResize(ultralight::Window *window, uint32_t width, uint32_t height)
 
 void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const String &url)
 {
-  // Set the context for all subsequent JS* calls
-  RefPtr<JSContext> locked_context = view()->LockJSContext();
+  // Set the context for all subsequent JS* calls for THIS caller view
+  RefPtr<JSContext> locked_context = caller->LockJSContext();
   SetJSContext(locked_context->ctx());
 
   JSObject global = JSGlobalObject();
-  updateBack = global["updateBack"];
-  updateForward = global["updateForward"];
-  updateLoading = global["updateLoading"];
-  updateURL = global["updateURL"];
-  addTab = global["addTab"];
-  updateTab = global["updateTab"];
-  closeTab = global["closeTab"];
-  focusAddressBar = global["focusAddressBar"];
-  isAddressBarFocused = global["isAddressBarFocused"];
-  updateAdblockEnabled = global["updateAdblockEnabled"];
+  auto url_utf8 = url.utf8();
+  bool is_menu_view = url_utf8.data() && std::strstr(url_utf8.data(), "menu.html") != nullptr;
+
+  if (!is_menu_view)
+  {
+    // Only main UI view has these functions
+    updateBack = global["updateBack"];
+    updateForward = global["updateForward"];
+    updateLoading = global["updateLoading"];
+    updateURL = global["updateURL"];
+    addTab = global["addTab"];
+    updateTab = global["updateTab"];
+    closeTab = global["closeTab"];
+    focusAddressBar = global["focusAddressBar"];
+    isAddressBarFocused = global["isAddressBarFocused"];
+    updateAdblockEnabled = global["updateAdblockEnabled"];
+  }
 
   global["OnBack"] = BindJSCallback(&UI::OnBack);
   global["OnForward"] = BindJSCallback(&UI::OnForward);
@@ -183,18 +209,23 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnStop"] = BindJSCallback(&UI::OnStop);
   global["OnToggleTools"] = BindJSCallback(&UI::OnToggleTools);
   global["OnToggleAdblock"] = BindJSCallback(&UI::OnToggleAdblock);
+  global["OnMenuOpen"] = BindJSCallback(&UI::OnMenuOpen);
+  global["OnMenuClose"] = BindJSCallback(&UI::OnMenuClose);
   global["OnRequestNewTab"] = BindJSCallback(&UI::OnRequestNewTab);
   global["OnRequestTabClose"] = BindJSCallback(&UI::OnRequestTabClose);
   global["OnActiveTabChange"] = BindJSCallback(&UI::OnActiveTabChange);
   global["OnRequestChangeURL"] = BindJSCallback(&UI::OnRequestChangeURL);
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
 
-  CreateNewTab();
-
-  // Initialize adblock state indicator, if available
-  if (adblocker_ && updateAdblockEnabled)
+  if (!is_menu_view)
   {
-    updateAdblockEnabled({adblocker_->enabled()});
+    CreateNewTab();
+
+    // Initialize adblock state indicator, if available
+    if (adblocker_ && updateAdblockEnabled)
+    {
+      updateAdblockEnabled({adblocker_->enabled()});
+    }
   }
 }
 
@@ -451,4 +482,64 @@ String UI::GetFaviconURL(const String &page_url)
   std::string favicon = origin_str + "/favicon.ico";
   favicon_cache_[origin_str] = favicon;
   return String(favicon.c_str());
+}
+
+void UI::OnMenuOpen(const JSObject &obj, const JSArgs &args)
+{
+  ShowMenuOverlay();
+}
+
+void UI::OnMenuClose(const JSObject &obj, const JSArgs &args)
+{
+  HideMenuOverlay();
+}
+
+void UI::AdjustUIHeight(uint32_t new_height)
+{
+  if (new_height == (uint32_t)ui_height_)
+    return;
+
+  ui_height_ = (int)new_height;
+
+  // Resize top UI overlay
+  overlay_->Resize(window_->width(), ui_height_);
+
+  // Note: Do NOT move or resize tabs here; we only enlarge the UI overlay canvas.
+}
+
+void UI::ShowMenuOverlay()
+{
+  if (menu_overlay_)
+    return;
+
+  // Create a transparent View so only the dropdown is visible over content
+  ultralight::ViewConfig cfg;
+  cfg.is_transparent = true;
+  cfg.initial_device_scale = window_->scale();
+  // Match acceleration/display with main UI view to avoid renderer mismatch
+  if (overlay_ && overlay_->view())
+  {
+    cfg.is_accelerated = overlay_->view()->is_accelerated();
+    cfg.display_id = overlay_->view()->display_id();
+  }
+  auto view = App::instance()->renderer()->CreateView(window_->width(), window_->height(), cfg, nullptr);
+
+  // Wrap it in an overlay on top of everything
+  menu_overlay_ = Overlay::Create(window_, view, 0, 0);
+  menu_overlay_->Show();
+  menu_overlay_->Focus();
+  view->set_load_listener(this);
+  view->LoadURL("file:///menu.html");
+}
+
+void UI::HideMenuOverlay()
+{
+  if (!menu_overlay_)
+    return;
+  menu_overlay_->Hide();
+  menu_overlay_->Unfocus();
+  if (overlay_)
+    overlay_->Focus();
+  menu_overlay_->view()->set_load_listener(nullptr);
+  menu_overlay_ = nullptr;
 }

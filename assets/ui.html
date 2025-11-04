@@ -72,6 +72,23 @@
                 <path d="M12 2l7 3v5c0 5-3.4 9.7-7 11-3.6-1.3-7-6-7-11V5l7-3z" fill="currentColor" />
             </svg>
         </span>
+        <!-- Overflow menu (three dots) -->
+        <span id="toggle-menu" class="icon" title="Customize and control">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <circle cx="5" cy="12" r="2" fill="currentColor"></circle>
+                <circle cx="12" cy="12" r="2" fill="currentColor"></circle>
+                <circle cx="19" cy="12" r="2" fill="currentColor"></circle>
+            </svg>
+        </span>
+    </div>
+
+    <!-- Dropdown Menu -->
+    <div id="menu-dropdown" class="menu-dropdown hidden" role="menu" aria-hidden="true">
+        <div class="menu-item" data-action="new-tab">New tab Ctrl+T</div>
+        <div class="menu-item" data-action="new-window">New window Ctrl+N</div>
+        <div class="menu-separator"></div>
+        <div class="menu-item" data-action="history">History</div>
+        <div class="menu-item" data-action="downloads">Downloads</div>
     </div>
 
     <script src="draggabilly.pkgd.min.js"></script>
@@ -143,6 +160,44 @@
         }
 
         bindCallbacks();
+
+        // Menu dropdown logic
+        (function initMenu() {
+            const toggleBtn = document.getElementById('toggle-menu');
+            const menu = document.getElementById('menu-dropdown');
+
+            function openMenu() {
+                // Use native overlay instead of inline dropdown
+                if (window.OnMenuOpen) OnMenuOpen();
+            }
+            function closeMenu() {
+                if (window.OnMenuClose) OnMenuClose();
+            }
+            function isMenuOpen() {
+                return menu && !menu.classList.contains('hidden');
+            }
+
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openMenu();
+                });
+            }
+
+            // Handle menu item clicks
+            // Inline menu is no longer used; actions handled by menu overlay
+
+            // Close on outside click
+            document.addEventListener('click', (e) => {
+                const within = e.target.closest('#toggle-menu');
+                if (!within) closeMenu();
+            });
+
+            // Close on Escape
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && isMenuOpen()) closeMenu();
+            });
+        })();
     </script>
 </body>
 
