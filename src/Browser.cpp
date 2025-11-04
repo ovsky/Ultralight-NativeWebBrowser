@@ -56,9 +56,11 @@ Browser::Browser()
 #endif
 
   // Create the UI
-  // Initialize basic ad/tracker blocker with default blocklist under assets
+  // Initialize ad/tracker blocker with default blocklist and additional filters
   adblock_ = std::make_unique<AdBlocker>();
-  adblock_->LoadDefaultBlocklist("assets/blocklist.txt");
+  adblock_->Clear();
+  adblock_->LoadBlocklist("assets/blocklist.txt", true);
+  adblock_->LoadBlocklistsInDirectory("assets/filters");
 
   ui_.reset(new UI(window_, adblock_.get(), adblock_.get()));
   window_->set_listener(ui_.get());

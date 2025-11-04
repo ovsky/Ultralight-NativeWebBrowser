@@ -4,6 +4,8 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <filesystem>
+#include <cstdio>
 
 using namespace ultralight;
 
@@ -24,15 +26,19 @@ namespace
     }
 }
 
-bool AdBlocker::LoadDefaultBlocklist(const std::string &path)
+bool AdBlocker::LoadBlocklist(const std::string &path, bool append)
 {
     std::ifstream in(path);
     if (!in.is_open())
         return false;
 
     std::lock_guard<std::mutex> lock(mtx_);
-    blocked_hosts_.clear();
-    url_substrings_.clear();
+    if (!append)
+    {
+        blocked_hosts_.clear();
+        url_substrings_.clear();
+        url_globs_.clear();
+    }
 
     std::string line;
     while (std::getline(in, line))
@@ -81,11 +87,40 @@ bool AdBlocker::LoadDefaultBlocklist(const std::string &path)
             continue;
         }
 
-        // Fallback: treat as URL substring rule
-        AddURLSubstring(line);
+        // If contains wildcard, treat as glob, else as substring
+        if (line.find('*') != std::string::npos || line.find('?') != std::string::npos)
+            AddURLGlob(line);
+        else
+            AddURLSubstring(line);
     }
 
     return true;
+}
+
+int AdBlocker::LoadBlocklistsInDirectory(const std::string &dir_path)
+{
+    int count = 0;
+#if __cplusplus >= 201703L
+    try
+    {
+        for (const auto &entry : std::filesystem::directory_iterator(dir_path))
+        {
+            if (!entry.is_regular_file())
+                continue;
+            auto path = entry.path();
+            if (path.extension() == ".txt")
+            {
+                if (LoadBlocklist(path.string(), true))
+                    ++count;
+            }
+        }
+    }
+    catch (...)
+    {
+        // ignore directory errors
+    }
+#endif
+    return count;
 }
 
 void AdBlocker::Clear()
@@ -117,10 +152,14 @@ bool AdBlocker::OnNetworkRequest(View * /*caller*/, NetworkRequest &request)
         std::lock_guard<std::mutex> lock(mtx_);
         if (!host.empty() && IsBlockedHost(host))
         {
+            if (log_blocked_)
+                std::fprintf(stderr, "AdBlock: blocked host: %s\n", host.c_str());
             return false; // Block by domain
         }
         if (!url.empty() && IsBlockedURL(url))
         {
+            if (log_blocked_)
+                std::fprintf(stderr, "AdBlock: blocked url: %s\n", url.c_str());
             return false; // Block by simple substring
         }
     }
@@ -147,6 +186,14 @@ void AdBlocker::AddURLSubstring(const std::string &needle_raw)
     url_substrings_.push_back(n);
 }
 
+void AdBlocker::AddURLGlob(const std::string &pattern_raw)
+{
+    std::string p = ToLower(Trim(pattern_raw));
+    if (p.empty())
+        return;
+    url_globs_.push_back(p);
+}
+
 bool AdBlocker::IsBlockedHost(const std::string &host) const
 {
     for (const auto &rule : blocked_hosts_)
@@ -162,6 +209,11 @@ bool AdBlocker::IsBlockedURL(const std::string &url) const
     for (const auto &needle : url_substrings_)
     {
         if (url.find(needle) != std::string::npos)
+            return true;
+    }
+    for (const auto &glob : url_globs_)
+    {
+        if (GlobMatch(url.c_str(), glob.c_str()))
             return true;
     }
     return false;
@@ -181,4 +233,41 @@ std::string AdBlocker::Trim(const std::string &s)
         return "";
     size_t end = s.find_last_not_of(" \t\r\n");
     return s.substr(start, end - start + 1);
+}
+
+// Very simple glob matcher supporting '*' and '?'
+bool AdBlocker::GlobMatch(const char *text, const char *pattern)
+{
+    // Based on recursive backtracking; fine for small pattern counts
+    if (!pattern || !text)
+        return false;
+    const char *p = pattern;
+    const char *t = text;
+    const char *star = nullptr;
+    const char *star_text = nullptr;
+    while (*t)
+    {
+        if (*p == '?' || *p == *t)
+        {
+            ++p;
+            ++t;
+            continue;
+        }
+        if (*p == '*')
+        {
+            star = p++;
+            star_text = t;
+            continue;
+        }
+        if (star)
+        {
+            p = star + 1;
+            t = ++star_text;
+            continue;
+        }
+        return false;
+    }
+    while (*p == '*')
+        ++p;
+    return *p == '\0';
 }

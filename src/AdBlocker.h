@@ -26,8 +26,15 @@ public:
     AdBlocker() = default;
     ~AdBlocker() override = default;
 
-    // Load a blocklist from the given file path. Returns true if loaded.
-    bool LoadDefaultBlocklist(const std::string &path);
+    // Load a blocklist from the given file path. When append=false, clears existing rules first.
+    bool LoadBlocklist(const std::string &path, bool append = false);
+
+    // Backwards-compat wrapper
+    bool LoadDefaultBlocklist(const std::string &path) { return LoadBlocklist(path, false); }
+
+    // Load all .txt blocklists in a directory (non-recursive), appending to current rules.
+    // Returns count of files successfully loaded.
+    int LoadBlocklistsInDirectory(const std::string &dir_path);
 
     // Clear all rules
     void Clear();
@@ -40,6 +47,8 @@ public:
 
     // Add a URL substring rule (case-insensitive)
     void AddURLSubstring(const std::string &needle);
+    // Add a simple glob pattern (supports '*' wildcard), case-insensitive
+    void AddURLGlob(const std::string &pattern);
 
     // Enable/disable blocking at runtime
     void set_enabled(bool enabled)
@@ -56,6 +65,7 @@ public:
 private:
     bool IsBlockedHost(const std::string &host) const;
     bool IsBlockedURL(const std::string &url) const;
+    static bool GlobMatch(const char *text, const char *pattern);
 
     static std::string ToLower(std::string s);
     static std::string Trim(const std::string &s);
@@ -63,7 +73,16 @@ private:
     // Data structures
     std::unordered_set<std::string> blocked_hosts_; // host suffixes in lowercase (eg, "doubleclick.net")
     std::vector<std::string> url_substrings_;       // lowercase substrings
+    std::vector<std::string> url_globs_;            // lowercase glob patterns with '*'
 
     mutable std::mutex mtx_;
     bool enabled_ = true;
+    bool log_blocked_ = false;
+
+public:
+    void set_log_blocked(bool v)
+    {
+        std::lock_guard<std::mutex> l(mtx_);
+        log_blocked_ = v;
+    }
 };
