@@ -6,6 +6,23 @@ name: Build - Linux (ARM64)
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      sdk_url:
+        description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
+        required: false
+        type: string
+      version:
+        description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
+        required: false
+        type: string
+      webbrowser_version:
+        description: "Override WebBrowser version used in package filenames (default 'dev')"
+        required: false
+        type: string
+      package_format:
+        description: "Package format(s) to produce via CPack (eg. TGZ only for ARM64 here)"
+        required: false
+        type: string
   workflow_call:
     inputs:
       webbrowser_version:
@@ -46,7 +63,10 @@ jobs:
           run: |
             set -euo pipefail
             cd "$GITHUB_WORKSPACE"
-            export WEBBROWSER_VERSION="${{ inputs.webbrowser_version || 'dev' }}"
+            # Configure git in container too
+            git config --global core.longpaths true
+            git config --global core.autocrlf false
+            export WEBBROWSER_VERSION="${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}"
             echo "== ARM64: Detect ULTRALIGHT_SDK_URL from base-sdk =="
             API="https://api.github.com/repos/${{ github.repository }}/contents/sdks?ref=base-sdk"
             RESP=$(curl -fLs -H "Accept: application/vnd.github+json" "$API" || true)

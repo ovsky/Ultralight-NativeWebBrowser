@@ -9,6 +9,23 @@ name: Build - Windows
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      sdk_url:
+        description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
+        required: false
+        type: string
+      version:
+        description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
+        required: false
+        type: string
+      webbrowser_version:
+        description: "Override WebBrowser version used in package filenames (default 'dev')"
+        required: false
+        type: string
+      create_installer:
+        description: "Create Windows installer via CPack (NSIS)"
+        required: false
+        type: boolean
   workflow_call:
     inputs:
       sdk_url:
@@ -39,6 +56,12 @@ jobs:
       CREATE_INSTALLER: ${{ inputs.create_installer || github.event.inputs.create_installer }}
 
     steps:
+      - name: "0. Configure Git (longpaths, autocrlf=false)"
+        shell: pwsh
+        run: |
+          git config --global core.longpaths true
+          git config --global core.autocrlf false
+
       - name: "1. Checkout Code (with submodules)"
         uses: actions/checkout@v4
         with:
