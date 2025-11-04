@@ -16,6 +16,10 @@ on:
         description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
         required: false
         type: string
+      webbrowser_version:
+        description: "Override WebBrowser version used in package filenames (default 'dev')"
+        required: false
+        type: string
       package_format:
         description: "Package format(s) to produce via CPack (eg. TGZ or DMG or multi 'TGZ;DMG')"
         required: false
@@ -31,6 +35,7 @@ jobs:
     env:
       ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url }}
       ULTRALIGHT_VERSION: ${{ inputs.version }}
+      WEBBROWSER_VERSION: ${{ inputs.webbrowser_version || 'dev' }}
       PACKAGE_GENERATORS: ${{ inputs.package_format || 'TGZ' }}
       TARGET_ARCH: arm64
     steps:
@@ -190,7 +195,7 @@ jobs:
         run: |
           cmake --version
           echo "Configuring with ULTRALIGHT_SDK_ROOT=$ULTRALIGHT_SDK_ROOT"
-          cmake -S . -B build -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT" -DBUILD_TESTING=ON
+          cmake -S . -B build -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT" -DBUILD_TESTING=ON -DWEBBROWSER_VERSION="$WEBBROWSER_VERSION"
 
       - name: 6. Build Project (Release)
         if: steps.prep_sdk.outputs.present == 'true'

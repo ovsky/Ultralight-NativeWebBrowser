@@ -8,6 +8,10 @@ on:
   workflow_dispatch:
   workflow_call:
     inputs:
+      webbrowser_version:
+        description: "Override WebBrowser version used in package filenames (default 'dev')"
+        required: false
+        type: string
       package_format:
         description: "Package format(s) to produce via CPack (eg. TGZ only for ARM64 here)"
         required: false
@@ -42,6 +46,7 @@ jobs:
           run: |
             set -euo pipefail
             cd "$GITHUB_WORKSPACE"
+            export WEBBROWSER_VERSION="${{ inputs.webbrowser_version || 'dev' }}"
             echo "== ARM64: Detect ULTRALIGHT_SDK_URL from base-sdk =="
             API="https://api.github.com/repos/${{ github.repository }}/contents/sdks?ref=base-sdk"
             RESP=$(curl -fLs -H "Accept: application/vnd.github+json" "$API" || true)
@@ -87,7 +92,7 @@ jobs:
             fi
             echo "Found SDK at: $ROOT"; ls -la "$ROOT/lib" || true
             echo "== ARM64: Configure & Build =="
-            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ROOT" -DBUILD_TESTING=OFF
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ROOT" -DBUILD_TESTING=OFF -DWEBBROWSER_VERSION="$WEBBROWSER_VERSION"
             cmake --build build --parallel
             echo "== ARM64: Package (TGZ) =="
             cpack --config build/CPackConfig.cmake -C Release -G TGZ -D CPACK_OUTPUT_FILE_PREFIX="$GITHUB_WORKSPACE/build"
