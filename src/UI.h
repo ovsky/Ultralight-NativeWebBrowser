@@ -106,9 +106,20 @@ protected:
   void OnSuggestionPick(const JSObject &obj, const JSArgs &args);
   // Paste a suggestion URL into the address bar without navigating
   void OnSuggestionPaste(const JSObject &obj, const JSArgs &args);
+  // Receive favicon image data (as data URL) from suggestions overlay and persist cache
+  void OnFaviconReady(const JSObject &obj, const JSArgs &args);
 
   // Compute a best-effort favicon URL (origin + "/favicon.ico") for http/https URLs
   String GetFaviconURL(const String &page_url);
+  // Get origin string (scheme+host+optional port)
+  static std::string GetOriginStringFromURL(const std::string &url);
+  // Favicon disk cache
+  void LoadFaviconDiskCache();
+  void SaveFaviconDiskCache();
+  std::string EnsureFaviconCacheDir();
+  static std::string Base64Decode(const std::string &in);
+  double GetOriginScore(const std::string &origin);
+  void PruneFaviconDiskCacheToLimit();
 
   Tab *active_tab() { return tabs_.empty() ? nullptr : tabs_[active_tab_id_].get(); }
 
@@ -162,6 +173,9 @@ protected:
   // Cache favicon URL per site origin so multiple tabs/pages reuse it
   // Key: origin string (eg, https://example.com), Value: favicon URL
   std::map<std::string, std::string> favicon_cache_;
+  // Disk-persisted favicon file cache (origin -> file path)
+  std::map<std::string, std::string> favicon_file_cache_;
+  size_t favicon_cache_limit_ = 128;
 
   // Simple in-memory history
   struct HistoryEntry

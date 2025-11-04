@@ -70,6 +70,16 @@
         // icon
         if (favicon) {
           const img = document.createElement('img'); img.className='icon'; img.src=favicon; img.alt='';
+          try { img.crossOrigin = 'anonymous'; } catch(_) {}
+          img.addEventListener('load', ()=>{
+            try{
+              // persist to disk via dataURL (may fail for cross-origin without CORS)
+              const c = document.createElement('canvas'); c.width = 16; c.height = 16; const g = c.getContext('2d');
+              g.imageSmoothingEnabled = true; g.clearRect(0,0,16,16); g.drawImage(img,0,0,16,16);
+              const dataUrl = c.toDataURL('image/png');
+              if (window.OnFaviconReady) OnFaviconReady(String(url||''), String(dataUrl||''));
+            }catch(e){ /* ignore tainted canvas */ }
+          });
           img.referrerPolicy = 'no-referrer';
           div.appendChild(img);
         } else {

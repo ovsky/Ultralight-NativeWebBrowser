@@ -97,9 +97,10 @@
         var el = document.querySelector('.chrome-tabs')
         var chromeTabs = new ChromeTabs()
         var select_next_mouseup = false;
-        var defaultFavicon = "earth.svg";
-        var suggEl = null;
-        var suggActiveIndex = -1;
+    var defaultFavicon = "earth.svg";
+    var suggEl = null;
+    var suggActiveIndex = -1;
+    var suggOverlayOpen = false;
 
         chromeTabs.init(el, {
             tabOverlapDistance: 6,
@@ -139,6 +140,7 @@
             var address = document.querySelector('#address');
             address.onkeypress = (function (e) {
                 if (e.which == '13') {
+                    if (suggOverlayOpen) { e.preventDefault(); return false; }
                     address.blur();
                     let url = address.value;
                     if (anchorme.validate.url(url) || anchorme.validate.ip(url)) {
@@ -173,6 +175,7 @@
                 suggActiveIndex = -1;
                 if (typeof CloseSuggestionsOverlay === 'function') CloseSuggestionsOverlay();
                 if (typeof OnSuggestClose === 'function') OnSuggestClose();
+                suggOverlayOpen = false;
             }
 
             function showSuggestions(items) {
@@ -187,6 +190,7 @@
                 if (typeof OpenSuggestionsOverlay === 'function') {
                     OpenSuggestionsOverlay(Math.round(r.left), Math.round(r.bottom + 4), Math.round(r.width), json);
                 }
+                suggOverlayOpen = true;
             }
 
             function commitSuggestion(text) {

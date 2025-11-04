@@ -8,6 +8,13 @@
 #include <cctype>
 #include <algorithm>
 #include <unordered_set>
+#include <cstdio>
+#ifdef _WIN32
+#include <direct.h> // _mkdir, _getcwd
+#else
+#include <sys/stat.h> // mkdir
+#include <unistd.h>   // getcwd
+#endif
 
 static UI *g_ui = 0;
 
@@ -33,6 +40,8 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
   LoadPopularSites();
   // Load suggestions favicons flag
   LoadSuggestionsFaviconsFlag();
+  // Load favicon disk cache
+  LoadFaviconDiskCache();
 
   // Load history from disk
   LoadHistoryFromDisk();
@@ -61,6 +70,8 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
   LoadPopularSites();
   // Load suggestions favicons flag
   LoadSuggestionsFaviconsFlag();
+  // Load favicon disk cache
+  LoadFaviconDiskCache();
 
   // Load history from disk
   LoadHistoryFromDisk();
@@ -458,6 +469,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     // suggestions overlay actions
     global["OnSuggestionPick"] = BindJSCallback(&UI::OnSuggestionPick);
     global["OnSuggestionPaste"] = BindJSCallback(&UI::OnSuggestionPaste);
+    global["OnFaviconReady"] = BindJSCallback(&UI::OnFaviconReady);
     setupSuggestions = global["setupSuggestions"];
     if (setupSuggestions)
     {
@@ -1231,7 +1243,7 @@ void UI::LoadPopularSites()
   std::ifstream in("assets/popular_sites.json", std::ios::in | std::ios::binary);
   if (!in.is_open())
     return;
-  
+
   std::ostringstream ss;
   ss << in.rdbuf();
   std::string content = ss.str();
@@ -1253,11 +1265,11 @@ void UI::LoadPopularSites()
     size_t quote2 = sites_array.find('"', quote1 + 1);
     if (quote2 == std::string::npos)
       break;
-    
+
     std::string site = sites_array.substr(quote1 + 1, quote2 - quote1 - 1);
     if (!site.empty())
       popular_sites_.push_back(site);
-    
+
     pos = quote2 + 1;
   }
 }
@@ -1286,7 +1298,7 @@ void UI::LoadHistoryFromDisk()
       break;
 
     std::string obj = content.substr(obj_start, obj_end - obj_start + 1);
-    
+
     // Extract url
     size_t url_key = obj.find("\"url\"");
     std::string url;
@@ -1370,7 +1382,7 @@ void UI::SaveHistoryToDisk()
     if (i > 0)
       out << ",";
     const auto &entry = history_[i];
-  out << "{\"url\":\"" << jsonEscape(entry.url) 
+  out << "{\"url\":\"" << jsonEscape(entry.url)
     << "\",\"title\":\"" << jsonEscape(entry.title)
     << "\",\"time\":" << entry.timestamp_ms
     << ",\"count\":" << entry.visit_count << "}";
@@ -1443,7 +1455,7 @@ std::vector<std::string> UI::GetSuggestions(const std::string &input, int maxRes
   auto matches = [&input_lower](const std::string &url) -> bool {
     std::string url_lower = url;
     std::transform(url_lower.begin(), url_lower.end(), url_lower.begin(), ::tolower);
-    
+
     // Check if input matches the beginning of the URL (after protocol)
     size_t protocol_end = url_lower.find("://");
     if (protocol_end != std::string::npos)
@@ -1452,7 +1464,7 @@ std::vector<std::string> UI::GetSuggestions(const std::string &input, int maxRes
       if (domain_part.find(input_lower) == 0)
         return true;
     }
-    
+
     // Check if input appears anywhere in the URL
     return url_lower.find(input_lower) != std::string::npos;
   };
@@ -1516,9 +1528,20 @@ JSValue UI::OnGetSuggestions(const JSObject &obj, const JSArgs &args)
     if (suggestion_favicons_enabled_)
     {
       std::string u = suggestions[i];
-      auto fav = GetFaviconURL(String(u.c_str()));
-      auto f8 = fav.utf8();
-      std::string f = f8.data() ? f8.data() : "";
+      // Prefer disk-cached favicon if available
+      std::string origin = GetOriginStringFromURL(u);
+      std::string f;
+      auto itf = favicon_file_cache_.find(origin);
+      if (itf != favicon_file_cache_.end())
+      {
+        f = itf->second; // file:///... path
+      }
+      if (f.empty())
+      {
+        auto fav = GetFaviconURL(String(u.c_str()));
+        auto f8 = fav.utf8();
+        f = f8.data() ? f8.data() : "";
+      }
       json += "{\"url\":\"" + jsonEscape(u) + "\"";
       if (!f.empty()) json += ",\"favicon\":\"" + jsonEscape(f) + "\"";
       json += "}";
@@ -1531,6 +1554,225 @@ JSValue UI::OnGetSuggestions(const JSObject &obj, const JSArgs &args)
   json += "]";
 
   return JSValue(json.c_str());
+}
+
+// --- Favicon Disk Cache Helpers ---
+std::string UI::GetOriginStringFromURL(const std::string &url)
+{
+  // Extract scheme://host[:port]
+  size_t scheme = url.find("://");
+  if (scheme == std::string::npos) return std::string();
+  size_t host_start = scheme + 3;
+  size_t slash = url.find('/', host_start);
+  if (slash == std::string::npos) return url; // whole string is origin
+  return url.substr(0, slash);
+}
+
+std::string UI::EnsureFaviconCacheDir()
+{
+  // Windows-style path acceptable; assets live under working dir.
+  // Use data/favicons for persisted favicons
+  std::string dir = "data/favicons";
+  // Create directories if missing (best-effort)
+  // We can't use std::filesystem here reliably; try to create via C runtime
+#ifdef _WIN32
+  _mkdir("data");
+  _mkdir("data\\favicons");
+#else
+  mkdir("data", 0755);
+  mkdir("data/favicons", 0755);
+#endif
+  return dir;
+}
+
+// simple base64 decoder (RFC 4648) for PNG payloads
+std::string UI::Base64Decode(const std::string &in)
+{
+  static const int T[256] = {
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,62,-1,-1,-1,63,
+    52,53,54,55,56,57,58,59,60,61,-1,-1,-1, 0,-1,-1,
+    -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,
+    15,16,17,18,19,20,21,22,23,24,25,-1,-1,-1,-1,-1,
+    -1,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
+    41,42,43,44,45,46,47,48,49,50,51,-1,-1,-1,-1,-1,
+    // rest -1
+  };
+  std::string out; out.reserve(in.size()*3/4);
+  int val=0, valb=-8;
+  for (unsigned char c : in) {
+    int d = -1;
+    if (c < 128) d = T[c];
+    if (d == -1) { if (c=='=') break; else continue; }
+    val = (val<<6) + d; valb += 6;
+    if (valb>=0) { out.push_back(char((val>>valb)&0xFF)); valb-=8; }
+  }
+  return out;
+}
+
+void UI::LoadFaviconDiskCache()
+{
+  favicon_file_cache_.clear();
+  // Ensure directory exists
+  EnsureFaviconCacheDir();
+  std::ifstream in("data/favicons/index.json", std::ios::in | std::ios::binary);
+  if (!in.is_open()) return;
+  std::ostringstream ss; ss << in.rdbuf(); std::string txt = ss.str(); in.close();
+  // Parse simple object { "origin": "file:///...", ... }
+  size_t pos = 0;
+  while (true) {
+    size_t k1 = txt.find('"', pos); if (k1==std::string::npos) break;
+    size_t k2 = txt.find('"', k1+1); if (k2==std::string::npos) break;
+    std::string key = txt.substr(k1+1, k2-k1-1);
+    size_t c = txt.find(':', k2+1); if (c==std::string::npos) break;
+    size_t v1 = txt.find('"', c+1); if (v1==std::string::npos) break;
+    size_t v2 = txt.find('"', v1+1); if (v2==std::string::npos) break;
+    std::string val = txt.substr(v1+1, v2-v1-1);
+    if (!key.empty() && !val.empty()) favicon_file_cache_[key] = val;
+    pos = v2+1;
+    if (favicon_file_cache_.size() > favicon_cache_limit_) break;
+  }
+  if (favicon_file_cache_.size() > favicon_cache_limit_) {
+    PruneFaviconDiskCacheToLimit();
+    SaveFaviconDiskCache();
+  }
+}
+
+void UI::SaveFaviconDiskCache()
+{
+  EnsureFaviconCacheDir();
+  std::ofstream out("data/favicons/index.json", std::ios::out | std::ios::binary | std::ios::trunc);
+  if (!out.is_open()) return;
+  out << "{";
+  bool first = true;
+  for (auto &p : favicon_file_cache_) {
+    if (!first) out << ","; first=false;
+    out << "\"" << jsonEscape(p.first) << "\":\"" << jsonEscape(p.second) << "\"";
+  }
+  out << "}";
+  out.close();
+}
+
+void UI::OnFaviconReady(const JSObject &obj, const JSArgs &args)
+{
+  // args: url, dataUrl (data:image/png;base64,....)
+  if (args.size() < 2 || !args[0].IsString() || !args[1].IsString()) return;
+  if (!suggestion_favicons_enabled_) return;
+  ultralight::String url_ul = args[0].ToString();
+  ultralight::String data_ul = args[1].ToString();
+  auto u8 = url_ul.utf8(); std::string url = u8.data() ? u8.data() : "";
+  auto d8 = data_ul.utf8(); std::string data = d8.data() ? d8.data() : "";
+  if (url.empty() || data.empty()) return;
+  std::string origin = GetOriginStringFromURL(url);
+  if (origin.empty()) return;
+
+  // Respect cache size limit with smarter eviction based on origin score
+  double new_score = GetOriginScore(origin);
+  if (favicon_file_cache_.find(origin) == favicon_file_cache_.end() && favicon_file_cache_.size() >= favicon_cache_limit_) {
+    // Find the lowest-score existing origin
+    std::string worst_origin; double worst_score = 1e18; bool found=false;
+    for (const auto &p : favicon_file_cache_) {
+      double s = GetOriginScore(p.first);
+      if (!found || s < worst_score) { worst_score = s; worst_origin = p.first; found=true; }
+    }
+    if (!found || new_score <= worst_score) {
+      // New origin is not better than the worst cached one; skip caching
+      return;
+    }
+    // Evict worst
+    auto itw = favicon_file_cache_.find(worst_origin);
+    if (itw != favicon_file_cache_.end()) {
+      // Try delete file on disk
+      std::string furl = itw->second;
+      std::string path;
+      const std::string prefix = "file:///";
+      if (furl.rfind(prefix, 0) == 0) {
+        path = furl.substr(prefix.size());
+#ifdef _WIN32
+        for (auto &ch : path) { if (ch=='/') ch='\\'; }
+#endif
+        std::remove(path.c_str());
+      }
+      favicon_file_cache_.erase(itw);
+    }
+  }
+
+  // Expect data URL like data:image/png;base64,....
+  size_t comma = data.find(","); if (comma == std::string::npos) return;
+  std::string b64 = data.substr(comma+1);
+  std::string bytes = Base64Decode(b64);
+  if (bytes.size() < 8) return;
+
+  std::string dir = EnsureFaviconCacheDir();
+  // Hash filename from origin
+  std::hash<std::string> hasher; size_t h = hasher(origin);
+  std::ostringstream path;
+  path << dir << "/" << std::hex << h << ".png";
+  std::string file = path.str();
+  // Write file
+  std::ofstream f(file, std::ios::out | std::ios::binary | std::ios::trunc);
+  if (!f.is_open()) return;
+  f.write(bytes.data(), (std::streamsize)bytes.size());
+  f.close();
+  // Store as file:/// absolute URL
+  char cwd_buf[1024] = {0};
+#ifdef _WIN32
+  _getcwd(cwd_buf, sizeof(cwd_buf));
+  std::string abs = std::string("file:///") + std::string(cwd_buf) + "/" + file;
+  // replace backslashes
+  for (auto &ch : abs) { if (ch=='\\') ch='/'; }
+#else
+  getcwd(cwd_buf, sizeof(cwd_buf));
+  std::string abs = std::string("file://") + std::string(cwd_buf) + "/" + file;
+#endif
+  favicon_file_cache_[origin] = abs;
+  SaveFaviconDiskCache();
+}
+
+double UI::GetOriginScore(const std::string &origin)
+{
+  // Combine recency and frequency across history entries that match this origin
+  if (origin.empty()) return 0.0;
+  auto now_ms = (uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count();
+  double total = 0.0;
+  for (const auto &e : history_) {
+    if (GetOriginStringFromURL(e.url) != origin) continue;
+    double age_days = std::max<double>(0.0, (double)(now_ms - e.timestamp_ms) / (1000.0*60.0*60.0*24.0));
+    double recency = std::max(0.0, 1.0 - (age_days / 30.0));
+    double freq = std::log(1.0 + (double)std::max<uint32_t>(1, e.visit_count)) / std::log(10.0);
+    total += (2.0*recency + 2.0*freq);
+  }
+  return total;
+}
+
+void UI::PruneFaviconDiskCacheToLimit()
+{
+  if (favicon_file_cache_.size() <= favicon_cache_limit_) return;
+  // Collect and sort by score desc
+  std::vector<std::pair<std::string,double>> arr; arr.reserve(favicon_file_cache_.size());
+  for (const auto &p : favicon_file_cache_) {
+    arr.emplace_back(p.first, GetOriginScore(p.first));
+  }
+  std::sort(arr.begin(), arr.end(), [](const auto &a, const auto &b){ return a.second > b.second; });
+  // Determine origins to keep
+  std::unordered_set<std::string> keep;
+  for (size_t i=0; i<arr.size() && i<favicon_cache_limit_; ++i) keep.insert(arr[i].first);
+  // Remove the rest (and try delete files)
+  for (auto it = favicon_file_cache_.begin(); it != favicon_file_cache_.end(); ) {
+    if (keep.find(it->first) != keep.end()) { ++it; continue; }
+    std::string furl = it->second;
+    const std::string prefix = "file:///";
+    if (furl.rfind(prefix, 0) == 0) {
+      std::string path = furl.substr(prefix.size());
+#ifdef _WIN32
+      for (auto &ch : path) { if (ch=='/') ch='\\'; }
+#endif
+      std::remove(path.c_str());
+    }
+    it = favicon_file_cache_.erase(it);
+  }
 }
 
 void UI::LoadSuggestionsFaviconsFlag()
