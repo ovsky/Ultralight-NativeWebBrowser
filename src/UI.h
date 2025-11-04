@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 using ultralight::JSArgs;
 using ultralight::JSFunction;
@@ -49,6 +50,8 @@ public:
   void OnRequestTabClose(const JSObject &obj, const JSArgs &args);
   void OnActiveTabChange(const JSObject &obj, const JSArgs &args);
   void OnRequestChangeURL(const JSObject &obj, const JSArgs &args);
+  // Explicitly called when user pressed Enter in the address bar
+  void OnAddressBarNavigate(const JSObject &obj, const JSArgs &args);
   void OnAddressBarBlur(const JSObject &obj, const JSArgs &args);
   void OnAddressBarFocus(const JSObject &obj, const JSArgs &args);
   void OnMenuOpen(const JSObject &obj, const JSArgs &args);
@@ -74,6 +77,11 @@ protected:
   void HideMenuOverlay();
   void ShowContextMenuOverlay(int x, int y, const ultralight::String &json_info);
   void HideContextMenuOverlay();
+
+  // History management
+  void RecordHistory(const String &url, const String &title);
+  String GetHistoryJSON();
+  void ClearHistory();
 
   // Compute a best-effort favicon URL (origin + "/favicon.ico") for http/https URLs
   String GetFaviconURL(const String &page_url);
@@ -124,6 +132,16 @@ protected:
   // Cache favicon URL per site origin so multiple tabs/pages reuse it
   // Key: origin string (eg, https://example.com), Value: favicon URL
   std::map<std::string, std::string> favicon_cache_;
+
+  // Simple in-memory history
+  struct HistoryEntry
+  {
+    std::string url;
+    std::string title;
+    uint64_t timestamp_ms;
+  };
+  std::vector<HistoryEntry> history_;
+  // Always enabled (disable-history feature removed)
 
   friend class Tab;
 };

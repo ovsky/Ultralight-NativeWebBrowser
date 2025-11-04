@@ -2,6 +2,7 @@
 #include <cstring>
 #include <cmath>
 #include <Ultralight/Renderer.h>
+#include <chrono>
 
 static UI *g_ui = 0;
 
@@ -302,6 +303,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnRequestTabClose"] = BindJSCallback(&UI::OnRequestTabClose);
   global["OnActiveTabChange"] = BindJSCallback(&UI::OnActiveTabChange);
   global["OnRequestChangeURL"] = BindJSCallback(&UI::OnRequestChangeURL);
+  global["OnAddressBarNavigate"] = BindJSCallback(&UI::OnAddressBarNavigate);
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
   global["OnAddressBarFocus"] = BindJSCallback(&UI::OnAddressBarFocus);
 
@@ -412,6 +414,19 @@ void UI::OnRequestChangeURL(const JSObject &obj, const JSArgs &args)
   {
     ultralight::String url = args[0];
 
+    if (!tabs_.empty())
+    {
+      auto &tab = tabs_[active_tab_id_];
+      tab->view()->LoadURL(url);
+    }
+  }
+}
+
+void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() == 1)
+  {
+    ultralight::String url = args[0];
     if (!tabs_.empty())
     {
       auto &tab = tabs_[active_tab_id_];
@@ -547,6 +562,100 @@ String UI::GetFaviconURL(const String &page_url)
   std::string favicon = origin_str + "/favicon.ico";
   favicon_cache_[origin_str] = favicon;
   return String(favicon.c_str());
+}
+
+// --- History helpers ---
+void UI::RecordHistory(const String &url, const String &title)
+{
+  auto url_u = url.utf8();
+  const char *c_url = url_u.data();
+  if (!c_url)
+    return;
+
+  // Only record http(s)
+  if (strncmp(c_url, "http://", 7) != 0 && strncmp(c_url, "https://", 8) != 0)
+    return;
+
+  // Basic cap to avoid unbounded growth
+  if (history_.size() >= 500)
+    history_.erase(history_.begin());
+
+  auto title_u = title.utf8();
+  std::string t = title_u.data() ? title_u.data() : "";
+  std::string u = c_url;
+  uint64_t now_ms = (uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::system_clock::now().time_since_epoch())
+                        .count();
+  history_.push_back({u, t, now_ms});
+
+  // If any tab is showing the History page, ask it to refresh now
+  for (auto &it : tabs_)
+  {
+    auto &tabPtr = it.second;
+    if (!tabPtr)
+      continue;
+    RefPtr<View> v = tabPtr->view();
+    if (!v)
+      continue;
+    auto vurl_u = v->url().utf8();
+    const char *vurl = vurl_u.data();
+    if (vurl && std::strstr(vurl, "history.html"))
+    {
+      v->EvaluateScript("(function(){ if (window.refresh) window.refresh(); })();", nullptr);
+    }
+  }
+}
+
+static std::string jsonEscape(const std::string &s)
+{
+  std::string out;
+  out.reserve(s.size() + 8);
+  for (char c : s)
+  {
+    switch (c)
+    {
+    case '\\':
+      out += "\\\\";
+      break;
+    case '"':
+      out += "\\\"";
+      break;
+    case '\n':
+      out += "\\n";
+      break;
+    case '\r':
+      out += "\\r";
+      break;
+    case '\t':
+      out += "\\t";
+      break;
+    default:
+      out += c;
+      break;
+    }
+  }
+  return out;
+}
+
+String UI::GetHistoryJSON()
+{
+  // Serialize as { items: [ {url,title,time}, ... ] }
+  std::string json = std::string("{\"items\":[");
+  // Newest first
+  for (size_t i = 0; i < history_.size(); ++i)
+  {
+    const auto &e = history_[history_.size() - 1 - i];
+    if (i)
+      json += ",";
+    json += "{\"url\":\"" + jsonEscape(e.url) + "\",\"title\":\"" + jsonEscape(e.title) + "\",\"time\":" + std::to_string(e.timestamp_ms) + "}";
+  }
+  json += "]}";
+  return String(json.c_str());
+}
+
+void UI::ClearHistory()
+{
+  history_.clear();
 }
 
 void UI::OnMenuOpen(const JSObject &obj, const JSArgs &args)

@@ -68,6 +68,10 @@ public:
   // JS callback from page when right-click occurs
   void OnOpenContextMenu(const JSObject &obj, const JSArgs &args);
 
+  // History page callbacks
+  JSValue OnHistoryGetData(const JSObject &obj, const JSArgs &args);
+  void OnHistoryClear(const JSObject &obj, const JSArgs &args);
+
 protected:
   UI *ui_;
   RefPtr<Overlay> overlay_;

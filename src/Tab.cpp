@@ -141,6 +141,11 @@ void Tab::OnChangeTitle(View *caller, const String &title)
 void Tab::OnChangeURL(View *caller, const String &url)
 {
   ui_->UpdateTabURL(id_, url);
+  // Record history when the page URL changes (navigation start/change), not on load finish
+  if (ui_)
+  {
+    ui_->RecordHistory(url, caller->title());
+  }
 }
 
 void Tab::OnChangeTooltip(View *caller, const String &tooltip) {}
@@ -262,6 +267,22 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
     })();
   )JS";
   caller->EvaluateScript(script, nullptr);
+
+  // If this is our History page, expose native methods
+  {
+    auto url_u = url.utf8();
+    const char *c = url_u.data();
+    if (c && std::strstr(c, "history.html"))
+    {
+      RefPtr<JSContext> ctx = caller->LockJSContext();
+      SetJSContext(ctx->ctx());
+      JSObject global = JSGlobalObject();
+      global["NativeGetHistory"] = BindJSCallbackWithRetval(&Tab::OnHistoryGetData);
+      global["NativeClearHistory"] = BindJSCallback(&Tab::OnHistoryClear);
+      // Notify the page JS that native bridge is ready so it can refresh now
+      caller->EvaluateScript("(function(){ if (window.__ul_history_ready) window.__ul_history_ready(); })();", nullptr);
+    }
+  }
 }
 
 void Tab::OnOpenContextMenu(const JSObject &obj, const JSArgs &args)
@@ -284,3 +305,19 @@ void Tab::OnOpenContextMenu(const JSObject &obj, const JSArgs &args)
     ui_->ShowContextMenuOverlay(win_x, win_y, json);
   }
 }
+
+// --- History page JS bridge ---
+JSValue Tab::OnHistoryGetData(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_)
+    return JSValue();
+  return JSValue(ui_->GetHistoryJSON());
+}
+
+void Tab::OnHistoryClear(const JSObject &obj, const JSArgs &args)
+{
+  if (ui_)
+    ui_->ClearHistory();
+}
+
+// (Disable-history removed)
