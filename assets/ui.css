@@ -2,6 +2,7 @@
      overflow: hidden;
      user-select: none;
      -webkit-user-select: none;
+     transition: all 0.2s ease-in-out;
 }
 
 body {
@@ -51,10 +52,11 @@ body {
 
 .icon {
      fill: rgba(200, 200, 200, 1.0);
-     vertical-align: top;
-     margin-top: -1px;
+     vertical-align: middle;
+     /* margin-top: -1px; */
      padding: 5px;
-     height: 22px;
+     height: 18px;
+     width: 18px;
 }
 
 /* Show hand cursor for clickable icons */
