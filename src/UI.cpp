@@ -553,9 +553,6 @@ String UI::GetFaviconURL(const String &page_url)
 // --- History helpers ---
 void UI::RecordHistory(const String &url, const String &title)
 {
-  if (!history_enabled_)
-    return;
-
   auto url_u = url.utf8();
   const char *c_url = url_u.data();
   if (!c_url)
@@ -611,8 +608,8 @@ static std::string jsonEscape(const std::string &s)
 
 String UI::GetHistoryJSON()
 {
-  // Serialize as { enabled: bool, items: [ {url,title,time}, ... ] }
-  std::string json = std::string("{\"enabled\":") + (history_enabled_ ? "true" : "false") + ",\"items\":[";
+  // Serialize as { items: [ {url,title,time}, ... ] }
+  std::string json = std::string("{\"items\":[");
   // Newest first
   for (size_t i = 0; i < history_.size(); ++i)
   {

@@ -278,7 +278,8 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
       JSObject global = JSGlobalObject();
       global["NativeGetHistory"] = BindJSCallbackWithRetval(&Tab::OnHistoryGetData);
       global["NativeClearHistory"] = BindJSCallback(&Tab::OnHistoryClear);
-      global["NativeSetHistoryEnabled"] = BindJSCallback(&Tab::OnHistorySetEnabled);
+      // Notify the page JS that native bridge is ready so it can refresh now
+      caller->EvaluateScript("(function(){ if (window.__ul_history_ready) window.__ul_history_ready(); })();", nullptr);
     }
   }
 }
@@ -318,16 +319,4 @@ void Tab::OnHistoryClear(const JSObject &obj, const JSArgs &args)
     ui_->ClearHistory();
 }
 
-void Tab::OnHistorySetEnabled(const JSObject &obj, const JSArgs &args)
-{
-  if (!ui_)
-    return;
-  bool enabled = true;
-  if (args.size() >= 1)
-  {
-    // We pass 1 for enabled, 0 for disabled
-    double v = args[0];
-    enabled = (v != 0.0);
-  }
-  ui_->SetHistoryEnabled(enabled);
-}
+// (Disable-history removed)

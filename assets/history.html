@@ -2,6 +2,9 @@
 
 <head>
     <meta charset="utf-8" />
+    <title>History</title>
+    <!-- Minimal inline favicon (book icon) so the tab shows an icon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23222' d='M6 2h9a3 3 0 0 1 3 3v15.5a.5.5 0 0 1-.8.4L14 19H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2m0 2a0 0 0 0 0 0 0v13a0 0 0 0 0 0 0h8l3 2V5a1 1 0 0 0-1-1z'/%3E%3C/svg%3E" />
     <link rel="stylesheet" type="text/css" href="ui.css">
     <style>
         :root {
@@ -35,11 +38,7 @@
             font-weight: 600;
         }
 
-        .controls {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+        .controls { display: flex; align-items: center; gap: 12px; }
 
         .btn {
             padding: 8px 12px;
@@ -103,17 +102,7 @@
             color: #666;
         }
 
-        .switch {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            user-select: none;
-            cursor: pointer;
-        }
-
-        input[type="checkbox"] {
-            cursor: pointer;
-        }
+        /* No toggle anymore */
     </style>
 </head>
 
@@ -122,10 +111,6 @@
         <header>
             <h1>History</h1>
             <div class="controls">
-                <label class="switch">
-                    <input id="toggle-enabled" type="checkbox" />
-                    <span id="toggle-label" class="muted">Disable history</span>
-                </label>
                 <button id="clear-btn" class="btn">Clear history</button>
             </div>
         </header>
@@ -184,7 +169,6 @@
                 if (window.NativeGetHistory) {
                     const json = NativeGetHistory();
                     const data = JSON.parse(json || '{}');
-                    document.getElementById('toggle-enabled').checked = data && data.enabled === false; // checked = disabled
                     render(data);
                     return;
                 }
@@ -193,18 +177,28 @@
             render({ items: [] });
         }
 
+        // Called by native after JS bridge is bound
+        window.__ul_history_ready = function() {
+            refresh();
+        }
+
         document.getElementById('clear-btn').addEventListener('click', () => {
             try { if (window.NativeClearHistory) NativeClearHistory(); } catch { }
             refresh();
         });
 
-        document.getElementById('toggle-enabled').addEventListener('change', (e) => {
-            const disabled = !!e.target.checked;
-            try { if (window.NativeSetHistoryEnabled) NativeSetHistoryEnabled(disabled ? 0 : 1); } catch { }
-            refresh();
+        // Auto-refresh when entering the page and when it becomes visible/focused
+        document.addEventListener('DOMContentLoaded', () => {
+            // If native not ready yet, retry shortly
+            let tries = 0;
+            const tick = () => {
+                if (window.NativeGetHistory) { refresh(); return; }
+                if (++tries < 20) setTimeout(tick, 50);
+            };
+            tick();
         });
-
-        document.addEventListener('DOMContentLoaded', refresh);
+        window.addEventListener('focus', refresh);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
     </script>
 </body>
 

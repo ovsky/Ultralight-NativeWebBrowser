@@ -50,6 +50,8 @@ public:
   void OnRequestTabClose(const JSObject &obj, const JSArgs &args);
   void OnActiveTabChange(const JSObject &obj, const JSArgs &args);
   void OnRequestChangeURL(const JSObject &obj, const JSArgs &args);
+  // Explicitly called when user pressed Enter in the address bar
+  void OnAddressBarNavigate(const JSObject &obj, const JSArgs &args);
   void OnAddressBarBlur(const JSObject &obj, const JSArgs &args);
   void OnAddressBarFocus(const JSObject &obj, const JSArgs &args);
   void OnMenuOpen(const JSObject &obj, const JSArgs &args);
@@ -80,8 +82,6 @@ protected:
   void RecordHistory(const String &url, const String &title);
   String GetHistoryJSON();
   void ClearHistory();
-  void SetHistoryEnabled(bool enabled) { history_enabled_ = enabled; }
-  bool history_enabled() const { return history_enabled_; }
 
   // Compute a best-effort favicon URL (origin + "/favicon.ico") for http/https URLs
   String GetFaviconURL(const String &page_url);
@@ -141,7 +141,7 @@ protected:
     uint64_t timestamp_ms;
   };
   std::vector<HistoryEntry> history_;
-  bool history_enabled_ = true;
+  // Always enabled (disable-history feature removed)
 
   friend class Tab;
 };

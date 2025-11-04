@@ -71,7 +71,6 @@ public:
   // History page callbacks
   JSValue OnHistoryGetData(const JSObject &obj, const JSArgs &args);
   void OnHistoryClear(const JSObject &obj, const JSArgs &args);
-  void OnHistorySetEnabled(const JSObject &obj, const JSArgs &args);
 
 protected:
   UI *ui_;
