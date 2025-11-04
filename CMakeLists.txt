@@ -233,3 +233,96 @@ if(EXISTS "${ULTRALIGHT_SDK_ROOT}/inspector")
     "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/inspector"
   )
 endif()
+
+# --- Install rules for packaging (install into a self-contained app dir) ---
+set(INSTALL_DIR_NAME "UltralightWebBrowser")
+
+# Binary and assets next to each other to preserve relative paths
+install(TARGETS Ultralight-WebBrowser RUNTIME DESTINATION ${INSTALL_DIR_NAME})
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets" DESTINATION ${INSTALL_DIR_NAME})
+
+if(WIN32)
+  # Runtime DLLs and resources (Windows)
+  install(FILES
+    "${ULTRALIGHT_SDK_ROOT}/bin/AppCore.dll"
+    "${ULTRALIGHT_SDK_ROOT}/bin/Ultralight.dll"
+    "${ULTRALIGHT_SDK_ROOT}/bin/UltralightCore.dll"
+    "${ULTRALIGHT_SDK_ROOT}/bin/WebCore.dll"
+    DESTINATION ${INSTALL_DIR_NAME}
+  )
+  install(FILES
+    "${ULTRALIGHT_SDK_ROOT}/bin/ICU/icudt67l.dat"
+    "${ULTRALIGHT_SDK_ROOT}/bin/ICU/cacert.pem"
+    DESTINATION ${INSTALL_DIR_NAME}/assets/resources
+  )
+else()
+  # Re-locate libraries at install time for macOS/Linux
+  find_library(APP_CORE_LIB NAMES AppCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
+  find_library(ULTRALIGHT_LIB NAMES Ultralight PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
+  find_library(ULTRALIGHT_CORE_LIB NAMES UltralightCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
+  find_library(WEB_CORE_LIB NAMES WebCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
+
+  if(APP_CORE_LIB)
+    install(FILES ${APP_CORE_LIB} DESTINATION ${INSTALL_DIR_NAME})
+  endif()
+  if(ULTRALIGHT_LIB)
+    install(FILES ${ULTRALIGHT_LIB} DESTINATION ${INSTALL_DIR_NAME})
+  endif()
+  if(ULTRALIGHT_CORE_LIB)
+    install(FILES ${ULTRALIGHT_CORE_LIB} DESTINATION ${INSTALL_DIR_NAME})
+  endif()
+  if(WEB_CORE_LIB)
+    install(FILES ${WEB_CORE_LIB} DESTINATION ${INSTALL_DIR_NAME})
+  endif()
+
+  # Include additional dylibs/so that ship with the SDK (both lib/ and bin/)
+  file(GLOB ULTRALIGHT_SHARED_LIBS
+    "${ULTRALIGHT_SDK_ROOT}/lib/*.dylib" "${ULTRALIGHT_SDK_ROOT}/lib/*.so")
+  file(GLOB ULTRALIGHT_BIN_LIBS
+    "${ULTRALIGHT_SDK_ROOT}/bin/*.dylib" "${ULTRALIGHT_SDK_ROOT}/bin/*.so")
+  if(ULTRALIGHT_SHARED_LIBS)
+    install(FILES ${ULTRALIGHT_SHARED_LIBS} DESTINATION ${INSTALL_DIR_NAME})
+  endif()
+  if(ULTRALIGHT_BIN_LIBS)
+    install(FILES ${ULTRALIGHT_BIN_LIBS} DESTINATION ${INSTALL_DIR_NAME})
+  endif()
+
+  # Resources (if present) or ICU fallback
+  if(EXISTS "${ULTRALIGHT_SDK_ROOT}/resources")
+    install(DIRECTORY "${ULTRALIGHT_SDK_ROOT}/resources" DESTINATION ${INSTALL_DIR_NAME}/assets)
+  elseif(EXISTS "${ULTRALIGHT_SDK_ROOT}/bin/ICU")
+    install(DIRECTORY "${ULTRALIGHT_SDK_ROOT}/bin/ICU" DESTINATION ${INSTALL_DIR_NAME}/assets/resources)
+  endif()
+endif()
+
+# License and docs
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+  install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE" DESTINATION ${INSTALL_DIR_NAME})
+endif()
+
+# --- Packaging via CPack ---
+# Try to extract Ultralight SDK version from header for package version; fallback to 1.4.0
+set(ULTRALIGHT_VERSION_STR "1.4.0")
+if(EXISTS "${ULTRALIGHT_SDK_ROOT}/include/Ultralight/Defines.h")
+  file(READ "${ULTRALIGHT_SDK_ROOT}/include/Ultralight/Defines.h" _UL_DEFINES)
+  string(REGEX MATCH "#define[ \t]+ULTRALIGHT_VERSION[ \t]+\"([^\"]+)\"" _UL_VER_MATCH "${_UL_DEFINES}")
+  if(_UL_VER_MATCH)
+    string(REGEX REPLACE ".*\"([^\"]+)\".*" "\\1" ULTRALIGHT_VERSION_STR "${_UL_VER_MATCH}")
+  endif()
+endif()
+
+set(CPACK_PACKAGE_NAME "Ultralight-WebBrowser")
+set(CPACK_PACKAGE_VENDOR "Ultralight")
+set(CPACK_PACKAGE_VERSION "${ULTRALIGHT_VERSION_STR}")
+set(CPACK_PACKAGE_CONTACT "noreply@example.com")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+
+# Default generator: TGZ (tar.gz). You can override: -DCPACK_GENERATOR="DEB;RPM;TGZ"
+if(NOT DEFINED CPACK_GENERATOR)
+  set(CPACK_GENERATOR "TGZ")
+endif()
+
+# Helpful names
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
+
+include(CPack)
