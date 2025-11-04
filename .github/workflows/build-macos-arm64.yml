@@ -134,8 +134,9 @@ jobs:
           [ -z "$ROOT" ] && ROOT="$ROOT_DEFAULT"
           echo "Initial ULTRALIGHT_SDK_ROOT candidate: $ROOT"
           present="false"
-          if [ -d "$ROOT/include" ] && ls "$ROOT/lib"/*.dylib >/dev/null 2>&1; then
-            present="true"
+          # Accept SDK roots with include + (lib or bin)
+          if [ -d "$ROOT/include" ] && { [ -d "$ROOT/lib" ] || [ -d "$ROOT/bin" ]; }; then
+            present="true";
           elif [ -n "${ULTRALIGHT_SDK_URL:-}" ]; then
             URL_DL="$ULTRALIGHT_SDK_URL"
             if echo "$URL_DL" | grep -qE '^https://github.com/.+/blob/'; then URL_DL=$(echo "$URL_DL" | sed -E 's#https://github.com/([^/]+)/([^/]+)/blob/(.+)$#https://raw.githubusercontent.com/\1/\2/\3#'); fi
@@ -148,13 +149,34 @@ jobs:
             "$EXTRACTOR" t -y "$pkg" >/dev/null 2>&1 || { echo "Archive invalid" >&2; exit 1; }
             "$EXTRACTOR" x -y -o"$RUNNER_TEMP/sdk-extract" "$pkg"
             ROOT_FOUND=""
-            while IFS= read -r -d '' dir; do if [ -d "$dir/include" ] && [ -d "$dir/lib" ]; then ROOT_FOUND="$dir"; break; fi; done < <(find "$RUNNER_TEMP/sdk-extract" -mindepth 1 -maxdepth 3 -type d -print0)
-            if [ -n "$ROOT_FOUND" ]; then ROOT="$ROOT_FOUND"; present="true"; fi
+            # Prefer directories having include + (lib or bin)
+            while IFS= read -r -d '' dir; do
+              if [ -d "$dir/include" ] && { [ -d "$dir/lib" ] || [ -d "$dir/bin" ]; }; then
+                ROOT_FOUND="$dir"; break
+              fi
+            done < <(find "$RUNNER_TEMP/sdk-extract" -mindepth 1 -maxdepth 4 -type d -print0)
+            if [ -z "$ROOT_FOUND" ]; then
+              # Fallback: derive from include/Ultralight path
+              INC_PARENT=$(find "$RUNNER_TEMP/sdk-extract" -type d -path '*/include/Ultralight' -print -quit 2>/dev/null | xargs -I{} dirname {} | xargs -I{} dirname {}) || true
+              if [ -n "$INC_PARENT" ] && [ -d "$INC_PARENT/include" ] && { [ -d "$INC_PARENT/lib" ] || [ -d "$INC_PARENT/bin" ]; }; then
+                ROOT_FOUND="$INC_PARENT"
+              fi
+            fi
+            if [ -n "$ROOT_FOUND" ]; then
+              ROOT="$ROOT_FOUND"; present="true"
+            else
+              echo "Could not infer ULTRALIGHT_SDK_ROOT from extraction. Showing deeper tree (depth 3):"
+              find "$RUNNER_TEMP/sdk-extract" -maxdepth 3 -type d -print | sed 's/^/  /'
+            fi
           fi
           echo "present=$present" >> "$GITHUB_OUTPUT"
           if [ "$present" = "true" ]; then
             echo "Using ULTRALIGHT_SDK_ROOT=$ROOT"
             echo "ULTRALIGHT_SDK_ROOT=$ROOT" >> "$GITHUB_ENV"
+            echo "Listing selected SDK include and lib/bin:"
+            ls -la "$ROOT/include" | head -n 100 || true
+            ls -la "$ROOT/lib" 2>/dev/null || true
+            ls -la "$ROOT/bin" 2>/dev/null || true
           else
             echo "::error::Ultralight macOS SDK not found for ARM64."; exit 1
           fi
