@@ -24,6 +24,10 @@ on:
         type: string
   pull_request:
 
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   macos-arm64:
     uses: ./.github/workflows/build-macos-arm64.yml
