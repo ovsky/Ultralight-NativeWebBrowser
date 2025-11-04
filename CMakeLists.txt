@@ -3,6 +3,9 @@ project(UltralightWebBrowser LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Option: create an installer on Windows via CPack (NSIS)
+option(CREATE_INSTALLER "Create a Windows installer via CPack (NSIS)" OFF)
+
 # --- Testing (CTest) ---
 include(CTest)
 
@@ -320,9 +323,45 @@ set(CPACK_OUTPUT_FILE_PREFIX "${CMAKE_BINARY_DIR}")
 # Strip binaries in packages to minimize size and avoid shipping debug symbols
 set(CPACK_STRIP_FILES ON)
 
-# Default generator: TGZ (tar.gz). You can override: -DCPACK_GENERATOR="DEB;RPM;TGZ"
-if(NOT DEFINED CPACK_GENERATOR)
-  set(CPACK_GENERATOR "TGZ")
+# Icon detection (used by Windows installers when available)
+set(APP_ICON_ICO "")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/browser.ico")
+  set(APP_ICON_ICO "${CMAKE_CURRENT_SOURCE_DIR}/browser.ico")
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon.ico")
+  set(APP_ICON_ICO "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon.ico")
+endif()
+
+# Choose default generators per platform; users can always override CPACK_GENERATOR
+if(WIN32)
+  if(NOT DEFINED CPACK_GENERATOR)
+    if(CREATE_INSTALLER)
+      # Try NSIS for an .exe installer, also emit a .zip as fallback
+      set(CPACK_GENERATOR "NSIS;ZIP")
+    else()
+      # No installer requested: just produce a portable .zip
+      set(CPACK_GENERATOR "ZIP")
+    endif()
+  endif()
+
+  # Windows installer settings (NSIS/WiX)
+  set(CPACK_PACKAGE_INSTALL_DIRECTORY "Ultralight Web Browser")
+  set(CPACK_NSIS_DISPLAY_NAME "Ultralight Web Browser")
+  set(CPACK_PACKAGE_EXECUTABLES "Ultralight-WebBrowser;Ultralight Web Browser")
+  set(CPACK_CREATE_DESKTOP_LINKS "Ultralight-WebBrowser")
+  set(CPACK_NSIS_MUI_FINISHPAGE_RUN "Ultralight-WebBrowser.exe")
+  if(APP_ICON_ICO)
+    # NSIS UI and product icons
+    set(CPACK_NSIS_MUI_ICON "${APP_ICON_ICO}")
+    set(CPACK_NSIS_MUI_UNIICON "${APP_ICON_ICO}")
+    set(CPACK_NSIS_INSTALLED_ICON_NAME "Ultralight-WebBrowser.exe")
+    # WiX product icon (if WIX generator is used explicitly by user)
+    set(CPACK_WIX_PRODUCT_ICON "${APP_ICON_ICO}")
+  endif()
+else()
+  # Default non-Windows generator
+  if(NOT DEFINED CPACK_GENERATOR)
+    set(CPACK_GENERATOR "TGZ")
+  endif()
 endif()
 
 # Helpful names
