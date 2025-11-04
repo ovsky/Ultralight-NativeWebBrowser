@@ -226,11 +226,17 @@ cpack --config build/CPackConfig.cmake -C Release -G TGZ
 
 This is a proof-of-concept, but there's plenty of room for improvement. Pull requests are welcome!
 
+-   [x] Flexible Context Menu
+
+-   [x] Local Browsing History
+
+-   [x] Optimized Ad-blocking and Tracking Blocking System
+
+-   [x] Universal Menu
+
 -   [ ] Bookmark System
 
--   [ ] Local Browsing History
-
--   [ ] Basic ad/tracker blocking (perhaps via a hosts file or filter list)
+-   [ ] Dark Theme
 
 -   [ ] Deeper integration with Ultralight's JS C++ bridge (expose native functions to JS)
 
