@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       sdk_url:
-        description: "Override ULTRALIGHT_SDK_URL (raw .7z in sdks branch)"
+        description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
         required: false
       version:
         description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
@@ -30,7 +30,7 @@ jobs:
         with:
           submodules: "recursive"
 
-      - name: "2. Detect ULTRALIGHT_SDK_URL from repo sdks branch (Windows)"
+      - name: "2. Detect ULTRALIGHT_SDK_URL from repo base-sdk branch (Windows)"
         id: detect_url
         shell: pwsh
         run: |
@@ -39,7 +39,7 @@ jobs:
             exit 0
           }
           # First attempt: Use GitHub API to list sdks branch and pick latest Windows SDK (x64)
-          $api = "https://api.github.com/repos/${{ github.repository }}/contents/sdks?ref=sdks"
+          $api = "https://api.github.com/repos/${{ github.repository }}/contents/sdks?ref=base-sdk"
           $headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = "application/vnd.github+json" }
           Write-Host "Querying GitHub API for SDK files: $api"
           try { $resp = Invoke-RestMethod -Uri $api -Headers $headers -Method Get -UseBasicParsing } catch { $resp = $null }
@@ -61,7 +61,7 @@ jobs:
                   }
                 }
                 if ($best) {
-                  $baseRaw = "https://raw.githubusercontent.com/${{ github.repository }}/sdks/sdks"
+                  $baseRaw = "https://raw.githubusercontent.com/${{ github.repository }}/base-sdk/sdks"
                   $url = "$baseRaw/$($best.File)"
                   Write-Host "Auto-detected latest Windows SDK URL=$url"
                   "ULTRALIGHT_SDK_URL=$url" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -83,7 +83,7 @@ jobs:
             if ($env:ULTRALIGHT_VERSION) { $version = $env:ULTRALIGHT_VERSION; Write-Host "ULTRALIGHT_VERSION provided via env: $version" }
             else { $version = '1.4.0'; Write-Host "ULTRALIGHT_VERSION not found in header; defaulting to $version" }
           }
-          $baseRaw = "https://raw.githubusercontent.com/${{ github.repository }}/sdks/sdks"
+          $baseRaw = "https://raw.githubusercontent.com/${{ github.repository }}/base-sdk/sdks"
           Write-Host "Detected ULTRALIGHT_VERSION=$version; probing Windows SDK URLs under $baseRaw"
           Write-Host "Header path: $header"
           Write-Host "Repository: ${{ github.repository }}"
@@ -111,7 +111,7 @@ jobs:
             "ULTRALIGHT_SDK_URL=$found" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
             "url=$found" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           } else {
-            Write-Error "Could not auto-detect a valid Windows SDK URL in sdks branch for version $version."
+            Write-Error "Could not auto-detect a valid Windows SDK URL in base-sdk branch for version $version."
             exit 1
           }
 
@@ -169,7 +169,7 @@ jobs:
             if (Test-Path (Join-Path $root 'include')) { Get-ChildItem -Force (Join-Path $root 'include') | Select-Object -First 50 | Format-List -Property Mode,Length,Name }
             if (Test-Path (Join-Path $root 'lib')) { Get-ChildItem -Force (Join-Path $root 'lib') | Format-List -Property Mode,Length,Name }
           } else {
-            Write-Error "Ultralight Windows SDK not found. Ensure sdks branch contains a valid archive or set ULTRALIGHT_SDK_ROOT/ULTRALIGHT_SDK_URL."; exit 1
+            Write-Error "Ultralight Windows SDK not found. Ensure base-sdk branch contains a valid archive or set ULTRALIGHT_SDK_ROOT/ULTRALIGHT_SDK_URL."; exit 1
           }
 
       - name: "5. Configure CMake"

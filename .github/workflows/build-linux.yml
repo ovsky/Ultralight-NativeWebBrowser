@@ -1,5 +1,5 @@
 # .github/workflows/build-linux.yml
-# Linux build using SDK archives hosted in the repo's sdks branch.
+# Linux build using SDK archives hosted in the repo's base-sdk branch.
 
 name: Build - Linux
 
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       sdk_url:
-        description: "Override ULTRALIGHT_SDK_URL (raw .7z in sdks branch)"
+        description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
         required: false
       version:
         description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
@@ -31,7 +31,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: 2. Detect ULTRALIGHT_SDK_URL from repo sdks branch (Linux)
+      - name: 2. Detect ULTRALIGHT_SDK_URL from repo base-sdk branch (Linux)
         id: detect_url
         shell: bash
         run: |
@@ -41,7 +41,7 @@ jobs:
             exit 0
           fi
           # First attempt: auto-detect latest Linux SDK by listing sdks branch via GitHub API
-          API="https://api.github.com/repos/${{ github.repository }}/contents/sdks?ref=sdks"
+          API="https://api.github.com/repos/${{ github.repository }}/contents/sdks?ref=base-sdk"
           echo "Querying GitHub API for SDK files: $API"
           RESP=$(curl -fLs -H "Authorization: Bearer ${GITHUB_TOKEN:-}" -H "Accept: application/vnd.github+json" "$API" || true)
           if [ -n "$RESP" ]; then
@@ -70,7 +70,7 @@ jobs:
                 done
               fi
               if [ -n "$BEST_FILE" ]; then
-                BASE_RAW="https://raw.githubusercontent.com/${{ github.repository }}/sdks/sdks"
+                BASE_RAW="https://raw.githubusercontent.com/${{ github.repository }}/base-sdk/sdks"
                 URL="$BASE_RAW/$BEST_FILE"
                 echo "Auto-detected latest Linux SDK URL=$URL"
                 echo "ULTRALIGHT_SDK_URL=$URL" >> "$GITHUB_ENV"
@@ -95,7 +95,7 @@ jobs:
               echo "ULTRALIGHT_VERSION not found in header; defaulting to $VERSION"
             fi
           fi
-          BASE_RAW="https://raw.githubusercontent.com/${{ github.repository }}/sdks/sdks"
+          BASE_RAW="https://raw.githubusercontent.com/${{ github.repository }}/base-sdk/sdks"
           echo "Detected ULTRALIGHT_VERSION=$VERSION; probing Linux SDK URLs under $BASE_RAW"
           echo "Header path: $HEADER"
           echo "Repository: ${{ github.repository }}"
@@ -117,7 +117,7 @@ jobs:
             echo "ULTRALIGHT_SDK_URL=$found" >> "$GITHUB_ENV"
             echo "url=$found" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::Could not auto-detect a valid Linux SDK URL in sdks branch for version $VERSION."
+            echo "::error::Could not auto-detect a valid Linux SDK URL in base-sdk branch for version $VERSION."
             echo "Tried candidates:"; printf ' - %s\n' "${candidates[@]}"
             exit 1
           fi
@@ -192,7 +192,7 @@ jobs:
             ls -la "$ROOT/include" | head -n 100 || true
             ls -la "$ROOT/lib" || true
           else
-            echo "::error::Ultralight Linux SDK not found. Ensure sdks branch contains a valid archive or set ULTRALIGHT_SDK_ROOT/ULTRALIGHT_SDK_URL."
+            echo "::error::Ultralight Linux SDK not found. Ensure base-sdk branch contains a valid archive or set ULTRALIGHT_SDK_ROOT/ULTRALIGHT_SDK_URL."
             exit 1
           fi
 
