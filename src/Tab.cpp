@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 #include <cstdio>
+#include <sstream>
 
 #define INSPECTOR_DRAG_HANDLE_HEIGHT 10
 
@@ -26,7 +27,10 @@ void Tab::Show()
   overlay_->Focus();
 
   if (inspector_overlay_)
+  {
     inspector_overlay_->Show();
+    inspector_overlay_->Focus();
+  }
 }
 
 void Tab::Hide()
@@ -42,17 +46,33 @@ void Tab::ToggleInspector()
 {
   if (!inspector_overlay_)
   {
-    view()->CreateLocalInspectorView();
+    // Lightweight Quick Inspector: create our own overlay and load local UI
+    inspector_overlay_ = Overlay::Create(ui_->window_, container_width_, container_height_ / 3, 0, 0);
+    // Re-layout so the content overlay makes room and inspector is at the bottom
+    Resize(container_width_, container_height_);
+    inspector_overlay_->Show();
+    auto iv = inspector_overlay_->view();
+    if (iv)
+    {
+      iv->set_load_listener(this);
+      iv->set_view_listener(this);
+      iv->LoadURL("file:///quick-inspector.html");
+    }
   }
   else
   {
     if (inspector_overlay_->is_hidden())
     {
       inspector_overlay_->Show();
+      inspector_overlay_->Focus();
+      // Ensure layout updates so inspector sits below content
+      Resize(container_width_, container_height_);
     }
     else
     {
       inspector_overlay_->Hide();
+      // Restore full content height when inspector is hidden
+      Resize(container_width_, container_height_);
     }
   }
 
@@ -158,6 +178,22 @@ void Tab::OnChangeCursor(View *caller, Cursor cursor)
 
 void Tab::OnAddConsoleMessage(View *caller, const ConsoleMessage &msg)
 {
+  // Forward console messages to Quick Inspector if visible
+  if (inspector_overlay_ && !inspector_overlay_->is_hidden())
+  {
+    auto iv = inspector_overlay_->view();
+    if (iv)
+    {
+      String smsg = msg.message();
+      auto u = smsg.utf8();
+      std::string m = u.data() ? u.data() : "";
+      // Minimal escaping for safe JS string literal
+      auto escape = [](const std::string &in)
+      { std::string out; out.reserve(in.size()+16); for(char c: in){ switch(c){ case '\\': out += "\\\\"; break; case '"': out += "\\\""; break; case '\n': out += "\\n"; break; case '\r': out += "\\r"; break; case '\t': out += "\\t"; break; default: out += c; }} return out; };
+      std::string js = std::string("(function(m){ if(window.__qi && __qi.onConsole){ __qi.onConsole({message:m}); } })(\"") + escape(m) + "\")";
+      iv->EvaluateScript(String(js.c_str()), nullptr);
+    }
+  }
 }
 
 RefPtr<View> Tab::OnCreateChildView(ultralight::View *caller,
@@ -170,15 +206,14 @@ RefPtr<View> Tab::OnCreateChildView(ultralight::View *caller,
 RefPtr<View> Tab::OnCreateInspectorView(ultralight::View *caller, bool is_local,
                                         const String &inspected_url)
 {
-  if (inspector_overlay_)
-    return nullptr;
-
-  inspector_overlay_ = Overlay::Create(ui_->window_, container_width_, container_height_ / 2, 0, 0);
-
-  // Force resize to update layout
-  Resize(container_width_, container_height_);
-  inspector_overlay_->Show();
-
+  // For compatibility: if devtools requests an inspector view, host it in our overlay.
+  if (!inspector_overlay_)
+  {
+    inspector_overlay_ = Overlay::Create(ui_->window_, container_width_, container_height_ / 2, 0, 0);
+    // Force resize to update layout
+    Resize(container_width_, container_height_);
+    inspector_overlay_->Show();
+  }
   return inspector_overlay_->view();
 }
 
@@ -303,6 +338,38 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
   if (is_main_frame)
     caller->EvaluateScript(script, nullptr);
 
+  // Lightweight network monitor (fetch / XHR)
+  if (is_main_frame)
+  {
+    RefPtr<JSContext> ctx = caller->LockJSContext();
+    SetJSContext(ctx->ctx());
+    JSObject global = JSGlobalObject();
+    global["NativeNetworkEvent"] = BindJSCallback(&Tab::OnNetworkEvent);
+    const char *netPatch = R"JS((function(){
+      if (window.__ul_net_patched) return; window.__ul_net_patched = true;
+      function now(){ return Date.now(); }
+      function report(o){ try{ if(window.NativeNetworkEvent) window.NativeNetworkEvent(JSON.stringify(o)); }catch(e){} }
+      var ofetch = window.fetch;
+      if (ofetch) {
+        window.fetch = function(input, init){
+          var start = now();
+          var url = (typeof input==='string') ? input : ((input && input.url) || '');
+          return ofetch.apply(this, arguments).then(function(resp){
+            try{ report({type:'fetch', url:url, status: resp.status, ok: !!resp.ok, time: now()-start}); }catch(e){}
+            return resp; });
+        };
+      }
+      var xo = XMLHttpRequest.prototype.open, xs = XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.open = function(method, url){ this.__ul = {m:method,u:url,s:0}; return xo.apply(this, arguments); };
+      XMLHttpRequest.prototype.send = function(){
+        var self=this; self.__ul.s = now();
+        self.addEventListener('loadend', function(){ try{ report({type:'xhr', url:(self.__ul && self.__ul.u)||'', status:self.status, time: now()-self.__ul.s}); }catch(e){} });
+        return xs.apply(this, arguments);
+      };
+    })())JS";
+    caller->EvaluateScript(netPatch, nullptr);
+  }
+
   // If this is our History page, expose native methods
   {
     auto url_u = url.utf8();
@@ -317,6 +384,30 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
       // Notify the page JS that native bridge is ready so it can refresh now
       caller->EvaluateScript("(function(){ if (window.__ul_history_ready) window.__ul_history_ready(); })();", nullptr);
     }
+    else if (c && std::strstr(c, "quick-inspector.html"))
+    {
+      RefPtr<JSContext> ctx = caller->LockJSContext();
+      SetJSContext(ctx->ctx());
+      JSObject global = JSGlobalObject();
+      // Bind Quick Inspector callbacks
+      global["NativeQuickClose"] = BindJSCallback(&Tab::OnQuickInspectorClose);
+      global["NativeQuickOpenDevtools"] = BindJSCallback(&Tab::OnQuickInspectorOpenDevtools);
+      global["NativeQuickGetInfo"] = BindJSCallbackWithRetval(&Tab::OnQuickInspectorGetInfo);
+      // Advanced APIs
+      global["NativeQuickEval"] = BindJSCallbackWithRetval(&Tab::QI_Eval);
+      global["NativeQuickGetDOMTree"] = BindJSCallbackWithRetval(&Tab::QI_GetDOMTree);
+      global["NativeQuickGetNodeRect"] = BindJSCallbackWithRetval(&Tab::QI_GetNodeRect);
+      global["NativeQuickStartPicker"] = BindJSCallback(&Tab::QI_StartPicker);
+      global["NativeQuickStopPicker"] = BindJSCallback(&Tab::QI_StopPicker);
+      global["NativeQuickHighlightSelector"] = BindJSCallback(&Tab::QI_HighlightSelector);
+      global["NativeQuickGetComputedStyle"] = BindJSCallbackWithRetval(&Tab::QI_GetComputedStyle);
+      global["NativeQuickGetStorage"] = BindJSCallbackWithRetval(&Tab::QI_GetStorage);
+      global["NativeQuickGetPerformance"] = BindJSCallbackWithRetval(&Tab::QI_GetPerformance);
+      global["NativeQuickGetOuterHTML"] = BindJSCallbackWithRetval(&Tab::QI_GetOuterHTML);
+      global["NativeQuickSetAttribute"] = BindJSCallback(&Tab::QI_SetAttribute);
+      global["NativeQuickRemoveAttribute"] = BindJSCallback(&Tab::QI_RemoveAttribute);
+      // Initial refresh happens in page JS
+    }
   }
 
   // Auto Dark Mode: if enabled, inject dark styling in this document
@@ -325,6 +416,350 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
     // Reuse UI helpers via the view
     ui_->ApplyDarkModeToView(caller);
   }
+}
+
+void Tab::OnQuickInspectorClose(const JSObject &obj, const JSArgs &args)
+{
+  if (inspector_overlay_)
+  {
+    // Stop the picker if it's active
+    QI_StopPicker(obj, args);
+
+    inspector_overlay_->Hide();
+    // Restore content area to full height and return focus to page
+    Resize(container_width_, container_height_);
+    overlay_->Focus();
+  }
+}
+
+void Tab::OnQuickInspectorOpenDevtools(const JSObject &obj, const JSArgs &args)
+{
+  // Hide quick inspector and open full devtools into the same overlay
+  if (inspector_overlay_)
+  {
+    inspector_overlay_->Show();
+  }
+  view()->CreateLocalInspectorView();
+}
+
+JSValue Tab::OnQuickInspectorGetInfo(const JSObject &obj, const JSArgs &args)
+{
+  std::string t, u;
+  if (view())
+  {
+    auto tu = view()->title().utf8();
+    auto uu = view()->url().utf8();
+    if (tu.data())
+      t = tu.data();
+    if (uu.data())
+      u = uu.data();
+  }
+  bool loading = view() ? view()->is_loading() : false;
+  std::string json = std::string("{") +
+                     "\"title\":\"" + t + "\"," +
+                     "\"url\":\"" + u + "\"," +
+                     "\"loading\":" + (loading ? "true" : "false") +
+                     "}";
+  return JSValue(String(json.c_str()));
+}
+
+// ---- Events forwarded to Quick Inspector ----
+void Tab::OnNetworkEvent(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() < 1)
+    return;
+  if (!(inspector_overlay_ && inspector_overlay_->view()))
+    return;
+  ultralight::String payload = args[0];
+  auto u = payload.utf8();
+  std::string s = u.data() ? u.data() : "{}";
+  std::string js = std::string("(function(p){ if(window.__qi && __qi.onNetwork) __qi.onNetwork(p); })(") + s + ")";
+  inspector_overlay_->view()->EvaluateScript(String(js.c_str()), nullptr);
+}
+
+void Tab::OnPickerHover(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() < 1)
+    return;
+  if (!(inspector_overlay_ && inspector_overlay_->view()))
+    return;
+  ultralight::String payload = args[0];
+  auto u = payload.utf8();
+  std::string s = u.data() ? u.data() : "{}";
+  std::string js = std::string("(function(p){ if(window.__qi && __qi.onPickHover) __qi.onPickHover(p); })(") + s + ")";
+  inspector_overlay_->view()->EvaluateScript(String(js.c_str()), nullptr);
+}
+
+void Tab::OnPickerSelect(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() < 1)
+    return;
+  if (!(inspector_overlay_ && inspector_overlay_->view()))
+    return;
+  ultralight::String payload = args[0];
+  auto u = payload.utf8();
+  std::string s = u.data() ? u.data() : "{}";
+  std::string js = std::string("(function(p){ if(window.__qi && __qi.onPickSelect) __qi.onPickSelect(p); })(") + s + ")";
+  inspector_overlay_->view()->EvaluateScript(String(js.c_str()), nullptr);
+}
+
+// ---- Quick Inspector advanced APIs ----
+JSValue Tab::QI_Eval(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() < 1 || !view())
+    return JSValue(String(""));
+  String expr = args[0];
+  String result;
+  view()->EvaluateScript(expr, &result);
+  return JSValue(result);
+}
+
+JSValue Tab::QI_GetDOMTree(const JSObject &obj, const JSArgs &args)
+{
+  int depth = 3;
+  int maxChildren = 20;
+  if (args.size() >= 1)
+    depth = (int)(double)args[0];
+  if (args.size() >= 2)
+    maxChildren = (int)(double)args[1];
+  if (!view())
+    return JSValue(String("{}"));
+  std::ostringstream ss;
+  ss << "(function(){\n";
+  ss << "function nodeInfo(n,d){ if(!n||d<0) return null; if(n.nodeType!==1) return null; var c=[]; var kids=n.children; var m=kids?Math.min(kids.length," << maxChildren << "):0; for(var i=0;i<m;i++){ var ci=nodeInfo(kids[i],d-1); if(ci) c.push(ci);} return { tag:n.tagName.toLowerCase(), id:n.id||'', cls:(n.className||'').toString(), children:c }; }\n";
+  ss << "var r=nodeInfo(document.documentElement," << depth << "); return JSON.stringify(r||{});\n";
+  ss << "})()";
+  String res;
+  view()->EvaluateScript(String(ss.str().c_str()), &res);
+  return JSValue(res);
+}
+
+JSValue Tab::QI_GetNodeRect(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() < 1 || !view())
+    return JSValue(String("{}"));
+  String sel = args[0];
+  auto u = sel.utf8();
+  std::string jssel = u.data() ? u.data() : "";
+  std::string script = std::string("(function(){ var el=document.querySelector(\"") + jssel + "\"); if(!el) return '{}'; var r=el.getBoundingClientRect(); return JSON.stringify({left:r.left,top:r.top,width:r.width,height:r.height}); })()";
+  String res;
+  view()->EvaluateScript(String(script.c_str()), &res);
+  return JSValue(res);
+}
+
+void Tab::QI_StartPicker(const JSObject &obj, const JSArgs &args)
+{
+  if (!view())
+    return;
+  RefPtr<JSContext> ctx = view()->LockJSContext();
+  SetJSContext(ctx->ctx());
+  JSObject global = JSGlobalObject();
+  global["NativeInspectorPickHover"] = BindJSCallback(&Tab::OnPickerHover);
+  global["NativeInspectorPickSelect"] = BindJSCallback(&Tab::OnPickerSelect);
+  const char *picker = R"JS((function(){
+    if (window.__ul_picker_active) return; window.__ul_picker_active = true;
+    if (!window.__ul_pick_overlay){ var o=document.createElement('div'); o.style.cssText='position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #4af;background:rgba(68,170,255,.15)'; document.documentElement.appendChild(o); window.__ul_pick_overlay=o; }
+    function cssPath(el){ try{ var p=[]; for(;el&&el.nodeType===1; el=el.parentElement){ var s=el.nodeName.toLowerCase(); if(el.id){ s += '#'+el.id; p.unshift(s); break; } else { var cls = (el.className||'').toString().trim().split(/\s+/).filter(Boolean); if(cls.length) s += '.'+cls.join('.'); var idx=1, sib=el; while((sib=sib.previousElementSibling)!=null){ if(sib.nodeName===el.nodeName) idx++; } p.unshift(s+':nth-of-type('+idx+')'); } } return p.join('>');} catch(e){ return ''; } }
+    function update(el){ if(!el) return; var r=el.getBoundingClientRect(); var o=window.__ul_pick_overlay; o.style.left=r.left+'px'; o.style.top=r.top+'px'; o.style.width=r.width+'px'; o.style.height=r.height+'px'; }
+    window.__ul_pick_move = function(e){ var t=e.target; update(t); try{ if(window.NativeInspectorPickHover) NativeInspectorPickHover(JSON.stringify({selector:cssPath(t)})); }catch(_){} };
+    window.__ul_pick_click = function(e){ e.preventDefault(); e.stopPropagation(); var t=e.target; try{ if(window.NativeInspectorPickSelect) NativeInspectorPickSelect(JSON.stringify({selector:cssPath(t)})); }catch(_){} };
+    document.addEventListener('mousemove', window.__ul_pick_move, true);
+    document.addEventListener('click', window.__ul_pick_click, true);
+  })())JS";
+  view()->EvaluateScript(String(picker), nullptr);
+}
+
+void Tab::QI_StopPicker(const JSObject &obj, const JSArgs &args)
+{
+  if (!view())
+    return;
+  const char *stop = R"JS((function(){
+    if (!window.__ul_picker_active) return; window.__ul_picker_active=false;
+    document.removeEventListener('mousemove', window.__ul_pick_move, true);
+    document.removeEventListener('click', window.__ul_pick_click, true);
+    if (window.__ul_pick_overlay && window.__ul_pick_overlay.parentNode) window.__ul_pick_overlay.parentNode.removeChild(window.__ul_pick_overlay);
+    window.__ul_pick_overlay=null;
+  })())JS";
+  view()->EvaluateScript(String(stop), nullptr);
+}
+
+void Tab::QI_HighlightSelector(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() < 1 || !view())
+    return;
+  String sel = args[0];
+  auto u = sel.utf8();
+  std::string jssel = u.data() ? u.data() : "";
+  std::string script = std::string("(function(){ var el=document.querySelector(\"") + jssel + "\"); if(!el) return; if(!window.__ul_pick_overlay){ var o=document.createElement('div'); o.style.cssText='position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #4af;background:rgba(68,170,255,.15)'; document.documentElement.appendChild(o); window.__ul_pick_overlay=o; } var r=el.getBoundingClientRect(); var o=window.__ul_pick_overlay; o.style.left=r.left+'px'; o.style.top=r.top+'px'; o.style.width=r.width+'px'; o.style.height=r.height+'px'; })()";
+  view()->EvaluateScript(String(script.c_str()), nullptr);
+}
+
+JSValue Tab::QI_GetComputedStyle(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() < 1 || !view())
+    return JSValue(String("{}"));
+  String sel = args[0];
+  auto u = sel.utf8();
+  std::string raw = u.data() ? u.data() : "";
+  auto esc = [](const std::string &in)
+  {
+    std::string out;
+    out.reserve(in.size() + 8);
+    for (char c : in)
+    {
+      if (c == '\\')
+        out += "\\\\";
+      else if (c == '"')
+        out += "\\\"";
+      else if (c == '\n')
+        out += "\\n";
+      else if (c == '\r')
+        out += "\\r";
+      else
+        out += c;
+    }
+    return out;
+  };
+  std::ostringstream ss;
+  ss << "(function(){ var el=document.querySelector(\"" << esc(raw) << "\"); if(!el) return '{}'; var cs=getComputedStyle(el); var out={}; try{ for(var i=0;i<cs.length;i++){ var k=cs.item(i); out[k]=cs.getPropertyValue(k); } }catch(e){} return JSON.stringify(out); })()";
+  String res;
+  std::string js = ss.str();
+  view()->EvaluateScript(String(js.c_str()), &res);
+  return JSValue(res);
+}
+
+JSValue Tab::QI_GetStorage(const JSObject &obj, const JSArgs &args)
+{
+  if (!view())
+    return JSValue(String("{}"));
+  const char *script = R"JS((function(){
+    function dumpLS(ls){ var o={}; try{ for(var i=0;i<ls.length;i++){ var k=ls.key(i); o[k]=ls.getItem(k); } }catch(e){} return o; }
+    var out={ localStorage: dumpLS(window.localStorage||{}), sessionStorage: dumpLS(window.sessionStorage||{}), cookies: document.cookie||'' };
+    return JSON.stringify(out);
+  })())JS";
+  String res;
+  view()->EvaluateScript(String(script), &res);
+  return JSValue(res);
+}
+
+JSValue Tab::QI_GetPerformance(const JSObject &obj, const JSArgs &args)
+{
+  if (!view())
+    return JSValue(String("{}"));
+  const char *script = R"JS((function(){
+    var nav = (performance.getEntriesByType && performance.getEntriesByType('navigation'));
+    var resources = (performance.getEntriesByType && performance.getEntriesByType('resource'))||[];
+    var t = performance.timing || {};
+    return JSON.stringify({ navigation: nav && nav[0] || {}, resourceCount: resources.length, timing: t });
+  })())JS";
+  String res;
+  view()->EvaluateScript(String(script), &res);
+  return JSValue(res);
+}
+
+JSValue Tab::QI_GetOuterHTML(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() < 1 || !view())
+    return JSValue(String(""));
+  String sSel = args[0];
+  auto us = sSel.utf8();
+  std::string sel = us.data() ? us.data() : "";
+  auto esc = [](const std::string &in)
+  {
+    std::string out;
+    out.reserve(in.size() + 8);
+    for (char c : in)
+    {
+      if (c == '\\')
+        out += "\\\\";
+      else if (c == '"')
+        out += "\\\"";
+      else if (c == '\n')
+        out += "\\n";
+      else if (c == '\r')
+        out += "\\r";
+      else
+        out += c;
+    }
+    return out;
+  };
+  std::string js = std::string("(function(){ var el=document.querySelector(\"") + esc(sel) + "\"); if(!el) return ''; return el.outerHTML; })()";
+  String res;
+  view()->EvaluateScript(String(js.c_str()), &res);
+  return JSValue(res);
+}
+
+void Tab::QI_SetAttribute(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() < 3 || !view())
+    return;
+  String sSel = args[0];
+  String sName = args[1];
+  String sVal = args[2];
+  auto us = sSel.utf8();
+  auto un = sName.utf8();
+  auto uv = sVal.utf8();
+  std::string sel = us.data() ? us.data() : "";
+  std::string name = un.data() ? un.data() : "";
+  std::string val = uv.data() ? uv.data() : "";
+  auto esc = [](const std::string &in)
+  {
+    std::string out;
+    out.reserve(in.size() + 8);
+    for (char c : in)
+    {
+      if (c == '\\')
+        out += "\\\\";
+      else if (c == '"')
+        out += "\\\"";
+      else if (c == '\n')
+        out += "\\n";
+      else if (c == '\r')
+        out += "\\r";
+      else
+        out += c;
+    }
+    return out;
+  };
+  std::ostringstream ss;
+  ss << "(function(){ var el=document.querySelector(\"" << esc(sel) << "\"); if(!el) return; el.setAttribute(\"" << esc(name) << "\",\"" << esc(val) << "\"); })()";
+  std::string js = ss.str();
+  view()->EvaluateScript(String(js.c_str()), nullptr);
+}
+
+void Tab::QI_RemoveAttribute(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() < 2 || !view())
+    return;
+  String sSel = args[0];
+  String sName = args[1];
+  auto us = sSel.utf8();
+  auto un = sName.utf8();
+  std::string sel = us.data() ? us.data() : "";
+  std::string name = un.data() ? un.data() : "";
+  auto esc = [](const std::string &in)
+  {
+    std::string out;
+    out.reserve(in.size() + 8);
+    for (char c : in)
+    {
+      if (c == '\\')
+        out += "\\\\";
+      else if (c == '"')
+        out += "\\\"";
+      else if (c == '\n')
+        out += "\\n";
+      else if (c == '\r')
+        out += "\\r";
+      else
+        out += c;
+    }
+    return out;
+  };
+  std::ostringstream ss;
+  ss << "(function(){ var el=document.querySelector(\"" << esc(sel) << "\"); if(!el) return; el.removeAttribute(\"" << esc(name) << "\"); })()";
+  std::string js = ss.str();
+  view()->EvaluateScript(String(js.c_str()), nullptr);
 }
 
 // --- General JS bridge implementations ---
