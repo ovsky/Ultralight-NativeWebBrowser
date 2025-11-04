@@ -233,6 +233,41 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
     SetJSContext(ctx->ctx());
     JSObject global = JSGlobalObject();
     global["NativeOpenContextMenu"] = BindJSCallback(&Tab::OnOpenContextMenu);
+
+    // Expose a unified native bridge on window.__ul using global function proxies
+    global["__ul_back"] = BindJSCallback(&Tab::JS_Back);
+    global["__ul_forward"] = BindJSCallback(&Tab::JS_Forward);
+    global["__ul_reload"] = BindJSCallback(&Tab::JS_Reload);
+    global["__ul_stop"] = BindJSCallback(&Tab::JS_Stop);
+    global["__ul_navigate"] = BindJSCallback(&Tab::JS_Navigate);
+    global["__ul_newTab"] = BindJSCallback(&Tab::JS_NewTab);
+    global["__ul_closeTab"] = BindJSCallback(&Tab::JS_CloseTab);
+    global["__ul_openHistory"] = BindJSCallback(&Tab::JS_OpenHistory);
+    global["__ul_getHistory"] = BindJSCallbackWithRetval(&Tab::JS_GetHistory);
+    global["__ul_clearHistory"] = BindJSCallback(&Tab::JS_ClearHistory);
+    global["__ul_toggleDarkMode"] = BindJSCallback(&Tab::JS_ToggleDarkMode);
+    global["__ul_isDarkModeEnabled"] = BindJSCallbackWithRetval(&Tab::JS_IsDarkModeEnabled);
+    global["__ul_getAppInfo"] = BindJSCallbackWithRetval(&Tab::JS_GetAppInfo);
+
+    const char *attachScript = R"JS((function(){
+      try{
+        var n = (window.__ul = window.__ul || {});
+        n.back = window.__ul_back;
+        n.forward = window.__ul_forward;
+        n.reload = window.__ul_reload;
+        n.stop = window.__ul_stop;
+        n.navigate = window.__ul_navigate;
+        n.newTab = window.__ul_newTab;
+        n.closeTab = window.__ul_closeTab;
+        n.openHistory = window.__ul_openHistory;
+        n.getHistory = window.__ul_getHistory;
+        n.clearHistory = window.__ul_clearHistory;
+        n.toggleDarkMode = window.__ul_toggleDarkMode;
+        n.isDarkModeEnabled = window.__ul_isDarkModeEnabled;
+        n.getAppInfo = window.__ul_getAppInfo;
+      }catch(e){}
+    })())JS";
+    caller->EvaluateScript(attachScript, nullptr);
   }
 
   // Inject a contextmenu handler into the page to capture link/image/selection info
@@ -290,6 +325,99 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
     // Reuse UI helpers via the view
     ui_->ApplyDarkModeToView(caller);
   }
+}
+
+// --- General JS bridge implementations ---
+void Tab::JS_Back(const JSObject &obj, const JSArgs &args)
+{
+  if (view()) view()->GoBack();
+}
+
+void Tab::JS_Forward(const JSObject &obj, const JSArgs &args)
+{
+  if (view()) view()->GoForward();
+}
+
+void Tab::JS_Reload(const JSObject &obj, const JSArgs &args)
+{
+  if (view()) view()->Reload();
+}
+
+void Tab::JS_Stop(const JSObject &obj, const JSArgs &args)
+{
+  if (view()) view()->Stop();
+}
+
+void Tab::JS_Navigate(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() >= 1 && view())
+  {
+    ultralight::String url = args[0];
+    view()->LoadURL(url);
+  }
+}
+
+void Tab::JS_NewTab(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_) return;
+  if (args.size() >= 1)
+  {
+    ultralight::String url = args[0];
+    RefPtr<View> child = ui_->CreateNewTabForChildView(url);
+    if (child) child->LoadURL(url);
+  }
+  else
+  {
+    ui_->CreateNewTab();
+  }
+}
+
+void Tab::JS_CloseTab(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_) return;
+  // If an id is passed, close it, else close current tab
+  uint64_t target = id_;
+  if (args.size() >= 1)
+  {
+    // Clamp to uint64 from JS number
+    target = static_cast<uint64_t>((double)args[0]);
+  }
+  ui_->OnRequestTabClose({}, { (double)target });
+}
+
+void Tab::JS_OpenHistory(const JSObject &obj, const JSArgs &args)
+{
+  if (view()) view()->LoadURL("file:///history.html");
+}
+
+JSValue Tab::JS_GetHistory(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_) return JSValue();
+  return JSValue(ui_->GetHistoryJSON());
+}
+
+void Tab::JS_ClearHistory(const JSObject &obj, const JSArgs &args)
+{
+  if (ui_) ui_->ClearHistory();
+}
+
+void Tab::JS_ToggleDarkMode(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_) return;
+  ui_->OnToggleDarkMode({}, {});
+}
+
+JSValue Tab::JS_IsDarkModeEnabled(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_) return JSValue(false);
+  return ui_->OnGetDarkModeEnabled({}, {});
+}
+
+JSValue Tab::JS_GetAppInfo(const JSObject &obj, const JSArgs &args)
+{
+  // Minimal app info
+  std::string json = std::string("{\"name\":\"Ultralight-WebBrowser\",\"version\":\"1.0\"}");
+  return JSValue(String(json.c_str()));
 }
 
 void Tab::OnOpenContextMenu(const JSObject &obj, const JSArgs &args)

@@ -206,6 +206,50 @@ On Windows you can also use the helper scripts:
 
 The final executable is typically in `build/Release/` (Windows multi‑config) or `build/` (Unix Makefiles/Ninja).
 
+## 🧩 JavaScript Bridge API (window.__ul)
+
+Pages can call native functionality via a minimal JS bridge exposed on the main page frame as `window.__ul`.
+
+Available methods:
+
+- Navigation and tabs:
+    - `__ul.back()` / `__ul.forward()` / `__ul.reload()` / `__ul.stop()`
+    - `__ul.navigate(url)` – navigate current tab to `url`
+    - `__ul.newTab([url])` – open a new tab (optionally at `url`)
+    - `__ul.closeTab([id])` – close current tab or a specific tab by id
+    - `__ul.openHistory()` – open built‑in History page in current tab
+
+- History:
+    - `__ul.getHistory()` → `{ items: [{ url, title, time }, ...] }`
+    - `__ul.clearHistory()` – clear in‑memory history
+
+- Dark theme:
+    - `__ul.toggleDarkMode()` – toggle auto dark mode for all tabs
+    - `__ul.isDarkModeEnabled()` → `boolean`
+
+- App info:
+    - `__ul.getAppInfo()` → `{ name, version }`
+
+Example:
+
+```js
+// Open a link in a new tab
+__ul.newTab('https://example.com');
+
+// Toggle dark mode from page JS
+if (!__ul.isDarkModeEnabled()) __ul.toggleDarkMode();
+
+// Render a simple history list
+const h = __ul.getHistory();
+for (const item of h.items) console.log(item.time, item.title, item.url);
+```
+
+Notes:
+
+- The bridge is injected on DOM ready for the main frame of each page. Subframes don’t receive it.
+- The History API reflects an in‑memory list. It is not persisted across launches.
+- Methods are no‑ops if the underlying native state is unavailable.
+
 ### Create packages locally (optional)
 We ship CPack rules for self‑contained packages:
 
@@ -238,13 +282,14 @@ This is a proof-of-concept, but there's plenty of room for improvement. Pull req
 
 -   [x] Dark Theme [WIP]
 
+ -  [x] Deeper integration with Ultralight's JS C++ bridge (expose native functions to JS)
+
 -   [ ] Bookmark System
 
 -   [ ] Downloads
 
 -   [ ] Plugins Support (Scripts?)
 
--   [ ] Deeper integration with Ultralight's JS C++ bridge (expose native functions to JS)
 
 -   [ ] Improved UI/UX (a settings panel, right-click context menus)
 
