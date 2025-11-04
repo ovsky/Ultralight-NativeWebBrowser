@@ -369,12 +369,10 @@ if(WIN32)
   # IMPORTANT: We must double-escape quotes (\\\") so they survive into CPackConfig.cmake
   # and then into NSIS script without breaking CMake parsing.
   set(CPACK_NSIS_CREATE_ICONS_EXTRA
-    "CreateShortCut \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Ultralight Web Browser.lnk\\\" \\\"$INSTDIR\\\\${INSTALL_DIR_NAME}\\\\Ultralight-WebBrowser.exe\\\""
-    "CreateShortCut \\\"$DESKTOP\\\\Ultralight Web Browser.lnk\\\" \\\"$INSTDIR\\\\${INSTALL_DIR_NAME}\\\\Ultralight-WebBrowser.exe\\\""
+    "CreateShortCut \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Ultralight Web Browser.lnk\\\" \\\"$INSTDIR\\\\${INSTALL_DIR_NAME}\\\\Ultralight-WebBrowser.exe\\\"\nCreateShortCut \\\"$DESKTOP\\\\Ultralight Web Browser.lnk\\\" \\\"$INSTDIR\\\\${INSTALL_DIR_NAME}\\\\Ultralight-WebBrowser.exe\\\""
   )
   set(CPACK_NSIS_DELETE_ICONS_EXTRA
-    "Delete \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Ultralight Web Browser.lnk\\\""
-    "Delete \\\"$DESKTOP\\\\Ultralight Web Browser.lnk\\\""
+    "Delete \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Ultralight Web Browser.lnk\\\"\nDelete \\\"$DESKTOP\\\\Ultralight Web Browser.lnk\\\""
   )
 else()
   # Default non-Windows generator
