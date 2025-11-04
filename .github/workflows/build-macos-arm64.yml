@@ -131,13 +131,10 @@ jobs:
           set -euo pipefail
           ROOT_DEFAULT="${{ github.workspace }}/data"
           ROOT="${ULTRALIGHT_SDK_ROOT:-}"
-          [ -z "$ROOT" ] && ROOT="$ROOT_DEFAULT"
           echo "Initial ULTRALIGHT_SDK_ROOT candidate: $ROOT"
           present="false"
-          # Accept SDK roots with include + (lib or bin)
-          if [ -d "$ROOT/include" ] && { [ -d "$ROOT/lib" ] || [ -d "$ROOT/bin" ]; }; then
-            present="true";
-          elif [ -n "${ULTRALIGHT_SDK_URL:-}" ]; then
+          # If a URL is available (detected or provided), prefer downloading the matching SDK for this platform/arch
+          if [ -n "${ULTRALIGHT_SDK_URL:-}" ]; then
             URL_DL="$ULTRALIGHT_SDK_URL"
             if echo "$URL_DL" | grep -qE '^https://github.com/.+/blob/'; then URL_DL=$(echo "$URL_DL" | sed -E 's#https://github.com/([^/]+)/([^/]+)/blob/(.+)$#https://raw.githubusercontent.com/\1/\2/\3#'); fi
             echo "Downloading Ultralight SDK from ULTRALIGHT_SDK_URL=$URL_DL"
@@ -167,6 +164,13 @@ jobs:
             else
               echo "Could not infer ULTRALIGHT_SDK_ROOT from extraction. Showing deeper tree (depth 3):"
               find "$RUNNER_TEMP/sdk-extract" -maxdepth 3 -type d -print | sed 's/^/  /'
+            fi
+          else
+            # No URL: fallback to provided ULTRALIGHT_SDK_ROOT or the repo data folder if it appears valid
+            if [ -n "$ROOT" ] && [ -d "$ROOT/include" ] && { [ -d "$ROOT/lib" ] || [ -d "$ROOT/bin" ]; }; then
+              present="true"
+            elif [ -d "$ROOT_DEFAULT/include" ] && { [ -d "$ROOT_DEFAULT/lib" ] || [ -d "$ROOT_DEFAULT/bin" ]; }; then
+              ROOT="$ROOT_DEFAULT"; present="true"
             fi
           fi
           echo "present=$present" >> "$GITHUB_OUTPUT"
