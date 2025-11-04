@@ -222,7 +222,7 @@ cpack --config build/CPackConfig.cmake -C Release -G RPM
 cpack --config build/CPackConfig.cmake -C Release -G TGZ
 ```
 
-## 🗺️ Roadmap / ideas
+## 🗺️ Roadmap / Ideas
 
 This is a proof-of-concept, but there's plenty of room for improvement. Pull requests are welcome!
 
@@ -236,9 +236,13 @@ This is a proof-of-concept, but there's plenty of room for improvement. Pull req
 
 -   [x] Shortcut Map System
 
+-   [x] Dark Theme [WIP]
+
 -   [ ] Bookmark System
 
--   [ ] Dark Theme
+-   [ ] Downloads
+
+-   [ ] Plugins Support (Scripts?)
 
 -   [ ] Deeper integration with Ultralight's JS C++ bridge (expose native functions to JS)
 
