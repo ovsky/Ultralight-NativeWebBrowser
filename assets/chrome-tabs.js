@@ -219,6 +219,14 @@
         contentEl.appendChild(tabEl)
       }
       this.updateTab(tabEl, tabProperties)
+
+      const tabWidth = this.tabWidth
+      const tabEffectiveWidth = tabWidth - this.options.tabOverlapDistance
+      tabEl.style.width = `${ tabWidth }px`
+      const lastIndex = this.tabEls.length - 1
+      const initialLeft = Math.max(0, lastIndex * tabEffectiveWidth)
+      tabEl.style.transform = `translate3d(${ initialLeft }px, 0, 0)`
+
       this.emit('tabAdd', { tabEl })
       this.setCurrentTab(tabEl)
       this.layoutTabs()
