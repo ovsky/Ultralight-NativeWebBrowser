@@ -331,9 +331,15 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
     {
       // Ask the UI view what element is under the cursor
       char script_buf[256];
-      std::snprintf(script_buf, sizeof(script_buf),
-                    "(function(x,y){try{var t=document.elementFromPoint(x,y); if(!t) return '0'; if (t.closest && (t.closest('#address')||t.closest('.icon'))) return '0'; return '1';}catch(e){return '0';}})(%d,%d)",
-                    evt.x, evt.y);
+  std::snprintf(script_buf, sizeof(script_buf),
+                    "(function(x,y){try{\n"
+                    "  var t=document.elementFromPoint(x,y); if(!t||!t.closest) return '0';\n"
+                    "  // Allow dragging only from free space within the tab strip (not on tabs or add button)\n"
+                    "  if (!t.closest('.chrome-tabs')) return '0';\n"
+                    "  if (t.closest('.chrome-tab')||t.closest('#chrome-tabs-add-tab')) return '0';\n"
+                    "  return '1';\n"
+                    "}catch(e){return '0';}})(%d,%d)",
+        evt.x, evt.y);
       ultralight::String canDrag = view()->EvaluateScript(script_buf, nullptr);
       auto u8 = canDrag.utf8();
       const char *s = u8.data();
@@ -1043,11 +1049,8 @@ void UI::StartWindowDrag()
     ShowWindow(hwnd, SW_RESTORE);
   // Release any capture held by child views and initiate a system move
   ReleaseCapture();
-  // Supply screen coordinates to SC_MOVE
-  POINT pt;
-  GetCursorPos(&pt);
-  LPARAM pos = MAKELPARAM(pt.x, pt.y);
-  SendMessage(hwnd, WM_SYSCOMMAND, SC_MOVE | HTCAPTION, pos);
+  // Use WM_NCLBUTTONDOWN on HTCAPTION which is broadly reliable for custom titlebars
+  SendMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
 #endif
 }
 

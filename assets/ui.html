@@ -14,6 +14,8 @@
         <div class="chrome-tabs-bottom-bar" style="z-index: 3;"></div>
     </div>
 
+    
+
     <svg style="display: none;">
         <defs>
             <g id="svg_arrow_back">
@@ -156,6 +158,16 @@
             el.addEventListener('requestNewTab', ({ detail }) => OnRequestNewTab());
             el.addEventListener('requestTabClose', ({ detail }) => OnRequestTabClose(detail.tabEl.getAttribute('data-tab-id')));
             el.addEventListener('activeTabChange', ({ detail }) => OnActiveTabChange(detail.tabEl.getAttribute('data-tab-id')));
+            // Drag window from the tab strip free space (not on a tab or the + button)
+            el.addEventListener('mousedown', (e) => {
+                const t = e.target;
+                if (t.closest('.chrome-tab') || t.closest('#chrome-tabs-add-tab')) return;
+                if (e.button === 0 && window.OnBeginWindowDrag) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    OnBeginWindowDrag();
+                }
+            });
             document.querySelector('#back').addEventListener('click', event => OnBack());
             document.querySelector('#forward').addEventListener('click', event => OnForward());
             document.querySelector('#refresh').addEventListener('click', event => OnRefresh());
@@ -170,13 +182,7 @@
             if (winMin) winMin.addEventListener('click', () => { if (window.OnWindowMinimize) OnWindowMinimize(); });
             if (winMax) winMax.addEventListener('click', () => { if (window.OnWindowToggleMaximize) OnWindowToggleMaximize(); });
             if (winClose) winClose.addEventListener('click', () => { if (window.OnWindowClose) OnWindowClose(); });
-            // Drag window when clicking the top bar (excluding interactive elements)
             const bar = document.getElementById('bar');
-            bar.addEventListener('mousedown', (e) => {
-                const target = e.target;
-                if (target.closest('#address') || target.closest('.icon')) return;
-                if (e.button === 0 && window.OnBeginWindowDrag) OnBeginWindowDrag();
-            });
             // Double-click to toggle maximize
             bar.addEventListener('dblclick', (e) => {
                 if (e.target.closest('#address')) return;

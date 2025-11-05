@@ -141,6 +141,8 @@ svg#icon_defs path {
      margin: 6px 0;
 }
 
+/* (drag handle removed) */
+
 /* Address suggestions panel */
 .suggestions-panel {
      position: fixed;
