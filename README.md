@@ -286,7 +286,7 @@ This is a proof-of-concept, but there's plenty of room for improvement. Pull req
 
  -  [x] Favicon Support
 
- -  [ ] Autosuggestion / Autocompletion 
+ -  [x] Autosuggestion / Autocompletion 
 
 -   [ ] Bookmark System
 
@@ -294,7 +294,7 @@ This is a proof-of-concept, but there's plenty of room for improvement. Pull req
 
 -   [ ] Plugins Support (Scripts?)
 
--   [ ] Improved UI/UX (a settings panel, right-click context menus)
+-   [ ] Settings Panel (with flags?)
 
 
 
