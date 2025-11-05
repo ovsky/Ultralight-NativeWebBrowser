@@ -12,6 +12,9 @@
   border-radius: 0.5em 0.5em 0 0;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
 }
 
 .chrome-tabs * {
@@ -22,18 +25,17 @@
 
 #chrome-tabs-add-tab {
   background: linear-gradient(0deg, #232330, #282836);
-  display: block;
-  position: absolute;
-  right: 12px;
-  top: 8px;
-  padding: 5px 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 15px;
   border: 0.8px solid #252532;
   border-radius: 15px;
   font-size: 12px;
-  z-index: 100;
   height: 24px;
   color: #c4c2d0 !important;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 #chrome-tabs-add-tab:hover {
@@ -58,9 +60,10 @@
 
 .chrome-tabs .chrome-tabs-content {
   position: relative;
-  width: calc(100% - 75px);
+  flex: 1 1 auto;
   height: 100%;
   overflow: hidden;
+  min-width: 0;
 }
 
 .chrome-tabs .chrome-tab {
@@ -207,14 +210,7 @@
   background: #b74a3b;
 }
 
-.chrome-tabs .chrome-tab {
-  width: 243px
-}
-
-.chrome-tabs .chrome-tab:nth-child(1) {
-  transform: translate3d(0px, 0, 0)
-}
-
-.chrome-tabs .chrome-tab:nth-child(2) {
-  transform: translate3d(229px, 0, 0)
+#chrome-tabs-add-tab:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(135, 120, 255, 0.35);
 }

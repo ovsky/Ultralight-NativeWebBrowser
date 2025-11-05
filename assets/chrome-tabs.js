@@ -57,7 +57,10 @@
     setupEvents() {
       window.addEventListener('resize', event => this.layoutTabs())
 
-      document.body.querySelector('#chrome-tabs-add-tab').addEventListener('click', event => this.emit('requestNewTab'))
+      const addButtonEl = this.el.querySelector('#chrome-tabs-add-tab')
+      if (addButtonEl) {
+        addButtonEl.addEventListener('click', event => this.emit('requestNewTab'))
+      }
 
       this.el.addEventListener('click', ({target}) => {
         if (target.classList.contains('chrome-tab')) {
@@ -79,8 +82,13 @@
     }
 
     get tabWidth() {
-      const tabsContentWidth = this.tabContentEl.clientWidth - this.options.tabOverlapDistance
-      const width = (tabsContentWidth / this.tabEls.length) + this.options.tabOverlapDistance
+      const tabCount = this.tabEls.length
+      if (!tabCount) {
+        return this.options.maxWidth
+      }
+
+      const tabsContentWidth = Math.max(0, this.tabContentEl.clientWidth - this.options.tabOverlapDistance)
+      const width = (tabsContentWidth / tabCount) + this.options.tabOverlapDistance
       return Math.max(this.options.minWidth, Math.min(this.options.maxWidth, width))
     }
 
