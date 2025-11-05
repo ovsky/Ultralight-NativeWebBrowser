@@ -91,13 +91,19 @@
         </span>
         <div class="window-controls">
             <span id="win-min" class="icon" title="Minimize">
-                <svg viewBox="0 0 24 24" width="18" height="18"><use xlink:href="#svg_min" /></svg>
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                    <use xlink:href="#svg_min" />
+                </svg>
             </span>
             <span id="win-max" class="icon" title="Maximize/Restore">
-                <svg viewBox="0 0 24 24" width="18" height="18"><use xlink:href="#svg_max" /></svg>
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                    <use xlink:href="#svg_max" />
+                </svg>
             </span>
             <span id="win-close" class="icon" title="Close">
-                <svg viewBox="0 0 24 24" width="18" height="18"><use xlink:href="#svg_close" /></svg>
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                    <use xlink:href="#svg_close" />
+                </svg>
             </span>
         </div>
     </div>
@@ -117,10 +123,10 @@
         var el = document.querySelector('.chrome-tabs')
         var chromeTabs = new ChromeTabs()
         var select_next_mouseup = false;
-    var defaultFavicon = "earth.svg";
-    var suggEl = null;
-    var suggActiveIndex = -1;
-    var suggOverlayOpen = false;
+        var defaultFavicon = "earth.svg";
+        var suggEl = null;
+        var suggActiveIndex = -1;
+        var suggOverlayOpen = false;
 
         chromeTabs.init(el, {
             tabOverlapDistance: 6,
@@ -161,18 +167,18 @@
             const winMin = document.getElementById('win-min');
             const winMax = document.getElementById('win-max');
             const winClose = document.getElementById('win-close');
-            if (winMin) winMin.addEventListener('click', ()=>{ if (window.OnWindowMinimize) OnWindowMinimize(); });
-            if (winMax) winMax.addEventListener('click', ()=>{ if (window.OnWindowToggleMaximize) OnWindowToggleMaximize(); });
-            if (winClose) winClose.addEventListener('click', ()=>{ if (window.OnWindowClose) OnWindowClose(); });
+            if (winMin) winMin.addEventListener('click', () => { if (window.OnWindowMinimize) OnWindowMinimize(); });
+            if (winMax) winMax.addEventListener('click', () => { if (window.OnWindowToggleMaximize) OnWindowToggleMaximize(); });
+            if (winClose) winClose.addEventListener('click', () => { if (window.OnWindowClose) OnWindowClose(); });
             // Drag window when clicking the top bar (excluding interactive elements)
             const bar = document.getElementById('bar');
-            bar.addEventListener('mousedown', (e)=>{
+            bar.addEventListener('mousedown', (e) => {
                 const target = e.target;
                 if (target.closest('#address') || target.closest('.icon')) return;
                 if (e.button === 0 && window.OnBeginWindowDrag) OnBeginWindowDrag();
             });
             // Double-click to toggle maximize
-            bar.addEventListener('dblclick', (e)=>{
+            bar.addEventListener('dblclick', (e) => {
                 if (e.target.closest('#address')) return;
                 if (window.OnWindowToggleMaximize) OnWindowToggleMaximize();
             });

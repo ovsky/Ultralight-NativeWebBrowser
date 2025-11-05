@@ -71,6 +71,7 @@ public:
   void OnWindowToggleMaximize(const JSObject &obj, const JSArgs &args);
   void OnWindowClose(const JSObject &obj, const JSArgs &args);
   void OnBeginWindowDrag(const JSObject &obj, const JSArgs &args);
+  void StartWindowDrag();
 
   RefPtr<Window> window() { return window_; }
 
