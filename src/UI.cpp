@@ -1424,6 +1424,9 @@ void UI::ApplySettings(bool initial)
   clear_history_on_exit_ = settings_.clear_history_on_exit;
   experimental_transparent_toolbar_enabled_ = settings_.experimental_transparent_toolbar;
   experimental_compact_tabs_enabled_ = settings_.experimental_compact_tabs;
+  reduce_motion_enabled_ = settings_.reduce_motion;
+  high_contrast_ui_enabled_ = settings_.high_contrast_ui;
+  vibrant_window_theme_enabled_ = settings_.vibrant_window_theme;
 
   if (!suggestions_enabled_)
     HideSuggestionsOverlay();
@@ -1535,6 +1538,9 @@ void UI::LoadSettingsFromDisk()
   settings_.clear_history_on_exit = ParseSettingsBool(content, "clear_history_on_exit", settings_.clear_history_on_exit);
   settings_.experimental_transparent_toolbar = ParseSettingsBool(content, "experimental_transparent_toolbar", settings_.experimental_transparent_toolbar);
   settings_.experimental_compact_tabs = ParseSettingsBool(content, "experimental_compact_tabs", settings_.experimental_compact_tabs);
+  settings_.reduce_motion = ParseSettingsBool(content, "reduce_motion", settings_.reduce_motion);
+  settings_.high_contrast_ui = ParseSettingsBool(content, "high_contrast_ui", settings_.high_contrast_ui);
+  settings_.vibrant_window_theme = ParseSettingsBool(content, "vibrant_window_theme", settings_.vibrant_window_theme);
 }
 
 void UI::SaveSettingsToDisk()
@@ -1560,7 +1566,10 @@ std::string UI::BuildSettingsJSON() const
   ss << "\"auto_open_download_panel\":" << (settings_.auto_open_download_panel ? "true" : "false") << ",";
   ss << "\"clear_history_on_exit\":" << (settings_.clear_history_on_exit ? "true" : "false") << ",";
   ss << "\"experimental_transparent_toolbar\":" << (settings_.experimental_transparent_toolbar ? "true" : "false") << ",";
-  ss << "\"experimental_compact_tabs\":" << (settings_.experimental_compact_tabs ? "true" : "false") << "}";
+  ss << "\"experimental_compact_tabs\":" << (settings_.experimental_compact_tabs ? "true" : "false") << ",";
+  ss << "\"reduce_motion\":" << (settings_.reduce_motion ? "true" : "false") << ",";
+  ss << "\"high_contrast_ui\":" << (settings_.high_contrast_ui ? "true" : "false") << ",";
+  ss << "\"vibrant_window_theme\":" << (settings_.vibrant_window_theme ? "true" : "false") << "}";
   return ss.str();
 }
 
@@ -1635,6 +1644,27 @@ void UI::HandleSettingMutation(const std::string &key, bool value)
     if (settings_.experimental_compact_tabs == value)
       return;
     settings_.experimental_compact_tabs = value;
+    changed = true;
+  }
+  else if (key == "reduce_motion")
+  {
+    if (settings_.reduce_motion == value)
+      return;
+    settings_.reduce_motion = value;
+    changed = true;
+  }
+  else if (key == "high_contrast_ui")
+  {
+    if (settings_.high_contrast_ui == value)
+      return;
+    settings_.high_contrast_ui = value;
+    changed = true;
+  }
+  else if (key == "vibrant_window_theme")
+  {
+    if (settings_.vibrant_window_theme == value)
+      return;
+    settings_.vibrant_window_theme = value;
     changed = true;
   }
 

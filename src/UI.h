@@ -213,6 +213,9 @@ protected:
   bool clear_history_on_exit_ = false;
   bool experimental_transparent_toolbar_enabled_ = false;
   bool experimental_compact_tabs_enabled_ = false;
+  bool reduce_motion_enabled_ = false;
+  bool high_contrast_ui_enabled_ = false;
+  bool vibrant_window_theme_enabled_ = false;
 
   JSFunction updateBack;
   JSFunction updateForward;
@@ -277,6 +280,9 @@ protected:
     bool clear_history_on_exit = false;
     bool experimental_transparent_toolbar = false;
     bool experimental_compact_tabs = false;
+    bool reduce_motion = false;
+    bool high_contrast_ui = false;
+    bool vibrant_window_theme = false;
   } settings_;
 
   friend class Tab;

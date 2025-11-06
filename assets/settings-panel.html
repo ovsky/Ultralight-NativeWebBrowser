@@ -1,255 +1,432 @@
 <!doctype html>
 <html>
+
 <head>
   <meta charset="utf-8">
   <title>Browser Settings</title>
   <link rel="stylesheet" type="text/css" href="ui.css">
   <style>
+    * {
+      box-sizing: border-box;
+      transition: color 0.12s ease, background-color 0.12s ease, border-color 0.12s ease;
+    }
+
+    :root {
+      color-scheme: light dark;
+    }
+
+    html,
     body {
       margin: 0;
-      font-family: "Segoe UI", -apple-system, Ubuntu, Arial, sans-serif;
+      padding: 0;
+      min-height: 100%;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       font-size: 14px;
-      color: #d8d7e6;
-      background: transparent;
+      background: var(--bg, #f4f5fb);
+      color: var(--fg, #1c1f28);
     }
 
-    .settings-backdrop {
+    body {
+      --bg: linear-gradient(180deg, rgba(244, 246, 255, 0.95) 0%, rgba(226, 231, 255, 0.88) 60%, rgba(216, 225, 255, 0.92) 100%);
+      --fg: #1c1f28;
+      --surface: rgba(255, 255, 255, 0.92);
+      --border: rgba(28, 31, 48, 0.08);
+      --shadow: rgba(15, 23, 42, 0.18);
+      --muted: #5c637d;
+      --accent: #3c7cff;
+      --accent-soft: rgba(60, 124, 255, 0.12);
+      --outline: rgba(28, 31, 48, 0.12);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body {
+        --bg: radial-gradient(circle at 20% 20%, rgba(37, 46, 82, 0.7) 0%, rgba(17, 20, 36, 0.94) 55%, rgba(10, 12, 24, 0.97) 100%);
+        --fg: #eef0ff;
+        --surface: rgba(20, 23, 36, 0.88);
+        --border: rgba(102, 112, 176, 0.28);
+        --shadow: rgba(4, 9, 20, 0.55);
+        --muted: #a6acc8;
+        --accent: #7c9aff;
+        --accent-soft: rgba(124, 154, 255, 0.18);
+        --outline: rgba(102, 112, 176, 0.32);
+      }
+    }
+
+    #settings-shell {
       position: fixed;
       inset: 0;
-      background: rgba(13, 13, 20, 0.72);
-      backdrop-filter: blur(12px);
+      padding: 40px 24px;
+      overflow-y: auto;
+      background: var(--bg);
       display: flex;
-      align-items: center;
       justify-content: center;
-      padding: 32px;
+      align-items: flex-start;
     }
 
-    .settings-dialog {
-      width: 520px;
-      max-width: 92vw;
-      max-height: 90vh;
-      border-radius: 14px;
-      border: 1px solid rgba(80, 80, 110, 0.5);
-      background: rgba(30, 30, 44, 0.96);
-      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
+    .settings-surface {
+      width: min(920px, 100%);
+      background: var(--surface);
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      box-shadow: 0 22px 48px var(--shadow);
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+      color: inherit;
     }
 
-    .settings-header {
-      padding: 20px 24px 12px;
-      border-bottom: 1px solid rgba(70, 70, 100, 0.45);
+    header.page-header {
+      padding: 32px clamp(20px, 4vw, 40px) 20px;
+      border-bottom: 1px solid var(--outline);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
     }
 
-    .settings-header h1 {
-      margin: 0;
-      font-size: 20px;
+    .page-header h1 {
+      margin: 0 0 10px;
+      font-size: clamp(22px, 2.4vw, 26px);
       font-weight: 600;
-      color: #f0f0ff;
+      color: inherit;
+    }
+
+    .page-header p {
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: var(--muted);
+      max-width: 540px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
     .settings-content {
-      padding: 20px 24px;
-      overflow-y: auto;
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
+      padding: 24px clamp(20px, 4vw, 40px) 32px;
+      display: grid;
+      gap: 20px;
     }
 
-    .settings-group h2 {
-      margin: 0 0 10px;
+    section.settings-section {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px 22px;
+      box-shadow: 0 8px 24px rgba(17, 24, 39, 0.08);
+    }
+
+    section.settings-section h2 {
+      margin: 0 0 14px;
       font-size: 15px;
-      font-weight: 600;
-      color: #f7f7ff;
-      letter-spacing: 0.2px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
     }
 
     .setting-row {
       display: flex;
       align-items: flex-start;
-      gap: 10px;
-      padding: 9px 0;
-      border-bottom: 1px solid rgba(70, 70, 100, 0.25);
+      gap: 14px;
+      padding: 14px 0;
+      border-top: 1px solid rgba(28, 31, 48, 0.06);
     }
 
-    .setting-row:last-child {
-      border-bottom: none;
+    .setting-row:first-of-type {
+      border-top: none;
+      padding-top: 0;
+    }
+
+    .setting-row:last-of-type {
+      padding-bottom: 0;
     }
 
     .setting-row input[type="checkbox"] {
-      margin-top: 3px;
-      accent-color: #6c63ff;
+      margin-top: 2px;
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
     }
 
-    .setting-label {
+    .setting-copy {
       flex: 1;
     }
 
-    .setting-label strong {
+    .setting-copy strong {
       display: block;
+      margin-bottom: 4px;
       font-weight: 600;
-      color: #f0f0ff;
-      margin-bottom: 2px;
+      font-size: 14px;
+      color: inherit;
     }
 
-    .setting-label span {
-      color: #b4b3c6;
+    .setting-copy span {
+      display: block;
       font-size: 13px;
-      line-height: 1.4;
+      color: var(--muted);
+      line-height: 1.6;
     }
 
     .settings-footer {
-      padding: 16px 24px 20px;
-      border-top: 1px solid rgba(70, 70, 100, 0.35);
+      border-top: 1px solid var(--outline);
+      padding: 18px clamp(20px, 4vw, 40px) 26px;
       display: flex;
       justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      background: rgba(255, 255, 255, 0.6);
+    }
+
+    .settings-footer .footer-actions {
+      display: flex;
       gap: 12px;
+      flex-wrap: wrap;
     }
 
-    .settings-footer button {
-      border: none;
+    button {
+      border: 1px solid rgba(28, 31, 48, 0.12);
       border-radius: 10px;
-      font-size: 14px;
       padding: 10px 18px;
+      font-size: 13.5px;
+      font-weight: 500;
       cursor: pointer;
-      background: #38384b;
-      color: #f0f0ff;
-      transition: background 0.18s ease;
+      background: rgba(255, 255, 255, 0.9);
+      color: inherit;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
     }
 
-    .settings-footer button:hover {
-      background: #45455f;
+    button:hover {
+      background: rgba(237, 240, 255, 0.95);
+      box-shadow: 0 8px 22px rgba(30, 64, 175, 0.16);
     }
 
-    .settings-footer button.primary {
-      background: linear-gradient(180deg, #6c63ff, #5650d4);
+    button:active {
+      transform: translateY(1px);
+      box-shadow: none;
+    }
+
+    button.primary {
+      border-color: rgba(60, 124, 255, 0.45);
+      background: linear-gradient(180deg, rgba(84, 142, 255, 0.95), rgba(62, 115, 245, 0.92));
       color: #fff;
+      box-shadow: 0 12px 28px rgba(60, 124, 255, 0.35);
     }
 
-    .settings-footer button.primary:hover {
-      background: linear-gradient(180deg, #7d75ff, #6760eb);
+    button.primary:hover {
+      background: linear-gradient(180deg, rgba(96, 152, 255, 0.98), rgba(68, 120, 245, 0.98));
     }
 
-    @media (max-width: 640px) {
-      .settings-dialog {
-        width: 100%;
-        max-height: 100vh;
+    button.outline {
+      background: transparent;
+      border-color: var(--outline);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      section.settings-section {
+        background: rgba(18, 20, 32, 0.9);
+        border-color: var(--border);
+        box-shadow: 0 16px 32px rgba(4, 9, 20, 0.6);
       }
-      .settings-backdrop {
-        padding: 12px;
+
+      .settings-footer {
+        background: rgba(18, 20, 32, 0.82);
+      }
+
+      button {
+        border-color: rgba(120, 130, 195, 0.28);
+        background: rgba(35, 39, 64, 0.65);
+      }
+
+      button:hover {
+        background: rgba(46, 51, 78, 0.78);
+        box-shadow: 0 10px 24px rgba(12, 16, 32, 0.6);
+      }
+
+      button.outline {
+        border-color: rgba(120, 130, 195, 0.4);
+        background: rgba(35, 39, 64, 0.35);
+      }
+    }
+
+    @media (max-width: 720px) {
+      #settings-shell {
+        padding: 20px;
+      }
+
+      .settings-surface {
+        border-radius: 14px;
+      }
+
+      header.page-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .header-actions {
+        justify-content: flex-start;
+      }
+
+      .settings-footer {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .settings-footer .footer-actions,
+      .header-actions {
+        width: 100%;
+      }
+
+      button {
+        width: 100%;
+        justify-content: center;
       }
     }
   </style>
 </head>
+
 <body>
-  <div id="settings-backdrop" class="settings-backdrop">
-    <div class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-      <div class="settings-header">
-        <h1 id="settings-title">Settings</h1>
-      </div>
-      <div class="settings-content">
-        <section class="settings-group" aria-labelledby="appearance-group">
+  <div id="settings-shell">
+    <div class="settings-surface" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <header class="page-header">
+        <div class="header-copy">
+          <h1 id="settings-title">Browser Settings</h1>
+          <p>Configure how the Ultralight browser looks, feels, and protects your privacy. Changes save instantly, and
+            most options take effect right away.</p>
+        </div>
+        <div class="header-actions">
+          <button id="restore-defaults" class="outline" type="button">Restore defaults</button>
+        </div>
+      </header>
+
+      <main class="settings-content">
+        <section class="settings-section" aria-labelledby="appearance-group">
           <h2 id="appearance-group">Appearance</h2>
           <label class="setting-row">
             <input type="checkbox" data-key="launch_dark_theme">
-            <div class="setting-label">
+            <div class="setting-copy">
               <strong>Launch in dark theme</strong>
-              <span>Automatically applies the dark stylesheet to all pages when the browser starts.</span>
+              <span>Start the browser with a dark chrome and UI accents across all surfaces.</span>
             </div>
           </label>
           <label class="setting-row">
             <input type="checkbox" data-key="experimental_transparent_toolbar">
-            <div class="setting-label">
+            <div class="setting-copy">
               <strong>Transparent toolbar (experimental)</strong>
-              <span>Enable a glass-like toolbar background. May cause readability issues on bright pages.</span>
+              <span>Blend the toolbar into page content with a translucent, glass-like finish.</span>
             </div>
           </label>
           <label class="setting-row">
             <input type="checkbox" data-key="experimental_compact_tabs">
-            <div class="setting-label">
+            <div class="setting-copy">
               <strong>Compact tabs (experimental)</strong>
-              <span>Reduces tab height and spacing to show more tabs at once.</span>
+              <span>Reduce tab height and spacing so more tabs remain visible without scrolling.</span>
+            </div>
+          </label>
+          <label class="setting-row">
+            <input type="checkbox" data-key="vibrant_window_theme">
+            <div class="setting-copy">
+              <strong>Vibrant window frame</strong>
+              <span>Apply a subtle color wash to window chrome for a livelier, app-like finish.</span>
             </div>
           </label>
         </section>
 
-        <section class="settings-group" aria-labelledby="privacy-group">
+        <section class="settings-section" aria-labelledby="accessibility-group">
+          <h2 id="accessibility-group">Accessibility &amp; Motion</h2>
+          <label class="setting-row">
+            <input type="checkbox" data-key="reduce_motion">
+            <div class="setting-copy">
+              <strong>Reduce motion effects</strong>
+              <span>Limit animated transitions and parallax UI flourishes to keep the interface calm.</span>
+            </div>
+          </label>
+          <label class="setting-row">
+            <input type="checkbox" data-key="high_contrast_ui">
+            <div class="setting-copy">
+              <strong>High contrast UI</strong>
+              <span>Boost contrast levels for overlays, menus, and dialogs to improve readability.</span>
+            </div>
+          </label>
+        </section>
+
+        <section class="settings-section" aria-labelledby="privacy-group">
           <h2 id="privacy-group">Privacy &amp; Content</h2>
           <label class="setting-row">
             <input type="checkbox" data-key="enable_adblock">
-            <div class="setting-label">
+            <div class="setting-copy">
               <strong>Enable ad blocking</strong>
-              <span>Blocks requests using the built-in filter lists. Disable to allow all content.</span>
+              <span>Filter network requests with the bundled block lists to hide intrusive ads and trackers.</span>
             </div>
           </label>
           <label class="setting-row">
             <input type="checkbox" data-key="log_blocked_requests">
-            <div class="setting-label">
+            <div class="setting-copy">
               <strong>Log blocked requests</strong>
-              <span>Prints blocked URL details to the console for debugging.</span>
+              <span>Write details about each blocked request to the console for debugging filter rules.</span>
             </div>
           </label>
           <label class="setting-row">
             <input type="checkbox" data-key="clear_history_on_exit">
-            <div class="setting-label">
+            <div class="setting-copy">
               <strong>Clear history on exit</strong>
-              <span>Removes browsing history when the browser closes and skips saving new history to disk.</span>
+              <span>Remove browsing history when the browser closes and skip saving new visits to disk.</span>
             </div>
           </label>
         </section>
 
-        <section class="settings-group" aria-labelledby="suggestions-group">
+        <section class="settings-section" aria-labelledby="suggestions-group">
           <h2 id="suggestions-group">Suggestions</h2>
           <label class="setting-row">
             <input type="checkbox" data-key="enable_suggestions">
-            <div class="setting-label">
+            <div class="setting-copy">
               <strong>Show address bar suggestions</strong>
-              <span>Displays frequently visited sites and history matches while typing.</span>
+              <span>Surface history matches and popular sites as you type in the address field.</span>
             </div>
           </label>
           <label class="setting-row">
             <input type="checkbox" data-key="enable_suggestion_favicons">
-            <div class="setting-label">
+            <div class="setting-copy">
               <strong>Show favicons in suggestions</strong>
-              <span>Displays site icons next to suggestion entries when available.</span>
+              <span>Display site icons beside suggestion rows whenever an icon is available.</span>
             </div>
           </label>
         </section>
 
-        <section class="settings-group" aria-labelledby="downloads-group">
+        <section class="settings-section" aria-labelledby="downloads-group">
           <h2 id="downloads-group">Downloads</h2>
           <label class="setting-row">
             <input type="checkbox" data-key="show_download_badge">
-            <div class="setting-label">
+            <div class="setting-copy">
               <strong>Show download badge</strong>
-              <span>Displays a badge on the toolbar icon while downloads are active.</span>
+              <span>Highlight the toolbar downloads button whenever transfers are active.</span>
             </div>
           </label>
           <label class="setting-row">
             <input type="checkbox" data-key="auto_open_download_panel">
-            <div class="setting-label">
+            <div class="setting-copy">
               <strong>Open downloads panel automatically</strong>
-              <span>Automatically opens the downloads overlay when a download starts.</span>
+              <span>Pop open the quick downloads overlay as soon as a new download begins.</span>
             </div>
           </label>
         </section>
-      </div>
-      <div class="settings-footer">
-        <button id="restore-defaults" type="button">Restore Defaults</button>
-        <div style="display:flex; gap:10px;">
+      </main>
+
+      <footer class="settings-footer">
+        <span class="footer-caption">Changes save automatically.</span>
+        <div class="footer-actions">
           <button id="close-settings" type="button">Close</button>
           <button id="apply-settings" class="primary" type="button">Done</button>
         </div>
-      </div>
+      </footer>
     </div>
   </div>
 
   <script>
     (function () {
-      const backdrop = document.getElementById('settings-backdrop');
-      const dialog = document.querySelector('.settings-dialog');
+      const shell = document.getElementById('settings-shell');
       const restoreBtn = document.getElementById('restore-defaults');
       const closeBtn = document.getElementById('close-settings');
       const doneBtn = document.getElementById('apply-settings');
@@ -305,8 +482,8 @@
       closeBtn.addEventListener('click', closePanel);
       doneBtn.addEventListener('click', closePanel);
 
-      backdrop.addEventListener('click', (e) => {
-        if (e.target === backdrop) closePanel();
+      shell.addEventListener('click', (e) => {
+        if (e.target === shell) closePanel();
       });
 
       document.addEventListener('keydown', (e) => {
@@ -327,4 +504,5 @@
     })();
   </script>
 </body>
+
 </html>
