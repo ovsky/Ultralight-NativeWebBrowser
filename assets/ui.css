@@ -109,11 +109,31 @@ svg#icon_defs path {
      display: inline-block;
 }
 
-/* AdBlock toggle coloring: enabled => purple-blue, disabled => grey (inherited) */
-#toggle-adblock:not(.disabled) {
+/* AdBlock toggle coloring: highlight when protection is active */
+#toggle-adblock {
+     color: #b6b3c9;
+     fill: #b6b3c9;
+     transition: color 0.15s ease, fill 0.15s ease, opacity 0.15s ease;
+}
+
+#toggle-adblock:not(.inactive) {
      color: #6C63FF;
-     /* purple-blue */
      fill: #6C63FF;
+}
+
+#toggle-adblock:not(.inactive):hover {
+     color: #8a83ff;
+     fill: #8a83ff;
+}
+
+#toggle-adblock.inactive {
+     opacity: 0.65;
+}
+
+#toggle-adblock.inactive:hover {
+     color: #cbc9d8;
+     fill: #cbc9d8;
+     opacity: 0.85;
 }
 
 /* Dropdown menu styles */
@@ -182,4 +202,41 @@ svg#icon_defs path {
 .suggestions-item:hover,
 .suggestions-item.active {
      background: #343446;
+}
+
+/* Floating tooltip for toolbar icons */
+.toolbar-tooltip {
+     position: fixed;
+     padding: 4px 10px;
+     background: rgba(43, 43, 56, 0.95);
+     color: #f0f0ff;
+     border-radius: 4px;
+     font-size: 12px;
+     line-height: 1.4;
+     pointer-events: none;
+     opacity: 0;
+     transform: translate(-50%, 4px);
+     transition: opacity 0.12s ease, transform 0.12s ease;
+     z-index: 4000;
+     white-space: nowrap;
+     overflow: visible !important;
+     box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+.toolbar-tooltip.visible {
+     opacity: 1;
+     transform: translate(-50%, 0px);
+}
+
+.toolbar-tooltip::after {
+     content: "";
+     position: absolute;
+     top: -5px;
+     left: 50%;
+     margin-left: -5px;
+     width: 0;
+     height: 0;
+     border-width: 0 5px 5px 5px;
+     border-style: solid;
+     border-color: transparent transparent rgba(43, 43, 56, 0.95) transparent;
 }
