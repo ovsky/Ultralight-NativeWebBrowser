@@ -109,11 +109,26 @@ svg#icon_defs path {
      display: inline-block;
 }
 
-/* AdBlock toggle coloring: enabled => purple-blue, disabled => grey (inherited) */
-#toggle-adblock:not(.disabled) {
+/* AdBlock toggle coloring: highlight when protection is active */
+#toggle-adblock {
+     color: #b6b3c9;
+     fill: #b6b3c9;
+     transition: color 0.075s ease, fill 0.075s ease;
+}
+
+#toggle-adblock:hover {
+     color: #cbc9d8;
+     fill: #cbc9d8;
+}
+
+#toggle-adblock.active {
      color: #6C63FF;
-     /* purple-blue */
      fill: #6C63FF;
+}
+
+#toggle-adblock.active:hover {
+     color: #8a83ff;
+     fill: #8a83ff;
 }
 
 /* Dropdown menu styles */
@@ -182,4 +197,56 @@ svg#icon_defs path {
 .suggestions-item:hover,
 .suggestions-item.active {
      background: #343446;
+}
+
+/* Floating tooltip for toolbar icons */
+.toolbar-tooltip {
+     position: fixed;
+     padding: 4px 10px;
+     background: rgba(43, 43, 56, 0.95);
+     color: #f0f0ff;
+     border-radius: 4px;
+     font-size: 12px;
+     line-height: 1.4;
+     pointer-events: none;
+     opacity: 0;
+     transform: translate(-50%, -6px);
+     transition: opacity 0.12s ease, transform 0.12s ease;
+     z-index: 12000;
+     white-space: nowrap;
+     overflow: visible !important;
+     box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+.toolbar-tooltip.visible {
+     opacity: 1;
+     transform: translate(-50%, -2px);
+}
+
+.toolbar-tooltip::after {
+     content: "";
+     position: absolute;
+     left: 50%;
+     bottom: -5px;
+     margin-left: -5px;
+     width: 0;
+     height: 0;
+     border-width: 5px 5px 0 5px;
+     border-style: solid;
+     border-color: rgba(43, 43, 56, 0.95) transparent transparent transparent;
+}
+
+.toolbar-tooltip.below {
+     transform: translate(-50%, 6px);
+}
+
+.toolbar-tooltip.below.visible {
+     transform: translate(-50%, 2px);
+}
+
+.toolbar-tooltip.below::after {
+     top: -5px;
+     bottom: auto;
+     border-width: 0 5px 5px 5px;
+     border-color: transparent transparent rgba(43, 43, 56, 0.95) transparent;
 }

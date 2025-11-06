@@ -49,6 +49,9 @@ document.getElementById('address').addEventListener('focus', () => {
 function updateAdblockEnabled(enabled) {
 	const el = document.getElementById('toggle-adblock');
 	if (!el) return;
-	if (enabled) el.classList.remove('disabled');
-	else el.classList.add('disabled');
+	const isEnabled = !!enabled;
+	el.classList.remove('inactive');
+	el.classList.toggle('active', isEnabled);
+	el.setAttribute('aria-pressed', isEnabled ? 'true' : 'false');
+	el.dataset.state = isEnabled ? 'on' : 'off';
 }

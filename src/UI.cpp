@@ -10,6 +10,7 @@
 #include <unordered_set>
 #include <cstdio>
 #include "DownloadManager.h"
+#include "AdBlocker.h"
 #ifdef _WIN32
 #include <direct.h> // _mkdir, _getcwd
 #else
@@ -89,6 +90,8 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
 
   // Load history from disk
   LoadHistoryFromDisk();
+
+  adblock_enabled_cached_ = adblock_ ? adblock_->enabled() : adblock_enabled_cached_;
 }
 
 UI::~UI()
@@ -493,7 +496,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     closeTab = global["closeTab"];
     focusAddressBar = global["focusAddressBar"];
     isAddressBarFocused = global["isAddressBarFocused"];
-    // (no adblock in this build)
+    updateAdblockEnabled = global["updateAdblockEnabled"];
   }
 
   global["OnBack"] = BindJSCallback(&UI::OnBack);
@@ -507,6 +510,8 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnDownloadsOverlayClose"] = BindJSCallback(&UI::OnDownloadsOverlayClose);
   global["OnToggleDarkMode"] = BindJSCallback(&UI::OnToggleDarkMode);
   global["GetDarkModeEnabled"] = BindJSCallbackWithRetval(&UI::OnGetDarkModeEnabled);
+  global["OnToggleAdblock"] = BindJSCallback(&UI::OnToggleAdblock);
+  global["GetAdblockEnabled"] = BindJSCallbackWithRetval(&UI::OnGetAdblockEnabled);
   if (is_ctx_view)
   {
     // context menu overlay actions
@@ -561,6 +566,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
 
   if (!is_menu_view && !is_ctx_view && !is_sugg_view && !is_downloads_overlay_view)
   {
+    SyncAdblockStateToUI();
     CreateNewTab();
   }
 }
@@ -1255,6 +1261,34 @@ void UI::OnToggleDarkMode(const JSObject &obj, const JSArgs &args)
 ultralight::JSValue UI::OnGetDarkModeEnabled(const JSObject &obj, const JSArgs &args)
 {
   return ultralight::JSValue(dark_mode_enabled_);
+}
+
+void UI::OnToggleAdblock(const JSObject &obj, const JSArgs &args)
+{
+  bool next_state = !(adblock_ ? adblock_->enabled() : adblock_enabled_cached_);
+  if (adblock_)
+    adblock_->set_enabled(next_state);
+  if (trackerblock_ && trackerblock_ != adblock_)
+    trackerblock_->set_enabled(next_state);
+  adblock_enabled_cached_ = next_state;
+  SyncAdblockStateToUI();
+}
+
+ultralight::JSValue UI::OnGetAdblockEnabled(const JSObject &obj, const JSArgs &args)
+{
+  bool enabled = adblock_ ? adblock_->enabled() : adblock_enabled_cached_;
+  adblock_enabled_cached_ = enabled;
+  return ultralight::JSValue(enabled);
+}
+
+void UI::SyncAdblockStateToUI()
+{
+  if (adblock_)
+    adblock_enabled_cached_ = adblock_->enabled();
+  if (updateAdblockEnabled)
+  {
+    updateAdblockEnabled({adblock_enabled_cached_ ? 1.0 : 0.0});
+  }
 }
 
 void UI::AdjustUIHeight(uint32_t new_height)
