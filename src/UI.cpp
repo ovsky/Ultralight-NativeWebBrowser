@@ -1321,9 +1321,9 @@ void UI::OnUpdateSetting(const JSObject &, const JSArgs &args)
   }
   else if (args[1].IsString())
   {
-  ultralight::String val_ul = args[1].ToString();
-  auto val_str = val_ul.utf8();
-  std::string text = val_str.data() ? val_str.data() : "";
+    ultralight::String val_ul = args[1].ToString();
+    auto val_str = val_ul.utf8();
+    std::string text = val_str.data() ? val_str.data() : "";
     std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c)
                    { return static_cast<char>(std::tolower(c)); });
     value = (text == "true" || text == "1" || text == "on" || text == "yes");

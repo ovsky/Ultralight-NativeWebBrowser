@@ -2,547 +2,559 @@
 <html>
 
 <head>
-  <meta charset="utf-8">
-  <title>Browser Settings</title>
-  <style>
-    :root {
-      color-scheme: dark;
-      --bg-gradient: radial-gradient(circle at 20% 15%, rgba(73, 92, 169, 0.38) 0%, rgba(22, 28, 66, 0.92) 46%, rgba(9, 11, 28, 0.96) 100%);
-      --surface: rgba(18, 20, 38, 0.9);
-      --surface-muted: rgba(20, 24, 48, 0.82);
-      --border: rgba(119, 134, 206, 0.24);
-      --border-strong: rgba(132, 144, 220, 0.35);
-      --text: #e7ecff;
-      --text-muted: rgba(205, 215, 255, 0.68);
-      --accent: #87a3ff;
-      --accent-strong: #4f7dff;
-      --shadow-lg: 0 30px 60px rgba(4, 8, 24, 0.68);
-      --shadow-md: 0 14px 32px rgba(6, 12, 32, 0.55);
-      --radius-lg: 22px;
-      --radius-md: 16px;
-      --radius-sm: 12px;
-      scroll-behavior: smooth;
-    }
+    <meta charset="utf-8">
+    <title>Browser Settings</title>
+    <style>
+        *
+        {
+            transition: all 0.2s ease-in-out;
+        }
+        :root {
+            color-scheme: dark;
+            --bg-gradient: radial-gradient(circle at 20% 15%, rgba(73, 92, 169, 0.38) 0%, rgba(22, 28, 66, 0.92) 46%, rgba(9, 11, 28, 0.96) 100%);
+            --surface: rgba(18, 20, 38, 0.9);
+            --surface-muted: rgba(20, 24, 48, 0.82);
+            --border: rgba(119, 134, 206, 0.24);
+            --border-strong: rgba(132, 144, 220, 0.35);
+            --text: #e7ecff;
+            --text-muted: rgba(205, 215, 255, 0.68);
+            --accent: #87a3ff;
+            --accent-strong: #4f7dff;
+            --shadow-lg: 0 30px 60px rgba(4, 8, 24, 0.68);
+            --shadow-md: 0 14px 32px rgba(6, 12, 32, 0.55);
+            --radius-lg: 22px;
+            --radius-md: 16px;
+            --radius-sm: 12px;
+            scroll-behavior: smooth;
+        }
 
-    * {
-      box-sizing: border-box;
-    }
+        * {
+            box-sizing: border-box;
+        }
 
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      font-size: 14px;
-      line-height: 1.6;
-      background: var(--bg-gradient);
-      color: var(--text);
-      padding: 56px 28px 72px;
-    }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+            background: var(--bg-gradient);
+            color: var(--text);
+            padding: 56px 28px 72px;
+        }
 
-    main {
-      width: min(1120px, 100%);
-      margin: 0 auto;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-lg);
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
+        main {
+            width: min(1120px, 100%);
+            margin: 0 auto;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
 
-    header.page-hero {
-      padding: clamp(28px, 4vw, 44px);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 28px;
-      justify-content: space-between;
-      align-items: flex-start;
-    }
+        header.page-hero {
+            padding: clamp(28px, 4vw, 44px);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 28px;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
 
-    header.page-hero h1 {
-      margin: 0 0 12px;
-      font-size: clamp(26px, 3vw, 32px);
-      font-weight: 600;
-    }
+        header.page-hero h1 {
+            margin: 0 0 12px;
+            font-size: clamp(26px, 3vw, 32px);
+            font-weight: 600;
+        }
 
-    header.page-hero p {
-      margin: 0;
-      max-width: 600px;
-      color: var(--text-muted);
-    }
+        header.page-hero p {
+            margin: 0;
+            max-width: 600px;
+            color: var(--text-muted);
+        }
 
-    .hero-actions {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
+        .hero-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
 
-    button {
-      border-radius: var(--radius-sm);
-      padding: 10px 18px;
-      font-size: 13.5px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
-      border: 1px solid var(--border);
-      background: rgba(34, 40, 72, 0.72);
-      color: inherit;
-    }
+        button {
+            border-radius: var(--radius-sm);
+            padding: 10px 18px;
+            font-size: 13.5px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+            border: 1px solid var(--border);
+            background: rgba(34, 40, 72, 0.72);
+            color: inherit;
+        }
 
-    button:hover {
-      transform: translateY(-1px);
-      box-shadow: var(--shadow-md);
-      background: rgba(46, 54, 92, 0.86);
-      border-color: var(--border-strong);
-    }
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+            background: rgba(46, 54, 92, 0.86);
+            border-color: var(--border-strong);
+        }
 
-    button:active {
-      transform: translateY(0);
-      box-shadow: none;
-    }
+        button:active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
 
-    button.primary {
-      background: linear-gradient(120deg, var(--accent-strong), var(--accent));
-      border-color: rgba(135, 163, 255, 0.55);
-      color: #fff;
-      box-shadow: 0 16px 36px rgba(78, 126, 255, 0.32);
-    }
+        button.primary {
+            background: linear-gradient(120deg, var(--accent-strong), var(--accent));
+            border-color: rgba(135, 163, 255, 0.55);
+            color: #fff;
+            box-shadow: 0 16px 36px rgba(78, 126, 255, 0.32);
+        }
 
-    button.primary:hover {
-      background: linear-gradient(120deg, #608aff, var(--accent));
-    }
+        button.primary:hover {
+            background: linear-gradient(120deg, #608aff, var(--accent));
+        }
 
-    .layout {
-      display: grid;
-      grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
-      gap: 32px;
-      padding: clamp(26px, 4vw, 42px);
-      background: rgba(13, 16, 34, 0.78);
-    }
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
+            gap: 32px;
+            padding: clamp(26px, 4vw, 42px);
+            background: rgba(13, 16, 34, 0.78);
+        }
 
-    .toc {
-      position: sticky;
-      top: 32px;
-      align-self: start;
-      background: var(--surface-muted);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      padding: 20px 18px;
-      box-shadow: var(--shadow-md);
-    }
+        .toc {
+            position: sticky;
+            top: 32px;
+            align-self: start;
+            background: var(--surface-muted);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 20px 18px;
+            box-shadow: var(--shadow-md);
+        }
 
-    .toc h2 {
-      margin: 0 0 12px;
-      font-size: 13px;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: rgba(190, 202, 255, 0.62);
-    }
+        .toc h2 {
+            margin: 0 0 12px;
+            font-size: 13px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: rgba(190, 202, 255, 0.62);
+        }
 
-    .toc ul {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: grid;
-      gap: 6px;
-    }
+        .toc ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            gap: 6px;
+        }
 
-    .toc a {
-      display: block;
-      padding: 8px 12px;
-      border-radius: 10px;
-      color: inherit;
-      text-decoration: none;
-      font-weight: 500;
-      transition: background-color 0.12s ease, transform 0.12s ease;
-    }
+        .toc a {
+            display: block;
+            padding: 8px 12px;
+            border-radius: 10px;
+            color: inherit;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background-color 0.12s ease, transform 0.12s ease;
+        }
 
-    .toc a:hover,
-    .toc a:focus-visible {
-      background: rgba(136, 158, 255, 0.16);
-      outline: none;
-      transform: translateX(4px);
-    }
+        .toc a:hover,
+        .toc a:focus-visible {
+            background: rgba(136, 158, 255, 0.16);
+            outline: none;
+            transform: translateX(4px);
+        }
 
-    .content {
-      display: grid;
-      gap: 26px;
-    }
+        .content {
+            display: grid;
+            gap: 26px;
+        }
 
-    section.settings-section {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      padding: 24px clamp(22px, 3vw, 32px);
-      box-shadow: var(--shadow-md);
-      scroll-margin-top: 72px;
-    }
+        section.settings-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 24px clamp(22px, 3vw, 32px);
+            box-shadow: var(--shadow-md);
+            scroll-margin-top: 72px;
+        }
 
-    section.settings-section h2 {
-      margin: 0 0 6px;
-      font-size: 15px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: rgba(182, 195, 255, 0.8);
-    }
+        section.settings-section h2 {
+            margin: 0 0 6px;
+            font-size: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: rgba(182, 195, 255, 0.8);
+        }
 
-    section.settings-section p.section-hint {
-      margin: 0 0 16px;
-      color: var(--text-muted);
-      font-size: 13px;
-    }
+        section.settings-section p.section-hint {
+            margin: 0 0 16px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
 
-    .settings-list {
-      display: grid;
-      gap: 18px;
-    }
+        .settings-list {
+            display: grid;
+            gap: 18px;
+        }
 
-    .setting-row {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: 16px;
-      align-items: flex-start;
-      padding: 14px 0;
-      border-top: 1px solid rgba(140, 156, 230, 0.18);
-    }
+        .setting-row {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 16px;
+            align-items: flex-start;
+            padding: 14px 0;
+            border-top: 1px solid rgba(140, 156, 230, 0.18);
+        }
 
-    .setting-row:first-of-type {
-      border-top: none;
-      padding-top: 0;
-    }
+        .setting-row:first-of-type {
+            border-top: none;
+            padding-top: 0;
+        }
 
-    .setting-row input[type="checkbox"] {
-      margin-top: 4px;
-      width: 20px;
-      height: 20px;
-      accent-color: var(--accent);
-      cursor: pointer;
-    }
+        .setting-row input[type="checkbox"] {
+            margin-top: 4px;
+            width: 20px;
+            height: 20px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
 
-    .setting-copy strong {
-      display: block;
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
+        .setting-copy strong {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
 
-    .setting-copy span {
-      font-size: 13px;
-      color: var(--text-muted);
-      line-height: 1.65;
-    }
+        .setting-copy span {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.65;
+        }
 
-    .setting-flair {
-      display: inline-block;
-      margin-left: 8px;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      padding: 2px 6px;
-      border-radius: 999px;
-      background: rgba(132, 144, 220, 0.2);
-      color: var(--accent);
-    }
+        .setting-flair {
+            display: inline-block;
+            margin-left: 8px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            padding: 2px 6px;
+            border-radius: 999px;
+            background: rgba(132, 144, 220, 0.2);
+            color: var(--accent);
+        }
 
-    footer.page-footer {
-      padding: 18px clamp(28px, 4vw, 44px) 26px;
-      border-top: 1px solid var(--border);
-      background: rgba(12, 15, 32, 0.88);
-      color: var(--text-muted);
-      font-size: 13.5px;
-      text-align: center;
-    }
+        footer.page-footer {
+            padding: 18px clamp(28px, 4vw, 44px) 26px;
+            border-top: 1px solid var(--border);
+            background: rgba(12, 15, 32, 0.88);
+            color: var(--text-muted);
+            font-size: 13.5px;
+            text-align: center;
+        }
 
-    @media (max-width: 1024px) {
-      .layout {
-        grid-template-columns: minmax(0, 1fr);
-      }
+        @media (max-width: 1024px) {
+            .layout {
+                grid-template-columns: minmax(0, 1fr);
+            }
 
-      .toc {
-        position: static;
-        order: 2;
-      }
-    }
+            .toc {
+                position: static;
+                order: 2;
+            }
+        }
 
-    @media (max-width: 720px) {
-      body {
-        padding: 32px 16px 44px;
-      }
+        @media (max-width: 720px) {
+            body {
+                padding: 32px 16px 44px;
+            }
 
-      main {
-        border-radius: 18px;
-      }
+            main {
+                border-radius: 18px;
+            }
 
-      header.page-hero {
-        flex-direction: column;
-      }
+            header.page-hero {
+                flex-direction: column;
+            }
 
-      .hero-actions button {
-        width: 100%;
-        justify-content: center;
-      }
+            .hero-actions button {
+                width: 100%;
+                justify-content: center;
+            }
 
-      section.settings-section {
-        padding-left: clamp(18px, 6vw, 24px);
-        padding-right: clamp(18px, 6vw, 24px);
-      }
+            section.settings-section {
+                padding-left: clamp(18px, 6vw, 24px);
+                padding-right: clamp(18px, 6vw, 24px);
+            }
 
-      .setting-row {
-        grid-template-columns: 1fr;
-      }
+            .setting-row {
+                grid-template-columns: 1fr;
+            }
 
-      .setting-row input[type="checkbox"] {
-        margin-top: 0;
-      }
-    }
-  </style>
+            .setting-row input[type="checkbox"] {
+                margin-top: 0;
+            }
+        }
+    </style>
 </head>
 
 <body>
-  <main>
-    <header class="page-hero">
-      <div class="hero-copy">
-        <h1>Browser Settings</h1>
-        <p>Fine-tune how Ultralight looks, behaves, and protects your privacy. Changes apply instantly and persist
-          between sessions.</p>
-      </div>
-      <div class="hero-actions">
-        <button id="restore-defaults" type="button">Restore defaults</button>
-        <button id="close-settings" type="button">Close</button>
-        <button id="apply-settings" class="primary" type="button">Done</button>
-      </div>
-    </header>
+    <main>
+        <header class="page-hero">
+            <div class="hero-copy">
+                <h1>Browser Settings</h1>
+                <p>Fine-tune how Ultralight looks, behaves, and protects your privacy. Changes apply instantly and
+                    persist
+                    between sessions.</p>
+            </div>
+            <div class="hero-actions">
+                <button id="restore-defaults" type="button">Restore defaults</button>
+                <button id="close-settings" type="button">Close</button>
+                <button id="apply-settings" class="primary" type="button">Done</button>
+            </div>
+        </header>
 
-    <div class="layout">
-      <nav class="toc" aria-label="Settings sections">
-        <h2>Jump to</h2>
-        <ul>
-          <li><a href="#appearance">Appearance</a></li>
-          <li><a href="#accessibility">Accessibility &amp; Motion</a></li>
-          <li><a href="#privacy">Privacy &amp; Content</a></li>
-          <li><a href="#suggestions">Suggestions</a></li>
-          <li><a href="#downloads">Downloads</a></li>
-        </ul>
-      </nav>
+        <div class="layout">
+            <nav class="toc" aria-label="Settings sections">
+                <h2>Jump to</h2>
+                <ul>
+                    <li><a href="#appearance">Appearance</a></li>
+                    <li><a href="#accessibility">Accessibility &amp; Motion</a></li>
+                    <li><a href="#privacy">Privacy &amp; Content</a></li>
+                    <li><a href="#suggestions">Suggestions</a></li>
+                    <li><a href="#downloads">Downloads</a></li>
+                </ul>
+            </nav>
 
-      <div class="content">
-        <section class="settings-section" id="appearance" aria-labelledby="appearance-heading">
-          <h2 id="appearance-heading">Appearance</h2>
-          <p class="section-hint">Personalize the chrome and window treatments to match your workspace.</p>
-          <div class="settings-list">
-            <label class="setting-row">
-              <input type="checkbox" data-key="launch_dark_theme">
-              <div class="setting-copy">
-                <strong>Launch in dark theme</strong>
-                <span>Start Ultralight with rich dark UI accents across the toolbar, panels, and menus.</span>
-              </div>
-            </label>
-            <label class="setting-row">
-              <input type="checkbox" data-key="experimental_transparent_toolbar">
-              <div class="setting-copy">
-                <strong>Transparent toolbar<span class="setting-flair">Experimental</span></strong>
-                <span>Blend the toolbar into page content with a translucent, glass-like finish.</span>
-              </div>
-            </label>
-            <label class="setting-row">
-              <input type="checkbox" data-key="experimental_compact_tabs">
-              <div class="setting-copy">
-                <strong>Compact tabs<span class="setting-flair">Experimental</span></strong>
-                <span>Reduce tab height and spacing so more tabs remain visible without scrolling.</span>
-              </div>
-            </label>
-            <label class="setting-row">
-              <input type="checkbox" data-key="vibrant_window_theme">
-              <div class="setting-copy">
-                <strong>Vibrant window theme</strong>
-                <span>Apply a subtle color wash to window chrome for a livelier, app-like finish.</span>
-              </div>
-            </label>
-          </div>
-        </section>
+            <div class="content">
+                <section class="settings-section" id="appearance" aria-labelledby="appearance-heading">
+                    <h2 id="appearance-heading">Appearance</h2>
+                    <p class="section-hint">Personalize the chrome and window treatments to match your workspace.</p>
+                    <div class="settings-list">
+                        <label class="setting-row">
+                            <input type="checkbox" data-key="launch_dark_theme">
+                            <div class="setting-copy">
+                                <strong>Launch in dark theme</strong>
+                                <span>Start Ultralight with rich dark UI accents across the toolbar, panels, and
+                                    menus.</span>
+                            </div>
+                        </label>
+                        <label class="setting-row">
+                            <input type="checkbox" data-key="experimental_transparent_toolbar">
+                            <div class="setting-copy">
+                                <strong>Transparent toolbar<span class="setting-flair">Experimental</span></strong>
+                                <span>Blend the toolbar into page content with a translucent, glass-like finish.</span>
+                            </div>
+                        </label>
+                        <label class="setting-row">
+                            <input type="checkbox" data-key="experimental_compact_tabs">
+                            <div class="setting-copy">
+                                <strong>Compact tabs<span class="setting-flair">Experimental</span></strong>
+                                <span>Reduce tab height and spacing so more tabs remain visible without
+                                    scrolling.</span>
+                            </div>
+                        </label>
+                        <label class="setting-row">
+                            <input type="checkbox" data-key="vibrant_window_theme">
+                            <div class="setting-copy">
+                                <strong>Vibrant window theme</strong>
+                                <span>Apply a subtle color wash to window chrome for a livelier, app-like finish.</span>
+                            </div>
+                        </label>
+                    </div>
+                </section>
 
-        <section class="settings-section" id="accessibility" aria-labelledby="accessibility-heading">
-          <h2 id="accessibility-heading">Accessibility &amp; Motion</h2>
-          <p class="section-hint">Make the interface calmer and more legible for sensitive eyes.</p>
-          <div class="settings-list">
-            <label class="setting-row">
-              <input type="checkbox" data-key="reduce_motion">
-              <div class="setting-copy">
-                <strong>Reduce motion effects</strong>
-                <span>Limit animated transitions and parallax flourishes to keep navigation steady.</span>
-              </div>
-            </label>
-            <label class="setting-row">
-              <input type="checkbox" data-key="high_contrast_ui">
-              <div class="setting-copy">
-                <strong>High contrast UI</strong>
-                <span>Boost contrast for overlays, menus, and dialogs to improve readability.</span>
-              </div>
-            </label>
-          </div>
-        </section>
+                <section class="settings-section" id="accessibility" aria-labelledby="accessibility-heading">
+                    <h2 id="accessibility-heading">Accessibility &amp; Motion</h2>
+                    <p class="section-hint">Make the interface calmer and more legible for sensitive eyes.</p>
+                    <div class="settings-list">
+                        <label class="setting-row">
+                            <input type="checkbox" data-key="reduce_motion">
+                            <div class="setting-copy">
+                                <strong>Reduce motion effects</strong>
+                                <span>Limit animated transitions and parallax flourishes to keep navigation
+                                    steady.</span>
+                            </div>
+                        </label>
+                        <label class="setting-row">
+                            <input type="checkbox" data-key="high_contrast_ui">
+                            <div class="setting-copy">
+                                <strong>High contrast UI</strong>
+                                <span>Boost contrast for overlays, menus, and dialogs to improve readability.</span>
+                            </div>
+                        </label>
+                    </div>
+                </section>
 
-        <section class="settings-section" id="privacy" aria-labelledby="privacy-heading">
-          <h2 id="privacy-heading">Privacy &amp; Content</h2>
-          <p class="section-hint">Control how Ultralight filters requests and retains your browsing history.</p>
-          <div class="settings-list">
-            <label class="setting-row">
-              <input type="checkbox" data-key="enable_adblock">
-              <div class="setting-copy">
-                <strong>Enable ad blocking</strong>
-                <span>Filter network requests with the bundled block lists to hide intrusive ads and trackers.</span>
-              </div>
-            </label>
-            <label class="setting-row">
-              <input type="checkbox" data-key="log_blocked_requests">
-              <div class="setting-copy">
-                <strong>Log blocked requests</strong>
-                <span>Write details about each blocked request to the console for debugging filter rules.</span>
-              </div>
-            </label>
-            <label class="setting-row">
-              <input type="checkbox" data-key="clear_history_on_exit">
-              <div class="setting-copy">
-                <strong>Clear history on exit</strong>
-                <span>Remove browsing history whenever the browser closes and skip saving new visits.</span>
-              </div>
-            </label>
-          </div>
-        </section>
+                <section class="settings-section" id="privacy" aria-labelledby="privacy-heading">
+                    <h2 id="privacy-heading">Privacy &amp; Content</h2>
+                    <p class="section-hint">Control how Ultralight filters requests and retains your browsing history.
+                    </p>
+                    <div class="settings-list">
+                        <label class="setting-row">
+                            <input type="checkbox" data-key="enable_adblock">
+                            <div class="setting-copy">
+                                <strong>Enable ad blocking</strong>
+                                <span>Filter network requests with the bundled block lists to hide intrusive ads and
+                                    trackers.</span>
+                            </div>
+                        </label>
+                        <label class="setting-row">
+                            <input type="checkbox" data-key="log_blocked_requests">
+                            <div class="setting-copy">
+                                <strong>Log blocked requests</strong>
+                                <span>Write details about each blocked request to the console for debugging filter
+                                    rules.</span>
+                            </div>
+                        </label>
+                        <label class="setting-row">
+                            <input type="checkbox" data-key="clear_history_on_exit">
+                            <div class="setting-copy">
+                                <strong>Clear history on exit</strong>
+                                <span>Remove browsing history whenever the browser closes and skip saving new
+                                    visits.</span>
+                            </div>
+                        </label>
+                    </div>
+                </section>
 
-        <section class="settings-section" id="suggestions" aria-labelledby="suggestions-heading">
-          <h2 id="suggestions-heading">Suggestions</h2>
-          <p class="section-hint">Fine-tune the autocomplete results that appear while typing.</p>
-          <div class="settings-list">
-            <label class="setting-row">
-              <input type="checkbox" data-key="enable_suggestions">
-              <div class="setting-copy">
-                <strong>Show address bar suggestions</strong>
-                <span>Surface history matches and popular sites as you type in the address field.</span>
-              </div>
-            </label>
-            <label class="setting-row">
-              <input type="checkbox" data-key="enable_suggestion_favicons">
-              <div class="setting-copy">
-                <strong>Show favicons in suggestions</strong>
-                <span>Display site icons next to suggestion rows whenever an icon is available.</span>
-              </div>
-            </label>
-          </div>
-        </section>
+                <section class="settings-section" id="suggestions" aria-labelledby="suggestions-heading">
+                    <h2 id="suggestions-heading">Suggestions</h2>
+                    <p class="section-hint">Fine-tune the autocomplete results that appear while typing.</p>
+                    <div class="settings-list">
+                        <label class="setting-row">
+                            <input type="checkbox" data-key="enable_suggestions">
+                            <div class="setting-copy">
+                                <strong>Show address bar suggestions</strong>
+                                <span>Surface history matches and popular sites as you type in the address field.</span>
+                            </div>
+                        </label>
+                        <label class="setting-row">
+                            <input type="checkbox" data-key="enable_suggestion_favicons">
+                            <div class="setting-copy">
+                                <strong>Show favicons in suggestions</strong>
+                                <span>Display site icons next to suggestion rows whenever an icon is available.</span>
+                            </div>
+                        </label>
+                    </div>
+                </section>
 
-        <section class="settings-section" id="downloads" aria-labelledby="downloads-heading">
-          <h2 id="downloads-heading">Downloads</h2>
-          <p class="section-hint">Choose how the browser notifies you about downloads as they progress.</p>
-          <div class="settings-list">
-            <label class="setting-row">
-              <input type="checkbox" data-key="show_download_badge">
-              <div class="setting-copy">
-                <strong>Show download badge</strong>
-                <span>Highlight the toolbar downloads button whenever transfers are active.</span>
-              </div>
-            </label>
-            <label class="setting-row">
-              <input type="checkbox" data-key="auto_open_download_panel">
-              <div class="setting-copy">
-                <strong>Open downloads panel automatically</strong>
-                <span>Pop open the quick downloads overlay as soon as a new download begins.</span>
-              </div>
-            </label>
-          </div>
-        </section>
-      </div>
-    </div>
+                <section class="settings-section" id="downloads" aria-labelledby="downloads-heading">
+                    <h2 id="downloads-heading">Downloads</h2>
+                    <p class="section-hint">Choose how the browser notifies you about downloads as they progress.</p>
+                    <div class="settings-list">
+                        <label class="setting-row">
+                            <input type="checkbox" data-key="show_download_badge">
+                            <div class="setting-copy">
+                                <strong>Show download badge</strong>
+                                <span>Highlight the toolbar downloads button whenever transfers are active.</span>
+                            </div>
+                        </label>
+                        <label class="setting-row">
+                            <input type="checkbox" data-key="auto_open_download_panel">
+                            <div class="setting-copy">
+                                <strong>Open downloads panel automatically</strong>
+                                <span>Pop open the quick downloads overlay as soon as a new download begins.</span>
+                            </div>
+                        </label>
+                    </div>
+                </section>
+            </div>
+        </div>
 
-    <footer class="page-footer">
-      Changes save automatically. You can close this tab when you are done.
-    </footer>
-  </main>
+        <footer class="page-footer">
+            Changes save automatically. You can close this tab when you are done.
+        </footer>
+    </main>
 
-  <script>
-    (function () {
-      const restoreBtn = document.getElementById('restore-defaults');
-      const closeBtn = document.getElementById('close-settings');
-      const doneBtn = document.getElementById('apply-settings');
-      const inputs = Array.from(document.querySelectorAll('input[type="checkbox"][data-key]'));
+    <script>
+        (function () {
+            const restoreBtn = document.getElementById('restore-defaults');
+            const closeBtn = document.getElementById('close-settings');
+            const doneBtn = document.getElementById('apply-settings');
+            const inputs = Array.from(document.querySelectorAll('input[type="checkbox"][data-key]'));
 
-      function normalizePayload(payload) {
-        if (typeof payload === 'string') {
-          try { return JSON.parse(payload || '{}'); } catch (e) { return null; }
-        }
-        return (payload && typeof payload === 'object') ? payload : null;
-      }
+            function normalizePayload(payload) {
+                if (typeof payload === 'string') {
+                    try { return JSON.parse(payload || '{}'); } catch (e) { return null; }
+                }
+                return (payload && typeof payload === 'object') ? payload : null;
+            }
 
-      function applySettingsState(payload) {
-        const state = normalizePayload(payload);
-        if (!state) return;
-        inputs.forEach((input) => {
-          const key = input.getAttribute('data-key');
-          if (Object.prototype.hasOwnProperty.call(state, key)) {
-            input.checked = !!state[key];
-          }
-        });
-      }
+            function applySettingsState(payload) {
+                const state = normalizePayload(payload);
+                if (!state) return;
+                inputs.forEach((input) => {
+                    const key = input.getAttribute('data-key');
+                    if (Object.prototype.hasOwnProperty.call(state, key)) {
+                        input.checked = !!state[key];
+                    }
+                });
+            }
 
-      function pushSetting(key, value) {
-        if (window.OnUpdateSetting) {
-          try { OnUpdateSetting(String(key || ''), !!value); } catch (e) { /* ignore */ }
-        }
-      }
+            function pushSetting(key, value) {
+                if (window.OnUpdateSetting) {
+                    try { OnUpdateSetting(String(key || ''), !!value); } catch (e) { /* ignore */ }
+                }
+            }
 
-      function refreshSnapshot() {
-        if (!window.GetSettingsSnapshot) return;
-        try {
-          const raw = GetSettingsSnapshot();
-          applySettingsState(raw);
-        } catch (e) { /* ignore */ }
-      }
+            function refreshSnapshot() {
+                if (!window.GetSettingsSnapshot) return;
+                try {
+                    const raw = GetSettingsSnapshot();
+                    applySettingsState(raw);
+                } catch (e) { /* ignore */ }
+            }
 
-      inputs.forEach((input) => {
-        input.addEventListener('change', () => {
-          const key = input.getAttribute('data-key');
-          if (!key) return;
-          pushSetting(key, input.checked);
-        });
-      });
+            inputs.forEach((input) => {
+                input.addEventListener('change', () => {
+                    const key = input.getAttribute('data-key');
+                    if (!key) return;
+                    pushSetting(key, input.checked);
+                });
+            });
 
-      restoreBtn.addEventListener('click', () => {
-        if (!window.OnRestoreSettingsDefaults) return;
-        try {
-          const raw = OnRestoreSettingsDefaults();
-          applySettingsState(raw);
-        } catch (e) { /* ignore */ }
-      });
+            restoreBtn.addEventListener('click', () => {
+                if (!window.OnRestoreSettingsDefaults) return;
+                try {
+                    const raw = OnRestoreSettingsDefaults();
+                    applySettingsState(raw);
+                } catch (e) { /* ignore */ }
+            });
 
-      function closePanel() {
-        if (window.OnCloseSettingsPanel) {
-          try { OnCloseSettingsPanel(); } catch (e) { /* ignore */ }
-        }
-      }
+            function closePanel() {
+                if (window.OnCloseSettingsPanel) {
+                    try { OnCloseSettingsPanel(); } catch (e) { /* ignore */ }
+                }
+            }
 
-      closeBtn.addEventListener('click', closePanel);
-      doneBtn.addEventListener('click', closePanel);
+            closeBtn.addEventListener('click', closePanel);
+            doneBtn.addEventListener('click', closePanel);
 
-      window.applySettingsState = applySettingsState;
+            window.applySettingsState = applySettingsState;
 
-      document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) refreshSnapshot();
-      });
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) refreshSnapshot();
+            });
 
-      window.addEventListener('focus', refreshSnapshot);
+            window.addEventListener('focus', refreshSnapshot);
 
-      document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          closePanel();
-        }
-      });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closePanel();
+                }
+            });
 
-      refreshSnapshot();
-    })();
-  </script>
+            refreshSnapshot();
+        })();
+    </script>
 </body>
 
 </html>
