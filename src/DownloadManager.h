@@ -37,6 +37,7 @@ public:
     bool CancelDownload(DownloadId id);
     bool RemoveDownload(DownloadId id);
     bool HasActiveDownloads() const;
+    void PruneStaleRequests();
 
     // DownloadListener overrides
     DownloadId NextDownloadId(ultralight::View *caller) override;

@@ -1019,9 +1019,13 @@ bool UI::RemoveDownloadItem(uint64_t id)
 
 void UI::NotifyDownloadsChanged()
 {
+  if (download_manager_)
+    download_manager_->PruneStaleRequests();
+
   bool has_active = download_manager_ ? download_manager_->HasActiveDownloads() : false;
-  if (has_active && !downloads_overlay_had_active_ && !downloads_overlay_user_dismissed_)
+  if (has_active && !downloads_overlay_had_active_)
   {
+    downloads_overlay_user_dismissed_ = false;
     ShowDownloadsOverlay();
   }
   else if (!has_active)

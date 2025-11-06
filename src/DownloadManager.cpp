@@ -13,11 +13,26 @@
 #endif
 
 #include <system_error>
+#include <algorithm>
+#include <cctype>
 
 namespace
 {
     constexpr const char *kDefaultFilename = "download";
     constexpr const char *kDownloadsFolderName = "downloads";
+
+    bool ShouldIgnoreDownloadURL(const std::string &url)
+    {
+        auto scheme_end = url.find(':');
+        if (scheme_end == std::string::npos)
+            return false;
+
+        std::string scheme = url.substr(0, scheme_end);
+        std::transform(scheme.begin(), scheme.end(), scheme.begin(), [](unsigned char c)
+                       { return static_cast<char>(std::tolower(c)); });
+
+        return scheme == "blob" || scheme == "data";
+    }
 
     std::string ToStdString(const ultralight::String &str)
     {
@@ -91,9 +106,13 @@ DownloadManager::DownloadId DownloadManager::NextDownloadId(ultralight::View *ca
 
 bool DownloadManager::OnRequestDownload(ultralight::View *caller, DownloadId id, const ultralight::String &url)
 {
+    std::string url_str = ToStdString(url);
+    if (ShouldIgnoreDownloadURL(url_str))
+        return false;
+
     std::unique_lock<std::mutex> lock(mutex_);
     auto &record = GetOrCreateRecordLocked(id);
-    record.url = ToStdString(url);
+    record.url = std::move(url_str);
     record.status = Status::Requested;
     record.error.clear();
     record.finished_at = {};
@@ -112,10 +131,14 @@ bool DownloadManager::OnRequestDownload(ultralight::View *caller, DownloadId id,
 void DownloadManager::OnBeginDownload(ultralight::View *caller, DownloadId id, const ultralight::String &url,
                                       const ultralight::String &filename, int64_t expected_content_length)
 {
+    std::string url_str = ToStdString(url);
+    if (ShouldIgnoreDownloadURL(url_str))
+        return;
+
     std::unique_lock<std::mutex> lock(mutex_);
     auto &record = GetOrCreateRecordLocked(id);
     if (record.url.empty())
-        record.url = ToStdString(url);
+        record.url = url_str;
 
     record.status = Status::InProgress;
     record.expected_bytes = expected_content_length;
@@ -351,6 +374,28 @@ bool DownloadManager::HasActiveDownloads() const
             return true;
     }
     return false;
+}
+
+void DownloadManager::PruneStaleRequests()
+{
+    constexpr auto kMaxPendingAge = std::chrono::seconds(2);
+
+    std::unique_lock<std::mutex> lock(mutex_);
+    const auto now = std::chrono::system_clock::now();
+    for (auto it = records_.begin(); it != records_.end();)
+    {
+        bool is_requested = it->second.status == Status::Requested;
+        bool has_active_stream = active_.find(it->first) != active_.end();
+        bool is_stale = (now - it->second.started_at) > kMaxPendingAge;
+
+        if (is_requested && !has_active_stream && is_stale)
+        {
+            it = records_.erase(it);
+            continue;
+        }
+
+        ++it;
+    }
 }
 
 std::filesystem::path DownloadManager::DetermineDefaultDirectory()
