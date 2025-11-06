@@ -74,6 +74,8 @@ private:
         std::chrono::system_clock::time_point finished_at;
         std::string error;
         uint64_t sequence = 0;
+        bool suppress_ui = false;
+        bool placeholder = false;
     };
 
     struct ActiveDownload

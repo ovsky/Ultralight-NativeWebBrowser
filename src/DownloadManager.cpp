@@ -132,7 +132,6 @@ bool DownloadManager::OnRequestDownload(ultralight::View *caller, DownloadId id,
         return false;
 
     std::unique_lock<std::mutex> lock(mutex_);
-    const bool was_existing = records_.find(id) != records_.end();
     auto &record = GetOrCreateRecordLocked(id);
     record.url = std::move(url_str);
     record.status = Status::Requested;
@@ -144,20 +143,13 @@ bool DownloadManager::OnRequestDownload(ultralight::View *caller, DownloadId id,
     std::string proposed_name = record.display_name;
     if (proposed_name.empty())
         proposed_name = SanitizeFilename(DeriveFilename(record.url, ""));
-
-    if (!was_existing && IsGuidLike(proposed_name))
-    {
-        records_.erase(id);
-        return false;
-    }
-
     if (record.display_name.empty())
         record.display_name = proposed_name;
-    if (record.sequence == 0)
-    {
-        record.sequence = ++start_sequence_counter_;
-        last_started_sequence_ = record.sequence;
-    }
+
+    bool looks_guid = IsGuidLike(record.display_name);
+    record.placeholder = looks_guid;
+    record.suppress_ui = true;
+    record.sequence = 0;
     record.started_at = std::chrono::system_clock::now();
     NotifyChangeLocked(lock);
     return true;
@@ -192,17 +184,21 @@ void DownloadManager::OnBeginDownload(ultralight::View *caller, DownloadId id, c
     std::string suggested = ToStdString(filename);
     std::string derived = DeriveFilename(record.url, suggested);
     std::string sanitized = SanitizeFilename(derived);
-    if (IsGuidLike(sanitized))
-    {
-        records_.erase(id);
-        NotifyChangeLocked(lock);
-        return;
-    }
-    auto full_path = EnsureUniquePath(sanitized);
+    std::string base_name;
+    if (!record.display_name.empty() && !record.placeholder)
+        base_name = record.display_name;
+    else
+        base_name = sanitized.empty() ? SanitizeFilename(DeriveFilename(record.url, "")) : sanitized;
+    if (base_name.empty())
+        base_name = kDefaultFilename;
 
-    record.display_name = full_path.filename().u8string();
+    auto full_path = EnsureUniquePath(base_name);
+
+    record.display_name = base_name;
     record.path = full_path;
     record.error.clear();
+    record.placeholder = false;
+    record.suppress_ui = false;
 
     auto stream = std::make_unique<std::ofstream>(full_path, std::ios::binary | std::ios::out);
     if (!stream->is_open())
@@ -218,6 +214,12 @@ void DownloadManager::OnBeginDownload(ultralight::View *caller, DownloadId id, c
     active.record = &record;
     active.stream = std::move(stream);
     active_[id] = std::move(active);
+
+    if (record.sequence == 0)
+    {
+        record.sequence = ++start_sequence_counter_;
+        last_started_sequence_ = record.sequence;
+    }
 
     NotifyChangeLocked(lock);
 }
@@ -289,6 +291,8 @@ std::string DownloadManager::GetDownloadsJSON()
     for (auto it = records_.rbegin(); it != records_.rend(); ++it)
     {
         const auto &rec = it->second;
+        if (rec.suppress_ui)
+            continue;
         if (!first)
             json += ',';
         first = false;
@@ -417,10 +421,15 @@ bool DownloadManager::RemoveDownload(DownloadId id)
 bool DownloadManager::HasActiveDownloads() const
 {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!active_.empty())
-        return true;
+    for (const auto &entry : active_)
+    {
+        if (entry.second.record && !entry.second.record->suppress_ui)
+            return true;
+    }
     for (const auto &entry : records_)
     {
+        if (entry.second.suppress_ui)
+            continue;
         if (entry.second.status == Status::Requested || entry.second.status == Status::InProgress)
             return true;
     }
@@ -439,18 +448,11 @@ bool DownloadManager::PruneStaleRequestsLocked(std::unique_lock<std::mutex> &loc
     bool removed = false;
     for (auto it = records_.begin(); it != records_.end();)
     {
-        if (IsGuidLike(it->second.display_name))
-        {
-            it = records_.erase(it);
-            removed = true;
-            continue;
-        }
-
         bool is_requested = it->second.status == Status::Requested;
         bool has_active_stream = active_.find(it->first) != active_.end();
         bool is_stale = (now - it->second.started_at) > kMaxPendingAge;
 
-        if (is_requested && !has_active_stream && is_stale)
+            if (it->second.placeholder && is_requested && !has_active_stream && is_stale)
         {
             it = records_.erase(it);
             removed = true;
