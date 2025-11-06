@@ -123,7 +123,6 @@ UI::~UI()
   HideDownloadsOverlay();
   HideContextMenuOverlay();
   HideSuggestionsOverlay();
-  HideSettingsOverlay();
 
   view()->set_load_listener(nullptr);
   view()->set_view_listener(nullptr);
@@ -146,11 +145,6 @@ bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
   if (menu_overlay_ && menu_overlay_->view())
   {
     menu_overlay_->view()->FireKeyEvent(evt);
-    return false;
-  }
-  if (settings_overlay_ && settings_overlay_->view())
-  {
-    settings_overlay_->view()->FireKeyEvent(evt);
     return false;
   }
   // If context menu overlay is active, route keys (eg ESC) to it and consume
@@ -327,11 +321,6 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
     menu_overlay_->view()->FireMouseEvent(evt);
     return false;
   }
-  if (settings_overlay_ && settings_overlay_->view())
-  {
-    settings_overlay_->view()->FireMouseEvent(evt);
-    return false;
-  }
   // If context menu overlay is active, route mouse events to it and consume
   if (context_menu_overlay_ && context_menu_overlay_->view())
   {
@@ -489,8 +478,6 @@ void UI::OnResize(ultralight::Window *window, uint32_t width, uint32_t height)
     menu_overlay_->Resize(window->width(), window->height());
   if (context_menu_overlay_)
     context_menu_overlay_->Resize(window->width(), window->height());
-  if (settings_overlay_)
-    settings_overlay_->Resize(window->width(), window->height());
   if (downloads_overlay_)
     LayoutDownloadsOverlay();
 
@@ -513,9 +500,9 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   bool is_ctx_view = url_utf8.data() && std::strstr(url_utf8.data(), "contextmenu.html") != nullptr;
   bool is_sugg_view = url_utf8.data() && std::strstr(url_utf8.data(), "suggestions.html") != nullptr;
   bool is_downloads_overlay_view = url_utf8.data() && std::strstr(url_utf8.data(), "downloads-panel.html") != nullptr;
-  bool is_settings_overlay_view = url_utf8.data() && std::strstr(url_utf8.data(), "settings-panel.html") != nullptr;
+  bool is_settings_page_view = url_utf8.data() && std::strstr(url_utf8.data(), "settings.html") != nullptr;
 
-  if (!is_menu_view && !is_ctx_view && !is_sugg_view && !is_downloads_overlay_view && !is_settings_overlay_view)
+  if (!is_menu_view && !is_ctx_view && !is_sugg_view && !is_downloads_overlay_view && !is_settings_page_view)
   {
     // Only main UI view has these functions
     updateBack = global["updateBack"];
@@ -601,7 +588,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     global["NativeRemoveDownload"] = BindJSCallback(&UI::OnDownloadsOverlayRemoveItem);
   }
 
-  if (is_settings_overlay_view)
+  if (is_settings_page_view)
   {
     applySettingsPanel = global["applySettingsState"];
     if (applySettingsPanel)
@@ -611,7 +598,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     }
   }
 
-  if (!is_menu_view && !is_ctx_view && !is_sugg_view && !is_downloads_overlay_view && !is_settings_overlay_view)
+  if (!is_menu_view && !is_ctx_view && !is_sugg_view && !is_downloads_overlay_view && !is_settings_page_view)
   {
     SyncAdblockStateToUI();
     SyncSettingsStateToUI();
@@ -1296,12 +1283,14 @@ void UI::OnToggleDarkMode(const JSObject &obj, const JSArgs &args)
 void UI::OnOpenSettingsPanel(const JSObject &, const JSArgs &)
 {
   HideMenuOverlay();
-  ShowSettingsOverlay();
+  RefPtr<View> child = CreateNewTabForChildView(String("file:///settings.html"));
+  if (child)
+    child->LoadURL("file:///settings.html");
 }
 
 void UI::OnCloseSettingsPanel(const JSObject &, const JSArgs &)
 {
-  HideSettingsOverlay();
+  // Legacy no-op: settings now open in a dedicated tab.
 }
 
 ultralight::JSValue UI::OnGetSettings(const JSObject &, const JSArgs &)
@@ -1394,10 +1383,33 @@ void UI::SyncSettingsStateToUI()
     applySettings({json_str});
   }
 
-  if (settings_overlay_ && settings_overlay_->view() && applySettingsPanel)
+  if (applySettingsPanel)
   {
-    RefPtr<JSContext> lock(settings_overlay_->view()->LockJSContext());
-    applySettingsPanel({json_str});
+    RefPtr<View> settings_view;
+    for (auto &entry : tabs_)
+    {
+      if (!entry.second)
+        continue;
+      auto v = entry.second->view();
+      if (!v)
+        continue;
+      auto url = v->url().utf8();
+      if (url.data() && std::strstr(url.data(), "settings.html"))
+      {
+        settings_view = v;
+        break;
+      }
+    }
+
+    if (settings_view)
+    {
+      RefPtr<JSContext> lock(settings_view->LockJSContext());
+      applySettingsPanel({json_str});
+    }
+    else
+    {
+      applySettingsPanel = JSFunction();
+    }
   }
 }
 
@@ -1472,8 +1484,6 @@ void UI::SetDarkModeEnabled(bool enabled)
     apply_to(context_menu_overlay_->view());
   if (suggestions_overlay_)
     apply_to(suggestions_overlay_->view());
-  if (settings_overlay_)
-    apply_to(settings_overlay_->view());
 }
 
 void UI::EnsureDataDirectoryExists()
@@ -1743,50 +1753,6 @@ void UI::HideMenuOverlay()
     overlay_->Focus();
   menu_overlay_->view()->set_load_listener(nullptr);
   menu_overlay_ = nullptr;
-}
-
-void UI::ShowSettingsOverlay()
-{
-  if (settings_overlay_)
-    return;
-
-  ultralight::ViewConfig cfg;
-  cfg.is_transparent = true;
-  cfg.initial_device_scale = window_->scale();
-  if (overlay_ && overlay_->view())
-  {
-    cfg.is_accelerated = overlay_->view()->is_accelerated();
-    cfg.display_id = overlay_->view()->display_id();
-  }
-
-  auto view = App::instance()->renderer()->CreateView(window_->width(), window_->height(), cfg, nullptr);
-  settings_overlay_ = Overlay::Create(window_, view, 0, 0);
-  settings_overlay_->Show();
-  settings_overlay_->Focus();
-  view->set_load_listener(this);
-  view->set_view_listener(this);
-  view->LoadURL("file:///settings-panel.html");
-  SyncSettingsStateToUI();
-}
-
-void UI::HideSettingsOverlay()
-{
-  if (!settings_overlay_)
-    return;
-
-  settings_overlay_->Hide();
-  settings_overlay_->Unfocus();
-  if (overlay_)
-    overlay_->Focus();
-
-  if (settings_overlay_->view())
-  {
-    settings_overlay_->view()->set_load_listener(nullptr);
-    settings_overlay_->view()->set_view_listener(nullptr);
-  }
-
-  settings_overlay_ = nullptr;
-  applySettingsPanel = JSFunction();
 }
 
 void UI::ShowContextMenuOverlay(int x, int y, const ultralight::String &json_info)

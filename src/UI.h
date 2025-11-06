@@ -105,8 +105,6 @@ protected:
   void ShowDownloadsOverlay();
   void HideDownloadsOverlay();
   void LayoutDownloadsOverlay();
-  void ShowSettingsOverlay();
-  void HideSettingsOverlay();
   void ShowContextMenuOverlay(int x, int y, const ultralight::String &json_info);
   void HideContextMenuOverlay();
   // Suggestions overlay (above all UI)
@@ -178,7 +176,6 @@ protected:
   RefPtr<Overlay> downloads_overlay_;
   RefPtr<Overlay> context_menu_overlay_;
   RefPtr<Overlay> suggestions_overlay_;
-  RefPtr<Overlay> settings_overlay_;
   float scale_;
   // Optional ad/tracker blocker references (may be unused in this build)
   AdBlocker *adblock_ = nullptr;
