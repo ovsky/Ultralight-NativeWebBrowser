@@ -9,8 +9,9 @@
 
 <body>
     <div class="chrome-tabs" data-chrome-tabs-instance-id="0">
-        <div class="chrome-tabs-content"></div>
-        <button id="chrome-tabs-add-tab" class="chrome-tabs-add-tab">+ New Tab</button>
+        <div class="chrome-tabs-content">
+            <button id="chrome-tabs-add-tab" class="chrome-tabs-add-tab" aria-label="New Tab"></button>
+        </div>
         <div class="chrome-tabs-bottom-bar" style="z-index: 3;"></div>
     </div>
 
@@ -97,10 +98,10 @@
         var el = document.querySelector('.chrome-tabs')
         var chromeTabs = new ChromeTabs()
         var select_next_mouseup = false;
-    var defaultFavicon = "earth.svg";
-    var suggEl = null;
-    var suggActiveIndex = -1;
-    var suggOverlayOpen = false;
+        var defaultFavicon = "earth.svg";
+        var suggEl = null;
+        var suggActiveIndex = -1;
+        var suggOverlayOpen = false;
 
         chromeTabs.init(el, {
             tabOverlapDistance: 6,

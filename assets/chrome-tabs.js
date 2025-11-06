@@ -1,4 +1,4 @@
-(function(){
+(function () {
   const isNodeContext = typeof module !== 'undefined' && typeof module.exports !== 'undefined'
   if (isNodeContext) {
     Draggabilly = require('draggabilly')
@@ -26,17 +26,26 @@
   class ChromeTabs {
     constructor() {
       this.draggabillyInstances = []
+      this.addButtonGap = 8
     }
 
     init(el, options) {
       this.el = el
       this.options = options
+      this.addButtonEl = this.el.querySelector('#chrome-tabs-add-tab')
+      const contentEl = this.tabContentEl
+      if (this.addButtonEl && contentEl && this.addButtonEl.parentNode !== contentEl) {
+        contentEl.appendChild(this.addButtonEl)
+      }
+      if (typeof this.options.addButtonGap === 'number') {
+        this.addButtonGap = this.options.addButtonGap
+      }
 
       this.instanceId = instanceId
       this.el.setAttribute('data-chrome-tabs-instance-id', this.instanceId)
       instanceId += 1
-	  
-	  this.tabId = tabId
+
+      this.tabId = tabId
 
       this.setupStyleEl()
       this.setupEvents()
@@ -57,16 +66,15 @@
     setupEvents() {
       window.addEventListener('resize', event => this.layoutTabs())
 
-      const addButtonEl = this.el.querySelector('#chrome-tabs-add-tab')
-      if (addButtonEl) {
-        addButtonEl.addEventListener('click', event => this.emit('requestNewTab'))
+      if (this.addButtonEl) {
+        this.addButtonEl.addEventListener('click', event => this.emit('requestNewTab'))
       }
 
-      this.el.addEventListener('click', ({target}) => {
+      this.el.addEventListener('click', ({ target }) => {
         if (target.classList.contains('chrome-tab')) {
           this.setCurrentTab(target)
         } else if (target.classList.contains('chrome-tab-close')) {
-		  this.emit('requestTabClose', {tabEl: target.parentNode})
+          this.emit('requestTabClose', { tabEl: target.parentNode })
         } else if (target.classList.contains('chrome-tab-title') || target.classList.contains('chrome-tab-favicon')) {
           this.setCurrentTab(target.parentNode)
         }
@@ -87,8 +95,17 @@
         return this.options.maxWidth
       }
 
-      const tabsContentWidth = Math.max(0, this.tabContentEl.clientWidth - this.options.tabOverlapDistance)
-      const width = (tabsContentWidth / tabCount) + this.options.tabOverlapDistance
+      const availableWidth = this.tabContentEl.clientWidth
+      const addButtonWidth = this.getAddButtonWidth()
+      const gap = tabCount ? this.addButtonGap : 0
+      const totalAtMax = this.calculateTabsTotalWidth(this.options.maxWidth, tabCount)
+
+      if (totalAtMax + addButtonWidth + gap <= availableWidth) {
+        return this.options.maxWidth
+      }
+
+      const availableForTabs = Math.max(0, availableWidth - addButtonWidth - gap)
+      const width = ((availableForTabs - this.options.tabOverlapDistance) / tabCount) + this.options.tabOverlapDistance
       return Math.max(this.options.minWidth, Math.min(this.options.maxWidth, width))
     }
 
@@ -113,17 +130,56 @@
 
       this.cleanUpPreviouslyDraggedTabs()
       this.tabEls.forEach((tabEl) => tabEl.style.width = tabWidth + 'px')
+      const tabPositions = this.tabPositions
       requestAnimationFrame(() => {
         let styleHTML = ''
-        this.tabPositions.forEach((left, i) => {
+        tabPositions.forEach((left, i) => {
           styleHTML += `
-            .chrome-tabs[data-chrome-tabs-instance-id="${ this.instanceId }"] .chrome-tab:nth-child(${ i + 1}) {
-              transform: translate3d(${ left }px, 0, 0)
+            .chrome-tabs[data-chrome-tabs-instance-id="${this.instanceId}"] .chrome-tab:nth-child(${i + 1}) {
+              transform: translate3d(${left}px, 0, 0)
             }
           `
         })
         this.animationStyleEl.innerHTML = styleHTML
+        this.positionAddButton(tabPositions, tabWidth)
       })
+      if (!this.tabEls.length) {
+        this.positionAddButton([], tabWidth)
+      }
+    }
+
+    positionAddButton(tabPositions, tabWidth) {
+      if (!this.addButtonEl) return
+      const buttonWidth = this.getAddButtonWidth()
+      const contentEl = this.tabContentEl
+      if (!contentEl) return
+      const maxInsideLeft = Math.max(0, contentEl.clientWidth - buttonWidth)
+      let insideLeft = 0
+
+      if (tabPositions.length) {
+        const lastLeft = tabPositions[tabPositions.length - 1]
+        const lastRight = lastLeft + tabWidth - this.options.tabOverlapDistance
+        insideLeft = Math.min(lastRight + this.addButtonGap, maxInsideLeft)
+      } else {
+        insideLeft = Math.min(this.addButtonGap, maxInsideLeft)
+      }
+
+      this.addButtonEl.style.left = `${Math.round(insideLeft)}px`
+      this.addButtonEl.style.right = 'auto'
+      this.addButtonEl.style.transform = ''
+    }
+
+    getAddButtonWidth() {
+      if (!this.addButtonEl) return 0
+      const rect = this.addButtonEl.getBoundingClientRect()
+      if (rect.width) return rect.width
+      return this.addButtonEl.offsetWidth || 0
+    }
+
+    calculateTabsTotalWidth(tabWidth, tabCount) {
+      if (!tabCount) return 0
+      const overlap = this.options.tabOverlapDistance
+      return tabWidth + (tabCount - 1) * (tabWidth - overlap)
     }
 
     fixZIndexes() {
@@ -150,15 +206,27 @@
 
     addTab(tabProperties) {
       const tabEl = this.createNewTabEl()
-	  
-	  tabEl.setAttribute('data-tab-id', tabProperties.id)
+      tabEl.setAttribute('data-tab-id', tabProperties.id)
 
       tabEl.classList.add('chrome-tab-just-added')
       setTimeout(() => tabEl.classList.remove('chrome-tab-just-added'), 500)
 
       tabProperties = Object.assign({}, defaultTabProperties, tabProperties)
-      this.tabContentEl.appendChild(tabEl)
+      const contentEl = this.tabContentEl
+      if (this.addButtonEl && contentEl && this.addButtonEl.parentNode === contentEl) {
+        contentEl.insertBefore(tabEl, this.addButtonEl)
+      } else {
+        contentEl.appendChild(tabEl)
+      }
       this.updateTab(tabEl, tabProperties)
+
+      const tabWidth = this.tabWidth
+      const tabEffectiveWidth = tabWidth - this.options.tabOverlapDistance
+      tabEl.style.width = `${ tabWidth }px`
+      const lastIndex = this.tabEls.length - 1
+      const initialLeft = Math.max(0, lastIndex * tabEffectiveWidth)
+      tabEl.style.transform = `translate3d(${ initialLeft }px, 0, 0)`
+
       this.emit('tabAdd', { tabEl })
       this.setCurrentTab(tabEl)
       this.layoutTabs()
@@ -230,7 +298,7 @@
           // Animate dragged tab back into its place
           requestAnimationFrame(() => {
             tabEl.style.left = '0'
-            tabEl.style.transform = `translate3d(${ finalTranslateX }px, 0, 0)`
+            tabEl.style.transform = `translate3d(${finalTranslateX}px, 0, 0)`
 
             requestAnimationFrame(() => {
               tabEl.classList.remove('chrome-tab-currently-dragged')

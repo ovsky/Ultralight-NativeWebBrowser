@@ -12,9 +12,6 @@
   border-radius: 0.5em 0.5em 0 0;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  display: flex;
-  align-items: center;
-  gap: 0.6em;
 }
 
 .chrome-tabs * {
@@ -24,26 +21,32 @@
 }
 
 #chrome-tabs-add-tab {
-  background: linear-gradient(0deg, #232330, #282836);
-  display: inline-flex;
+  background: linear-gradient(180deg, #212130, #1c1c24);
+  display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 15px;
+  position: absolute;
+  top: 2px;
+  left: 0;
+  padding: 0 18px;
   border: 0.8px solid #252532;
-  border-radius: 15px;
-  font-size: 12px;
-  height: 24px;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  font-size: 13px;
+  height: 37px;
   color: #c4c2d0 !important;
   cursor: pointer;
-  flex-shrink: 0;
+  z-index: 100;
+  min-width: 40px;
+  font-weight: 500;
 }
 
 #chrome-tabs-add-tab:hover {
-  background: linear-gradient(0deg, #2d2d3d, #323242);
+  background: linear-gradient(180deg, #2d2d3d, #323242);
 }
 
 #chrome-tabs-add-tab:active {
-  background: linear-gradient(0deg, #262633, #1e1e29);
+  background: linear-gradient(180deg, #262633, #1e1e29);
   box-shadow: none;
   transform: translateY(2px);
 }
@@ -60,10 +63,9 @@
 
 .chrome-tabs .chrome-tabs-content {
   position: relative;
-  flex: 1 1 auto;
+  width: 100%;
   height: 100%;
   overflow: hidden;
-  min-width: 0;
 }
 
 .chrome-tabs .chrome-tab {
@@ -213,4 +215,11 @@
 #chrome-tabs-add-tab:focus {
   outline: none;
   box-shadow: 0 0 0 2px rgba(135, 120, 255, 0.35);
+}
+
+#chrome-tabs-add-tab::after {
+  content: "+";
+  font-size: 16px;
+  line-height: 1;
+  display: block;
 }
