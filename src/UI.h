@@ -71,6 +71,8 @@ public:
   void OnDownloadsOverlayPauseItem(const JSObject &obj, const JSArgs &args);
   void OnDownloadsOverlayRemoveItem(const JSObject &obj, const JSArgs &args);
   ultralight::JSValue OnGetDarkModeEnabled(const JSObject &obj, const JSArgs &args);
+  void OnToggleAdblock(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnGetAdblockEnabled(const JSObject &obj, const JSArgs &args);
   // Suggestions callback (address bar autocomplete)
   ultralight::JSValue OnGetSuggestions(const JSObject &obj, const JSArgs &args);
   // Adjust UI overlay height for suggestions dropdown
@@ -118,6 +120,7 @@ protected:
   bool RemoveDownloadItem(uint64_t id);
   void NotifyDownloadsChanged();
   void OnNewDownloadStarted();
+  void SyncAdblockStateToUI();
 
   // Suggestions / persistence helpers
   void LoadPopularSites();
@@ -185,6 +188,7 @@ protected:
   int inspector_resize_begin_height_;
   int inspector_resize_begin_mouse_y_;
   bool address_bar_is_focused_ = false;
+  bool adblock_enabled_cached_ = true;
 
   JSFunction updateBack;
   JSFunction updateForward;
@@ -195,6 +199,7 @@ protected:
   JSFunction closeTab;
   JSFunction focusAddressBar;
   JSFunction isAddressBarFocused;
+  JSFunction updateAdblockEnabled;
   // Context menu setup function in overlay view
   JSFunction setupContextMenu;
   JSFunction setupSuggestions;
