@@ -1055,12 +1055,6 @@ void UI::NotifyDownloadsChanged()
     downloads_overlay_user_dismissed_ = false;
     ShowDownloadsOverlay();
   }
-  else if (!has_active)
-  {
-    downloads_overlay_user_dismissed_ = false;
-    if (downloads_overlay_)
-      HideDownloadsOverlay();
-  }
   downloads_overlay_had_active_ = has_active;
 
   for (auto &entry : tabs_)

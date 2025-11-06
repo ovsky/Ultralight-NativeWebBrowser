@@ -192,6 +192,12 @@ void DownloadManager::OnBeginDownload(ultralight::View *caller, DownloadId id, c
     std::string suggested = ToStdString(filename);
     std::string derived = DeriveFilename(record.url, suggested);
     std::string sanitized = SanitizeFilename(derived);
+    if (IsGuidLike(sanitized))
+    {
+        records_.erase(id);
+        NotifyChangeLocked(lock);
+        return;
+    }
     auto full_path = EnsureUniquePath(sanitized);
 
     record.display_name = full_path.filename().u8string();
@@ -433,6 +439,13 @@ bool DownloadManager::PruneStaleRequestsLocked(std::unique_lock<std::mutex> &loc
     bool removed = false;
     for (auto it = records_.begin(); it != records_.end();)
     {
+        if (IsGuidLike(it->second.display_name))
+        {
+            it = records_.erase(it);
+            removed = true;
+            continue;
+        }
+
         bool is_requested = it->second.status == Status::Requested;
         bool has_active_stream = active_.find(it->first) != active_.end();
         bool is_stale = (now - it->second.started_at) > kMaxPendingAge;
