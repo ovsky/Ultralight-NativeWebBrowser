@@ -91,6 +91,28 @@ namespace
             return s;
         return s.substr(0, qpos);
     }
+
+    std::string TrimTrailingDigitsAfterExtension(const std::string &name)
+    {
+        size_t dot = name.find_last_of('.');
+        if (dot == std::string::npos || dot + 1 >= name.size())
+            return name;
+
+        size_t end = name.size();
+        while (end > dot + 1 && std::isdigit(static_cast<unsigned char>(name[end - 1])))
+        {
+            --end;
+        }
+
+        if (end == name.size())
+            return name; // nothing trimmed
+
+        // Ensure we still have at least one character in extension
+        if (end <= dot + 1)
+            return name;
+
+        return name.substr(0, end);
+    }
 } // namespace
 
 DownloadManager::DownloadManager()
@@ -140,13 +162,12 @@ bool DownloadManager::OnRequestDownload(ultralight::View *caller, DownloadId id,
     record.path.clear();
     record.expected_bytes = -1;
     record.received_bytes = 0;
-    std::string proposed_name = record.display_name;
-    if (proposed_name.empty())
-        proposed_name = SanitizeFilename(DeriveFilename(record.url, ""));
-    if (record.display_name.empty())
-        record.display_name = proposed_name;
+    record.preferred_name = TrimTrailingDigitsAfterExtension(SanitizeFilename(DeriveFilename(record.url, "")));
+    if (record.preferred_name.empty())
+        record.preferred_name = kDefaultFilename;
+    record.display_name = record.preferred_name;
 
-    bool looks_guid = IsGuidLike(record.display_name);
+    bool looks_guid = IsGuidLike(record.preferred_name);
     record.placeholder = looks_guid;
     record.suppress_ui = true;
     record.sequence = 0;
@@ -183,18 +204,18 @@ void DownloadManager::OnBeginDownload(ultralight::View *caller, DownloadId id, c
 
     std::string suggested = ToStdString(filename);
     std::string derived = DeriveFilename(record.url, suggested);
-    std::string sanitized = SanitizeFilename(derived);
-    std::string base_name;
-    if (!record.display_name.empty() && !record.placeholder)
-        base_name = record.display_name;
-    else
-        base_name = sanitized.empty() ? SanitizeFilename(DeriveFilename(record.url, "")) : sanitized;
+    std::string sanitized = TrimTrailingDigitsAfterExtension(SanitizeFilename(derived));
+    std::string base_name = sanitized;
+    if (base_name.empty())
+        base_name = record.preferred_name;
     if (base_name.empty())
         base_name = kDefaultFilename;
 
+    base_name = TrimTrailingDigitsAfterExtension(base_name);
+
     auto full_path = EnsureUniquePath(base_name);
 
-    record.display_name = base_name;
+    record.display_name = full_path.filename().u8string();
     record.path = full_path;
     record.error.clear();
     record.placeholder = false;
