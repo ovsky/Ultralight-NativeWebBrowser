@@ -34,6 +34,27 @@ namespace
         return scheme == "blob" || scheme == "data";
     }
 
+    bool IsGuidLike(const std::string &name)
+    {
+        if (name.size() != 36)
+            return false;
+
+        for (size_t i = 0; i < name.size(); ++i)
+        {
+            if (i == 8 || i == 13 || i == 18 || i == 23)
+            {
+                if (name[i] != '-')
+                    return false;
+                continue;
+            }
+
+            if (!std::isxdigit(static_cast<unsigned char>(name[i])))
+                return false;
+        }
+
+        return true;
+    }
+
     std::string ToStdString(const ultralight::String &str)
     {
         auto utf8 = str.utf8();
@@ -111,6 +132,7 @@ bool DownloadManager::OnRequestDownload(ultralight::View *caller, DownloadId id,
         return false;
 
     std::unique_lock<std::mutex> lock(mutex_);
+    const bool was_existing = records_.find(id) != records_.end();
     auto &record = GetOrCreateRecordLocked(id);
     record.url = std::move(url_str);
     record.status = Status::Requested;
@@ -119,9 +141,22 @@ bool DownloadManager::OnRequestDownload(ultralight::View *caller, DownloadId id,
     record.path.clear();
     record.expected_bytes = -1;
     record.received_bytes = 0;
-    if (record.display_name.empty())
+    std::string proposed_name = record.display_name;
+    if (proposed_name.empty())
+        proposed_name = SanitizeFilename(DeriveFilename(record.url, ""));
+
+    if (!was_existing && IsGuidLike(proposed_name))
     {
-        record.display_name = SanitizeFilename(DeriveFilename(record.url, ""));
+        records_.erase(id);
+        return false;
+    }
+
+    if (record.display_name.empty())
+        record.display_name = proposed_name;
+    if (record.sequence == 0)
+    {
+        record.sequence = ++start_sequence_counter_;
+        last_started_sequence_ = record.sequence;
     }
     record.started_at = std::chrono::system_clock::now();
     NotifyChangeLocked(lock);
@@ -143,6 +178,11 @@ void DownloadManager::OnBeginDownload(ultralight::View *caller, DownloadId id, c
     record.status = Status::InProgress;
     record.expected_bytes = expected_content_length;
     record.received_bytes = 0;
+    if (record.sequence == 0)
+    {
+        record.sequence = ++start_sequence_counter_;
+        last_started_sequence_ = record.sequence;
+    }
     record.started_at = std::chrono::system_clock::now();
     record.error.clear();
     record.finished_at = {};
@@ -234,9 +274,10 @@ void DownloadManager::OnFailDownload(ultralight::View *caller, DownloadId id)
     NotifyChangeLocked(lock);
 }
 
-std::string DownloadManager::GetDownloadsJSON() const
+std::string DownloadManager::GetDownloadsJSON()
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
+    bool pruned = PruneStaleRequestsLocked(lock, std::chrono::system_clock::now(), false);
     std::string json = "{\"items\":[";
     bool first = true;
     for (auto it = records_.rbegin(); it != records_.rend(); ++it)
@@ -261,6 +302,10 @@ std::string DownloadManager::GetDownloadsJSON() const
         json += "}";
     }
     json += "]}";
+    auto callback = on_change_;
+    lock.unlock();
+    if (pruned && callback)
+        callback();
     return json;
 }
 
@@ -376,12 +421,16 @@ bool DownloadManager::HasActiveDownloads() const
     return false;
 }
 
-void DownloadManager::PruneStaleRequests()
+uint64_t DownloadManager::last_started_sequence() const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return last_started_sequence_;
+}
+
+bool DownloadManager::PruneStaleRequestsLocked(std::unique_lock<std::mutex> &lock, std::chrono::system_clock::time_point now, bool notify)
 {
     constexpr auto kMaxPendingAge = std::chrono::seconds(2);
-
-    std::unique_lock<std::mutex> lock(mutex_);
-    const auto now = std::chrono::system_clock::now();
+    bool removed = false;
     for (auto it = records_.begin(); it != records_.end();)
     {
         bool is_requested = it->second.status == Status::Requested;
@@ -391,11 +440,29 @@ void DownloadManager::PruneStaleRequests()
         if (is_requested && !has_active_stream && is_stale)
         {
             it = records_.erase(it);
+            removed = true;
             continue;
         }
 
         ++it;
     }
+
+    if (removed && notify)
+    {
+        auto callback = on_change_;
+        lock.unlock();
+        if (callback)
+            callback();
+        lock.lock();
+    }
+
+    return removed;
+}
+
+void DownloadManager::PruneStaleRequests()
+{
+    std::unique_lock<std::mutex> lock(mutex_);
+    PruneStaleRequestsLocked(lock, std::chrono::system_clock::now(), true);
 }
 
 std::filesystem::path DownloadManager::DetermineDefaultDirectory()

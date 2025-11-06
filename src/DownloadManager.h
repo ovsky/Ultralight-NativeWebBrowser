@@ -30,7 +30,7 @@ public:
 
     void SetOnChangeCallback(std::function<void()> callback);
 
-    std::string GetDownloadsJSON() const;
+    std::string GetDownloadsJSON();
     void ClearFinishedDownloads();
     bool OpenDownload(DownloadId id) const;
     bool RevealDownload(DownloadId id) const;
@@ -38,6 +38,7 @@ public:
     bool RemoveDownload(DownloadId id);
     bool HasActiveDownloads() const;
     void PruneStaleRequests();
+    uint64_t last_started_sequence() const;
 
     // DownloadListener overrides
     DownloadId NextDownloadId(ultralight::View *caller) override;
@@ -72,6 +73,7 @@ private:
         std::chrono::system_clock::time_point started_at;
         std::chrono::system_clock::time_point finished_at;
         std::string error;
+        uint64_t sequence = 0;
     };
 
     struct ActiveDownload
@@ -98,5 +100,9 @@ private:
     DownloadId next_id_ = 1;
     std::map<DownloadId, DownloadRecord> records_;
     std::unordered_map<DownloadId, ActiveDownload> active_;
+    uint64_t start_sequence_counter_ = 0;
+    uint64_t last_started_sequence_ = 0;
     std::function<void()> on_change_;
+
+    bool PruneStaleRequestsLocked(std::unique_lock<std::mutex> &lock, std::chrono::system_clock::time_point now, bool notify);
 };

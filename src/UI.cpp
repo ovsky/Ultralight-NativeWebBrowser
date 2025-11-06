@@ -21,6 +21,11 @@ static UI *g_ui = 0;
 
 #define UI_HEIGHT 80
 
+namespace
+{
+  constexpr int kDownloadsOverlaySpacing = 8;
+}
+
 UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
                                 is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false)
 {
@@ -310,8 +315,20 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
   }
   if (downloads_overlay_ && downloads_overlay_->view())
   {
-    downloads_overlay_->view()->FireMouseEvent(evt);
-    return false;
+    int overlay_x = downloads_overlay_->x();
+    int overlay_y = downloads_overlay_->y();
+    uint32_t overlay_w = downloads_overlay_->width();
+    uint32_t overlay_h = downloads_overlay_->height();
+
+    if (evt.x >= overlay_x && evt.x < overlay_x + static_cast<int>(overlay_w) &&
+        evt.y >= overlay_y && evt.y < overlay_y + static_cast<int>(overlay_h))
+    {
+      ultralight::MouseEvent adjusted = evt;
+      adjusted.x -= overlay_x;
+      adjusted.y -= overlay_y;
+      downloads_overlay_->view()->FireMouseEvent(adjusted);
+      return false;
+    }
   }
 
   // Handle right-clicks globally (both navbar/UI and page content)
@@ -441,6 +458,8 @@ void UI::OnResize(ultralight::Window *window, uint32_t width, uint32_t height)
     menu_overlay_->Resize(window->width(), window->height());
   if (context_menu_overlay_)
     context_menu_overlay_->Resize(window->width(), window->height());
+  if (downloads_overlay_)
+    LayoutDownloadsOverlay();
 
   for (auto &tab : tabs_)
   {
@@ -1020,7 +1039,15 @@ bool UI::RemoveDownloadItem(uint64_t id)
 void UI::NotifyDownloadsChanged()
 {
   if (download_manager_)
+  {
     download_manager_->PruneStaleRequests();
+    uint64_t latest_sequence = download_manager_->last_started_sequence();
+    if (latest_sequence != 0 && latest_sequence != downloads_last_sequence_seen_)
+    {
+      downloads_last_sequence_seen_ = latest_sequence;
+      OnNewDownloadStarted();
+    }
+  }
 
   bool has_active = download_manager_ ? download_manager_->HasActiveDownloads() : false;
   if (has_active && !downloads_overlay_had_active_)
@@ -1141,8 +1168,18 @@ void UI::ShowDownloadsOverlay()
     cfg.display_id = overlay_->view()->display_id();
   }
 
-  auto view = App::instance()->renderer()->CreateView(window_->width(), window_->height(), cfg, nullptr);
-  downloads_overlay_ = Overlay::Create(window_, view, 0, 0);
+  int overlay_top = ui_height_ + kDownloadsOverlaySpacing;
+  if (overlay_top < 0)
+    overlay_top = 0;
+  uint32_t overlay_height = window_->height();
+  if (overlay_height > (uint32_t)overlay_top)
+    overlay_height -= static_cast<uint32_t>(overlay_top);
+  else
+    overlay_height = 1;
+
+  auto view = App::instance()->renderer()->CreateView(window_->width(), overlay_height, cfg, nullptr);
+  downloads_overlay_ = Overlay::Create(window_, view, 0, overlay_top);
+  LayoutDownloadsOverlay();
   downloads_overlay_->Show();
   downloads_overlay_->Focus();
   view->set_load_listener(this);
@@ -1168,6 +1205,29 @@ void UI::HideDownloadsOverlay()
   }
 
   downloads_overlay_ = nullptr;
+}
+
+void UI::LayoutDownloadsOverlay()
+{
+  if (!downloads_overlay_)
+    return;
+
+  int overlay_top = ui_height_ + kDownloadsOverlaySpacing;
+  if (overlay_top < 0)
+    overlay_top = 0;
+
+  uint32_t overlay_width = window_->width();
+  uint32_t overlay_height = window_->height();
+  if (overlay_height > static_cast<uint32_t>(overlay_top))
+    overlay_height -= static_cast<uint32_t>(overlay_top);
+  else
+    overlay_height = 1;
+
+  downloads_overlay_->MoveTo(0, overlay_top);
+  downloads_overlay_->Resize(overlay_width, overlay_height);
+
+  if (auto view = downloads_overlay_->view())
+    view->Resize(overlay_width, overlay_height);
 }
 
 void UI::OnMenuOpen(const JSObject &obj, const JSArgs &args)
@@ -1214,6 +1274,8 @@ void UI::AdjustUIHeight(uint32_t new_height)
   overlay_->Resize(window_->width(), ui_height_);
 
   // Note: Do NOT move or resize tabs here; we only enlarge the UI overlay canvas.
+  if (downloads_overlay_)
+    LayoutDownloadsOverlay();
 }
 
 void UI::OnSuggestOpen(const JSObject &obj, const JSArgs &args)
@@ -2398,4 +2460,10 @@ void UI::OnSuggestionPaste(const JSObject &obj, const JSArgs &args)
   }
   // keep focus on address bar for continued typing
   address_bar_is_focused_ = true;
+}
+
+void UI::OnNewDownloadStarted()
+{
+  downloads_overlay_user_dismissed_ = false;
+  ShowDownloadsOverlay();
 }

@@ -97,6 +97,7 @@ protected:
   void HideMenuOverlay();
   void ShowDownloadsOverlay();
   void HideDownloadsOverlay();
+  void LayoutDownloadsOverlay();
   void ShowContextMenuOverlay(int x, int y, const ultralight::String &json_info);
   void HideContextMenuOverlay();
   // Suggestions overlay (above all UI)
@@ -116,6 +117,7 @@ protected:
   bool PauseDownloadItem(uint64_t id);
   bool RemoveDownloadItem(uint64_t id);
   void NotifyDownloadsChanged();
+  void OnNewDownloadStarted();
 
   // Suggestions / persistence helpers
   void LoadPopularSites();
@@ -163,6 +165,7 @@ protected:
   std::unique_ptr<DownloadManager> download_manager_;
   bool downloads_overlay_had_active_ = false;
   bool downloads_overlay_user_dismissed_ = false;
+  uint64_t downloads_last_sequence_seen_ = 0;
   // Transient context menu state
   std::pair<int, int> pending_ctx_position_ = {0, 0};
   ultralight::String pending_ctx_info_json_;

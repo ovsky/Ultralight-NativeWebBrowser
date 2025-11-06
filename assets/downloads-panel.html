@@ -28,7 +28,7 @@
 
         #downloads-dropdown {
             position: fixed;
-            top: 40px;
+            top: 12px;
             right: 10px;
             width: 320px;
             max-height: 380px;
@@ -40,6 +40,22 @@
             flex-direction: column;
             overflow: hidden;
             backdrop-filter: blur(12px);
+            transform: translateY(-12px);
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.18s ease, opacity 0.18s ease;
+        }
+
+        body.is-visible #downloads-dropdown {
+            transform: translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        body.is-closing #downloads-dropdown {
+            transform: translateY(-12px);
+            opacity: 0;
+            pointer-events: none;
         }
 
         header {
@@ -83,7 +99,7 @@
             padding: 10px 16px;
         }
 
-        .item + .item {
+        .item+.item {
             border-top: 1px solid rgba(255, 255, 255, 0.06);
         }
 
@@ -233,22 +249,31 @@
         <div id="downloads-dropdown" role="dialog" aria-label="Downloads preview">
             <header>
                 <h1>Downloads</h1>
-                <button id="downloads-clear" class="btn" type="button">Clear finished</button>
+                <button id="close-panel" class="btn" type="button">Close</button>
             </header>
             <div id="downloads-list" class="list"></div>
             <div id="downloads-empty" class="empty">No downloads yet.</div>
             <footer>
+                <button id="downloads-clear" class="btn" type="button">Clear finished</button>
                 <button id="open-downloads-page" class="link-btn" type="button">Open downloads page</button>
-                <button id="close-panel" class="btn" type="button">Close</button>
             </footer>
         </div>
     </div>
 
     <script>
         const MAX_ITEMS = 8;
+        let isClosing = false;
 
         function closePanel() {
-            try { if (window.OnDownloadsOverlayClose) OnDownloadsOverlayClose(); } catch { }
+            if (isClosing) return;
+            isClosing = true;
+            document.body.classList.remove('is-visible');
+            document.body.classList.add('is-closing');
+            setTimeout(() => {
+                try { if (window.OnDownloadsOverlayClose) OnDownloadsOverlayClose(); } catch { }
+                document.body.classList.remove('is-closing');
+                isClosing = false;
+            }, 160);
         }
 
         function fmtBytes(bytes) {
@@ -327,9 +352,10 @@
 
                 card.appendChild(meta);
 
-                const isActive = item.status === 'in-progress' || item.status === 'requested';
+                const isDownloading = item.status === 'in-progress';
+                const isCompletedState = item.status === 'completed' || item.status === 'failed' || item.status === 'cancelled';
 
-                if (isActive) {
+                if (isDownloading) {
                     const progress = document.createElement('div');
                     progress.className = 'progress';
                     const bar = document.createElement('span');
@@ -370,7 +396,7 @@
                     actions.appendChild(revealBtn);
                 }
 
-                if (isActive) {
+                if (isDownloading) {
                     const pauseBtn = document.createElement('button');
                     pauseBtn.className = 'btn';
                     pauseBtn.type = 'button';
@@ -381,7 +407,8 @@
                     });
                     actions.appendChild(pauseBtn);
                 } else {
-                    hasFinished = true;
+                    if (isCompletedState)
+                        hasFinished = true;
                     const removeBtn = document.createElement('button');
                     removeBtn.className = 'btn';
                     removeBtn.type = 'button';
@@ -443,6 +470,8 @@
         });
 
         document.addEventListener('DOMContentLoaded', () => {
+            document.body.classList.remove('is-closing');
+            requestAnimationFrame(() => document.body.classList.add('is-visible'));
             let tries = 0;
             const tick = () => {
                 if (window.NativeGetDownloads) { refresh(); return; }
