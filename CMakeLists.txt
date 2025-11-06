@@ -90,6 +90,12 @@ set(SOURCES "src/Browser.h"
 
 add_app(Ultralight-WebBrowser ${SOURCES})
 
+# Work around GCC 11 ICE on aarch64 when compiling UI.cpp at higher optimisation levels
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+  message(STATUS "Applying GCC/aarch64 workaround: forcing -O1 for src/UI.cpp")
+  set_source_files_properties(src/UI.cpp PROPERTIES COMPILE_OPTIONS "-O1")
+endif()
+
 # --- Define simple tests when enabled ---
 if(BUILD_TESTING)
   # Verify SDK basics
