@@ -1,45 +1,48 @@
-# Ultralight Web Browser
+# Ultralight Web Browser ✨
 > Ultra‑fast • Ultra‑light • Ultra‑portable
 
-[![Build - Linux (x64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux.yml?query=branch%3Adev)
-[![Build - macOS (x64/arm64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos.yml?query=branch%3Adev)
-[![Build - Windows (x64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-windows.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-windows.yml?query=branch%3Adev)
+[![Build - Linux (x64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux.yml?query=branch%3Amain)
+[![Build - macOS (x64/arm64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos.yml?query=branch%3Amain)
+[![Build - Windows (x64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-windows.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-windows.yml?query=branch%3Amain)
+[![Build - Linux (ARM64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux-arm64.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux-arm64.yml?query=branch%3Amain)
+[![Build - macOS (x64/arm64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos-arm64.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos-arm64.yml?query=branch%3Amain)
 
 <p align="center">
   <img src="https://github.com/ultralight-ux/Ultralight/raw/master/media/logo.png" width="200" alt="Ultralight Logo">
 </p>
 
-**A native C++ proof‑of‑concept browser focused on minimal overhead, cold‑start speed, and resource efficiency.**  
+<strong>A native C++ proof‑of‑concept browser focused on minimal overhead, cold‑start speed, and resource efficiency.</strong><br/>
 No multi‑process bloat, no background daemons, no gigabytes of RAM for a handful of tabs—just a lean renderer + native UI.
 
-> Status: Experimental / Educational. Not intended as a production security‑hardened browser.
+> Status: Experimental / Educational / Pre-Production
 
 ---
 
-## Table of Contents
-1. [Why Ultralight?](#-why-ultralight-ditch-the-bloat)  
-2. [Project Philosophy & Goals](#-project-philosophy--goals)  
-3. [Supported Platforms & Architectures](#-supported-platforms--architectures)  
-4. [Downloads](#-get-the-app)  
-5. [Installation](#-installation)  
-6. [Features](#-features)  
-7. [Tech Stack](#-tech-stack)  
-8. [Building From Source](#-build-from-source)  
-9. [ARM64 Build Notes](#-arm64-build-notes)  
-10. [JavaScript Bridge API](#-javascript-bridge-api-window__ul)  
-11. [Packaging](#-create-packages-locally-optional)  
-12. [CI / Automation](#-ci--automation)  
-13. [Roadmap](#-roadmap--ideas)  
-14. [Troubleshooting](#-troubleshooting)  
-15. [Contributing](#-contributing)  
-16. [Security & Privacy](#-security--privacy)  
-17. [License](#-license)  
+## 🧭 Table of Contents
+1. [Why Ultralight?](#-why-ultralight-ditch-the-bloat)
+2. [Project Philosophy & Goals](#-project-philosophy--goals)
+3. [Supported Platforms & Architectures](#-supported-platforms--architectures)
+4. [Get the App](#-get-the-app)
+5. [Installation](#-installation)
+6. [Features](#-features)
+7. [Tech Stack](#-tech-stack)
+8. [Build From Source](#-build-from-source)
+9. [ARM64 Build Notes](#-arm64-build-notes)
+10. [JavaScript Bridge API](#-javascript-bridge-api-window__ul)
+11. [Create Packages Locally](#-create-packages-locally-optional)
+12. [CI / Automation](#-ci--automation)
+13. [Roadmap](#-roadmap--ideas)
+14. [Troubleshooting](#-troubleshooting)
+15. [Contributing](#-contributing)
+16. [Security & Privacy](#-security--privacy)
+17. [License](#-license)
 18. [Acknowledgements](#-acknowledgements)
+19. [Disclaimer](#-disclaimer)
 
 ---
 
-## 🚀 Why Ultralight? Ditch the Bloat.
-Traditional browsers (and desktop web stacks like Electron / CEF) embed full, sandboxed operating systems (Chromium). They are powerful—but heavy. This project explores how far you can go by combining a **GPU‑accelerated HTML/CSS/JS renderer** (Ultralight) with a **thin native shell**.
+## 🚀 Why Ultralight? Ditch the Bloat
+Traditional browsers (and desktop web stacks like Electron / CEF) embed full, sandboxed operating systems (Chromium). They are powerful—but heavy. This project explores how far you can go by combining a lightweight GPU renderer with a native shell for a dramatically smaller footprint and near‑instant startup.
 
 ![Ultralight Memory Usage](https://ultralig.ht/media/base-memory-usage.webp)
 
@@ -50,12 +53,12 @@ Result: lower memory pressure, near‑instant cold starts, smaller footprint, si
 ## 🎯 Project Philosophy & Goals
 | Feature | Ultralight (This Project) | Electron / CEF |
 |--------|---------------------------|----------------|
-| Performance | Up to 6× faster in simple page render ops | Chromium baseline |
-| Memory Usage | ~1/10 RAM (no multi-process sandbox) | High (multi-process JS + GPU + extensions) |
-| Startup | < 1s typical | 3–5s cold start |
-| Disk Footprint | ~30–50 MB packaged | 1+ GB (runtime + cache) |
-| Rendering | Lightweight GPU | Full Chromium stack |
-| Architecture | Native C++ + pixel buffer compositing | Node.js + Chromium + interop bridge |
+| Performance | Up to 6× faster in simple page render ops ⚡ | Chromium baseline |
+| Memory Usage | ~1/10 RAM (no multi-process sandbox) 🧠 | High (multi-process JS + GPU + extensions) |
+| Startup | < 1s typical 🚀 | 3–5s cold start |
+| Disk Footprint | ~30–50 MB packaged 📦 | 1+ GB (runtime + cache) |
+| Rendering | Lightweight GPU 🎨 | Full Chromium stack |
+| Architecture | Native C++ + pixel buffer compositing 🧱 | Node.js + Chromium + interop bridge |
 
 Goals:
 - Showcase minimal native browser shell design.
@@ -70,9 +73,9 @@ Goals:
 |----------|---------------|--------------|-------|
 | Windows 10+ | x64 | Portable ZIP, optional NSIS installer | arm64 not yet published (needs arm64 SDK + runner) |
 | macOS 12+ | x64, arm64 | TGZ, optional DMG | arm64 auto‑detected when runner host is arm64 |
-| Linux (Ubuntu/Fedora etc.) | x64 (arm64 SDK logic present) | TGZ / DEB / RPM | arm64 requires arm64 runner; workflow includes detection & fallback |
+| Linux (Ubuntu/Fedora etc.) | x64 (arm64 logic present) | TGZ / DEB / RPM | arm64 requires aarch64 runner; workflow includes detection & fallback |
 
-ARM64 archives are probed automatically when available in the `base-sdk` branch (eg: `ultralight-free-sdk-<ver>-linux-arm64.7z`, `...-mac-arm64.7z`). Current public CI uses x64 runners; arm64 builds must be triggered via:
+ARM64 archives are probed automatically when available in the `base-sdk` branch (eg: `ultralight-free-sdk-<ver>-linux-arm64.7z`, `...-mac-arm64.7z`). Current public CI uses x64 runners; arm64 builds may require:
 - Self‑hosted runner (Apple Silicon / aarch64 Linux)
 - Future strategy matrix addition (see CI section)
 
@@ -80,34 +83,40 @@ ARM64 archives are probed automatically when available in the `base-sdk` branch 
 
 ## 📥 Get the App
 Official tagged releases:  
-[**Releases Page → Ultralight Web Browser**](https://github.com/ovsky/Ultralight-WebBrowser/releases)
+[🎉 Releases Page → Ultralight Web Browser](https://github.com/ovsky/Ultralight-WebBrowser/releases)
 
 Development (continuous) artifacts (latest successful `dev` workflow runs):
-| Platform | Packages | Latest Runs |
-|----------|----------|-------------|
-| Linux | TGZ, DEB, RPM | [Open runs](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux.yml?query=branch%3Adev) |
-| macOS | TGZ, DMG | [Open runs](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos.yml?query=branch%3Adev) |
-| Windows | ZIP (portable) / optional Installer | [Open runs](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-windows.yml?query=branch%3Adev) |
+
+| Platform | Architectures | Packages | Latest Runs |
+|----------|----------------|----------|-------------|
+| Linux | x64, arm64* | TGZ, DEB, RPM | [Open runs](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux.yml?query=branch%3Adev) |
+| macOS | x64, arm64 | TGZ, DMG | [Open runs](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos.yml?query=branch%3Adev) |
+| Windows | x64 | ZIP (portable) / optional Installer | [Open runs](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-windows.yml?query=branch%3Adev) |
+
+Notes:
+- ✅ macOS arm64 artifacts are produced automatically when the CI runner is Apple Silicon.
+- ✅ Linux arm64 artifacts appear when an aarch64 runner is used or when `ULTRALIGHT_SDK_URL` points to an arm64 SDK.
+- ⌛ Windows arm64 artifacts are not yet published (pending arm64 SDK + toolchain).
 
 How to fetch artifacts:
-1. Open the workflow link.
-2. Click the latest green run.
-3. Scroll to “Artifacts” (bottom) and download.
+1. Open the workflow link for your platform/arch.
+2. Click the latest green run (success).
+3. Scroll to “Artifacts” (bottom) and download the desired archive.
 
 ---
 
 ## 📦 Installation
 
-### Windows
+### Windows (x64)
 1. Download `Ultralight-WebBrowser-*-Windows-Portable.zip`.
 2. Extract & run `Ultralight-WebBrowser.exe`.
 3. Optional: Run installer (`*-Windows-Installer.exe`) if generated.
 
-### macOS
+### macOS (x64/arm64)
 - TGZ: Extract, move folder anywhere, run `Ultralight-WebBrowser`.
 - DMG: Mount, drag the app folder to `/Applications` (or preferred location), run the binary.
 
-### Linux
+### Linux (x64/arm64)
 DEB (Debian/Ubuntu):
 ```bash
 sudo apt install ./Ultralight-WebBrowser-*.deb
@@ -128,27 +137,27 @@ Packages install a desktop entry and icon + CLI launcher `ultralight-webbrowser`
 ---
 
 ## ✨ Features
-- **GPU‑Accelerated Rendering** (Ultralight core)
-- **Low Memory Footprint** (single process shell)
-- **HTML5 / CSS3 / Modern JS Support**
-- **Native C++17 Application Layer**
-- **Multi‑Tab Interface**
-- **Navigation Controls** (Back / Forward / Reload / Stop / Address bar)
-- **Dynamic Page Title + Loading Indicators**
-- **Responsive Resize**
-- **Lightweight Ad & Tracker Filtering**  
+- GPU‑Accelerated Rendering (Ultralight core)
+- Low Memory Footprint (single process shell)
+- HTML5 / CSS3 / Modern JS Support
+- Native C++17 Application Layer
+- Multi‑Tab Interface
+- Navigation Controls (Back / Forward / Reload / Stop / Address bar)
+- Dynamic Page Title + Loading Indicators
+- Responsive Resize
+- Lightweight Ad & Tracker Filtering  
   - Domain + substring + simple glob patterns  
   - Rule sources: `assets/blocklist.txt` + all additional `.txt` in `assets/filters/`  
   - Formats: `example.com`, `0.0.0.0 example.com`, `||example.com^`, `/ads.js`, `*://*/*analytics*.js`  
   - Always allowed: `file://`, `data:`  
   - Requires SDK network interception capabilities  
-- **Dark Mode (Global Toggle)**
-- **Local In‑Memory History** (non‑persistent)
-- **Favicon Support**
-- **Autosuggestion / Autocompletion**
-- **Download Manager + UI**
-- **Context Menu / Shortcut Map Systems**
-- **JavaScript ↔ Native Bridge** (`window.__ul`)
+- Dark Mode (Global Toggle)
+- Local In‑Memory History (non‑persistent)
+- Favicon Support
+- Autosuggestion / Autocompletion
+- Download Manager + UI
+- Context Menu / 🔤 Shortcut Map Systems
+- JavaScript ↔ Native Bridge (`window.__ul`)
 
 ---
 
@@ -294,7 +303,7 @@ Environment variables / inputs:
 | `PACKAGE_GENERATORS` (Linux/macOS) | CPack generator list (`TGZ;DEB;RPM`, `TGZ;DMG`, etc.) |
 | `CREATE_INSTALLER` (Windows) | Build NSIS installer when true |
 
-### Suggested Future Enhancement (ARM64 Matrix)
+### 🚧 Suggested Future Enhancement (ARM64 Matrix)
 ```yaml
 strategy:
   matrix:
@@ -307,7 +316,7 @@ Set `TARGET_ARCH` and select appropriate SDK archive per matrix entry.
 ---
 
 ## 🗺️ Roadmap / Ideas
-Completed:
+✅ Completed:
 - Context Menu
 - Local History
 - Optimized Filtering System
@@ -320,7 +329,7 @@ Completed:
 - Download Manager & UI
 - Tab UX Improvements
 
-Planned / Open:
+🧩 Planned / Open:
 - Bookmark System
 - Plugin / Script Injection API
 - Settings Panel (flags & experimental toggles)
@@ -332,7 +341,7 @@ Planned / Open:
 
 ## 🔧 Troubleshooting
 | Issue | Cause | Resolution |
-|-------|-------|-----------|
+|-------|-------|------------|
 | Blank window / no render | Missing GPU context / failed SDK load | Verify OpenGL 3.3 support; check `lib` / `dylib` / `dll` presence |
 | Cannot load external pages | Network interception not available | Use full Ultralight SDK version; confirm `ULTRALIGHT_SDK_ROOT` contents |
 | High CPU on resize | Continuous repaint loop | Known in rapid resize scenarios; consider throttle patch |
@@ -343,7 +352,7 @@ Planned / Open:
 ---
 
 ## 🔒 Security & Privacy
-This project:
+This project currently:
 - Does NOT implement hardened sandboxing found in mainstream browsers.
 - Stores only ephemeral in‑memory history (no disk persistence by default).
 - Performs lightweight filtering—no advanced tracker heuristics.
@@ -378,6 +387,4 @@ MIT License – see [LICENSE](./LICENSE).
 ---
 
 ## 📌 Disclaimer
-This is an educational project illustrating a minimal browser shell. It does not aim to replicate full Chromium feature parity (e.g., comprehensive security sandbox, extension ecosystem, advanced privacy tooling). Use at your discretion.
-
----
+This is an educational project illustrating a minimal browser shell. It does not aim to replicate full Chromium feature parity (e.g., comprehensive security sandbox, extension ecosystem, advanced privacy tooling).
