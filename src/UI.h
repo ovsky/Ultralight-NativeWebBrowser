@@ -73,6 +73,11 @@ public:
   ultralight::JSValue OnGetDarkModeEnabled(const JSObject &obj, const JSArgs &args);
   void OnToggleAdblock(const JSObject &obj, const JSArgs &args);
   ultralight::JSValue OnGetAdblockEnabled(const JSObject &obj, const JSArgs &args);
+  void OnOpenSettingsPanel(const JSObject &obj, const JSArgs &args);
+  void OnCloseSettingsPanel(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnGetSettings(const JSObject &obj, const JSArgs &args);
+  void OnUpdateSetting(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnRestoreSettingsDefaults(const JSObject &obj, const JSArgs &args);
   // Suggestions callback (address bar autocomplete)
   ultralight::JSValue OnGetSuggestions(const JSObject &obj, const JSArgs &args);
   // Adjust UI overlay height for suggestions dropdown
@@ -100,6 +105,8 @@ protected:
   void ShowDownloadsOverlay();
   void HideDownloadsOverlay();
   void LayoutDownloadsOverlay();
+  void ShowSettingsOverlay();
+  void HideSettingsOverlay();
   void ShowContextMenuOverlay(int x, int y, const ultralight::String &json_info);
   void HideContextMenuOverlay();
   // Suggestions overlay (above all UI)
@@ -121,6 +128,16 @@ protected:
   void NotifyDownloadsChanged();
   void OnNewDownloadStarted();
   void SyncAdblockStateToUI();
+  void SyncSettingsStateToUI();
+  void ApplySettings(bool initial);
+  void SetDarkModeEnabled(bool enabled);
+  void LoadSettingsFromDisk();
+  void SaveSettingsToDisk();
+  void EnsureDataDirectoryExists();
+  void RestoreSettingsToDefaults();
+  std::string BuildSettingsJSON() const;
+  bool ParseSettingsBool(const std::string &buffer, const char *key, bool fallback) const;
+  void HandleSettingMutation(const std::string &key, bool value);
 
   // Suggestions / persistence helpers
   void LoadPopularSites();
@@ -161,6 +178,7 @@ protected:
   RefPtr<Overlay> downloads_overlay_;
   RefPtr<Overlay> context_menu_overlay_;
   RefPtr<Overlay> suggestions_overlay_;
+  RefPtr<Overlay> settings_overlay_;
   float scale_;
   // Optional ad/tracker blocker references (may be unused in this build)
   AdBlocker *adblock_ = nullptr;
@@ -189,6 +207,12 @@ protected:
   int inspector_resize_begin_mouse_y_;
   bool address_bar_is_focused_ = false;
   bool adblock_enabled_cached_ = true;
+  bool suggestions_enabled_ = true;
+  bool show_download_badge_ = true;
+  bool auto_open_download_panel_ = true;
+  bool clear_history_on_exit_ = false;
+  bool experimental_transparent_toolbar_enabled_ = false;
+  bool experimental_compact_tabs_enabled_ = false;
 
   JSFunction updateBack;
   JSFunction updateForward;
@@ -200,6 +224,8 @@ protected:
   JSFunction focusAddressBar;
   JSFunction isAddressBarFocused;
   JSFunction updateAdblockEnabled;
+  JSFunction applySettings;
+  JSFunction applySettingsPanel;
   // Context menu setup function in overlay view
   JSFunction setupContextMenu;
   JSFunction setupSuggestions;
@@ -238,6 +264,20 @@ protected:
   std::map<std::string, std::string> shortcuts_;
   void LoadShortcuts();
   bool RunShortcutAction(const std::string &action);
+
+  struct BrowserSettings
+  {
+    bool launch_dark_theme = false;
+    bool enable_adblock = true;
+    bool log_blocked_requests = false;
+    bool enable_suggestions = true;
+    bool enable_suggestion_favicons = true;
+    bool show_download_badge = true;
+    bool auto_open_download_panel = true;
+    bool clear_history_on_exit = false;
+    bool experimental_transparent_toolbar = false;
+    bool experimental_compact_tabs = false;
+  } settings_;
 
   friend class Tab;
 };
