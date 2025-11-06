@@ -50,7 +50,8 @@ function updateAdblockEnabled(enabled) {
 	const el = document.getElementById('toggle-adblock');
 	if (!el) return;
 	const isEnabled = !!enabled;
-	el.classList.toggle('inactive', !isEnabled);
+	el.classList.remove('inactive');
+	el.classList.toggle('active', isEnabled);
 	el.setAttribute('aria-pressed', isEnabled ? 'true' : 'false');
 	el.dataset.state = isEnabled ? 'on' : 'off';
 }
