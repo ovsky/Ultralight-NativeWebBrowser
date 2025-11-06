@@ -286,11 +286,13 @@ This is a proof-of-concept, but there's plenty of room for improvement. Pull req
 
  -  [x] Favicon Support
 
- -  [x] Autosuggestion / Autocompletion 
+ -  [x] Autosuggestion / Autocompletion
+
+ -  [x] Download System, Download Manager and UI
+
+ -  [x] Better Add Tab UI/UX
 
 -   [ ] Bookmark System
-
--   [ ] Downloads
 
 -   [ ] Plugins Support (Scripts?)
 
