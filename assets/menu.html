@@ -37,6 +37,7 @@
             <div class="menu-separator"></div>
             <div class="menu-item" data-action="history">History [Ctrl+H]</div>
             <div class="menu-item" data-action="downloads">Downloads</div>
+            <div class="menu-item" data-action="settings">Settings</div>
         </div>
     </div>
 
@@ -92,6 +93,9 @@
                         break;
                     case 'downloads':
                         if (window.OnOpenDownloadsNewTab) OnOpenDownloadsNewTab();
+                        break;
+                    case 'settings':
+                        if (window.OnOpenSettingsPanel) OnOpenSettingsPanel();
                         break;
                 }
                 closeMenu();
