@@ -35,6 +35,8 @@ public:
     bool OpenDownload(DownloadId id) const;
     bool RevealDownload(DownloadId id) const;
     bool CancelDownload(DownloadId id);
+    bool RemoveDownload(DownloadId id);
+    bool HasActiveDownloads() const;
 
     // DownloadListener overrides
     DownloadId NextDownloadId(ultralight::View *caller) override;

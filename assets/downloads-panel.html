@@ -270,7 +270,7 @@
                 case 'failed':
                     return { text: 'failed', className: 'failed' };
                 case 'cancelled':
-                    return { text: 'cancelled', className: 'failed' };
+                    return { text: 'paused', className: 'waiting' };
                 case 'in-progress':
                     return { text: 'downloading', className: '' };
                 case 'requested':
@@ -327,7 +327,9 @@
 
                 card.appendChild(meta);
 
-                if (item.status === 'in-progress' || item.status === 'requested') {
+                const isActive = item.status === 'in-progress' || item.status === 'requested';
+
+                if (isActive) {
                     const progress = document.createElement('div');
                     progress.className = 'progress';
                     const bar = document.createElement('span');
@@ -366,6 +368,29 @@
                         try { if (window.NativeRevealDownload) NativeRevealDownload(item.id); } catch { }
                     });
                     actions.appendChild(revealBtn);
+                }
+
+                if (isActive) {
+                    const pauseBtn = document.createElement('button');
+                    pauseBtn.className = 'btn';
+                    pauseBtn.type = 'button';
+                    pauseBtn.textContent = 'Pause';
+                    pauseBtn.addEventListener('click', () => {
+                        try { if (window.NativePauseDownload) NativePauseDownload(item.id); } catch { }
+                        refresh();
+                    });
+                    actions.appendChild(pauseBtn);
+                } else {
+                    hasFinished = true;
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'btn';
+                    removeBtn.type = 'button';
+                    removeBtn.textContent = 'Remove';
+                    removeBtn.addEventListener('click', () => {
+                        try { if (window.NativeRemoveDownload) NativeRemoveDownload(item.id); } catch { }
+                        refresh();
+                    });
+                    actions.appendChild(removeBtn);
                 }
 
                 if (actions.childElementCount)

@@ -320,6 +320,39 @@ bool DownloadManager::CancelDownload(DownloadId id)
     return true;
 }
 
+bool DownloadManager::RemoveDownload(DownloadId id)
+{
+    std::unique_lock<std::mutex> lock(mutex_);
+    auto active = active_.find(id);
+    if (active != active_.end())
+    {
+        if (auto rec = FindRecordLocked(id))
+            rec->status = Status::Cancelled;
+        CloseStreamLocked(id, true);
+    }
+
+    auto rec_it = records_.find(id);
+    if (rec_it == records_.end())
+        return false;
+
+    records_.erase(rec_it);
+    NotifyChangeLocked(lock);
+    return true;
+}
+
+bool DownloadManager::HasActiveDownloads() const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!active_.empty())
+        return true;
+    for (const auto &entry : records_)
+    {
+        if (entry.second.status == Status::Requested || entry.second.status == Status::InProgress)
+            return true;
+    }
+    return false;
+}
+
 std::filesystem::path DownloadManager::DetermineDefaultDirectory()
 {
     std::filesystem::path base;

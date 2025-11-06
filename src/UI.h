@@ -68,6 +68,8 @@ public:
   void OnDownloadsOverlayClear(const JSObject &obj, const JSArgs &args);
   void OnDownloadsOverlayOpenItem(const JSObject &obj, const JSArgs &args);
   void OnDownloadsOverlayRevealItem(const JSObject &obj, const JSArgs &args);
+  void OnDownloadsOverlayPauseItem(const JSObject &obj, const JSArgs &args);
+  void OnDownloadsOverlayRemoveItem(const JSObject &obj, const JSArgs &args);
   ultralight::JSValue OnGetDarkModeEnabled(const JSObject &obj, const JSArgs &args);
   // Suggestions callback (address bar autocomplete)
   ultralight::JSValue OnGetSuggestions(const JSObject &obj, const JSArgs &args);
@@ -111,6 +113,8 @@ protected:
   void ClearCompletedDownloads();
   bool OpenDownloadItem(uint64_t id);
   bool RevealDownloadItem(uint64_t id);
+  bool PauseDownloadItem(uint64_t id);
+  bool RemoveDownloadItem(uint64_t id);
   void NotifyDownloadsChanged();
 
   // Suggestions / persistence helpers
@@ -157,6 +161,8 @@ protected:
   AdBlocker *adblock_ = nullptr;
   AdBlocker *trackerblock_ = nullptr;
   std::unique_ptr<DownloadManager> download_manager_;
+  bool downloads_overlay_had_active_ = false;
+  bool downloads_overlay_user_dismissed_ = false;
   // Transient context menu state
   std::pair<int, int> pending_ctx_position_ = {0, 0};
   ultralight::String pending_ctx_info_json_;

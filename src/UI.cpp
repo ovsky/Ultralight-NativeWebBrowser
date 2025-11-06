@@ -128,6 +128,12 @@ bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
     context_menu_overlay_->view()->FireKeyEvent(evt);
     return false;
   }
+  // If downloads overlay is active, route key events to it and consume
+  if (downloads_overlay_ && downloads_overlay_->view())
+  {
+    downloads_overlay_->view()->FireKeyEvent(evt);
+    return false;
+  }
   // If suggestions overlay is open, route navigation keys to it, others to UI overlay (address bar)
   if (suggestions_overlay_ && suggestions_overlay_->view())
   {
@@ -302,6 +308,11 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
     suggestions_overlay_->view()->FireMouseEvent(evt);
     return false;
   }
+  if (downloads_overlay_ && downloads_overlay_->view())
+  {
+    downloads_overlay_->view()->FireMouseEvent(evt);
+    return false;
+  }
 
   // Handle right-clicks globally (both navbar/UI and page content)
   if (evt.type == MouseEvent::kType_MouseDown && evt.button == MouseEvent::kButton_Right)
@@ -352,6 +363,11 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
   if (evt.type == MouseEvent::kType_MouseDown)
   {
     // Click occurred outside the UI overlay (handled above), switch focus to page
+    if (downloads_overlay_)
+    {
+      downloads_overlay_user_dismissed_ = true;
+      HideDownloadsOverlay();
+    }
     address_bar_is_focused_ = false;
     if (active_tab())
     {
@@ -520,6 +536,8 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     global["NativeClearDownloads"] = BindJSCallback(&UI::OnDownloadsOverlayClear);
     global["NativeOpenDownload"] = BindJSCallback(&UI::OnDownloadsOverlayOpenItem);
     global["NativeRevealDownload"] = BindJSCallback(&UI::OnDownloadsOverlayRevealItem);
+    global["NativePauseDownload"] = BindJSCallback(&UI::OnDownloadsOverlayPauseItem);
+    global["NativeRemoveDownload"] = BindJSCallback(&UI::OnDownloadsOverlayRemoveItem);
   }
 
   if (!is_menu_view && !is_ctx_view && !is_sugg_view && !is_downloads_overlay_view)
@@ -985,8 +1003,35 @@ bool UI::RevealDownloadItem(uint64_t id)
   return download_manager_->RevealDownload(static_cast<DownloadManager::DownloadId>(id));
 }
 
+bool UI::PauseDownloadItem(uint64_t id)
+{
+  if (!download_manager_)
+    return false;
+  return download_manager_->CancelDownload(static_cast<DownloadManager::DownloadId>(id));
+}
+
+bool UI::RemoveDownloadItem(uint64_t id)
+{
+  if (!download_manager_)
+    return false;
+  return download_manager_->RemoveDownload(static_cast<DownloadManager::DownloadId>(id));
+}
+
 void UI::NotifyDownloadsChanged()
 {
+  bool has_active = download_manager_ ? download_manager_->HasActiveDownloads() : false;
+  if (has_active && !downloads_overlay_had_active_ && !downloads_overlay_user_dismissed_)
+  {
+    ShowDownloadsOverlay();
+  }
+  else if (!has_active)
+  {
+    downloads_overlay_user_dismissed_ = false;
+    if (downloads_overlay_)
+      HideDownloadsOverlay();
+  }
+  downloads_overlay_had_active_ = has_active;
+
   for (auto &entry : tabs_)
   {
     auto &tab = entry.second;
@@ -1040,16 +1085,39 @@ void UI::OnDownloadsOverlayRevealItem(const JSObject &, const JSArgs &args)
   RevealDownloadItem(id);
 }
 
+void UI::OnDownloadsOverlayPauseItem(const JSObject &, const JSArgs &args)
+{
+  if (args.empty())
+    return;
+  uint64_t id = static_cast<uint64_t>((double)args[0]);
+  PauseDownloadItem(id);
+}
+
+void UI::OnDownloadsOverlayRemoveItem(const JSObject &, const JSArgs &args)
+{
+  if (args.empty())
+    return;
+  uint64_t id = static_cast<uint64_t>((double)args[0]);
+  RemoveDownloadItem(id);
+}
+
 void UI::OnDownloadsOverlayToggle(const JSObject &, const JSArgs &)
 {
   if (downloads_overlay_)
+  {
+    downloads_overlay_user_dismissed_ = true;
     HideDownloadsOverlay();
+  }
   else
+  {
+    downloads_overlay_user_dismissed_ = false;
     ShowDownloadsOverlay();
+  }
 }
 
 void UI::OnDownloadsOverlayClose(const JSObject &, const JSArgs &)
 {
+  downloads_overlay_user_dismissed_ = true;
   HideDownloadsOverlay();
 }
 
@@ -1057,6 +1125,8 @@ void UI::ShowDownloadsOverlay()
 {
   if (downloads_overlay_)
     return;
+
+  downloads_overlay_user_dismissed_ = false;
 
   ultralight::ViewConfig cfg;
   cfg.is_transparent = true;
