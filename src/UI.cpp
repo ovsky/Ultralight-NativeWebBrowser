@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <unordered_set>
 #include <cstdio>
+#include "DownloadManager.h"
 #ifdef _WIN32
 #include <direct.h> // _mkdir, _getcwd
 #else
@@ -32,6 +33,10 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
   view()->set_load_listener(this);
   view()->set_view_listener(this);
   view()->LoadURL("file:///ui.html");
+
+  download_manager_ = std::make_unique<DownloadManager>();
+  download_manager_->SetOnChangeCallback([this]()
+                                         { NotifyDownloadsChanged(); });
 
   // Load keyboard shortcuts mapping
   LoadShortcuts();
@@ -63,6 +68,10 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
   view()->set_view_listener(this);
   view()->LoadURL("file:///ui.html");
 
+  download_manager_ = std::make_unique<DownloadManager>();
+  download_manager_->SetOnChangeCallback([this]()
+                                         { NotifyDownloadsChanged(); });
+
   // Load keyboard shortcuts mapping
   LoadShortcuts();
 
@@ -81,6 +90,9 @@ UI::~UI()
 {
   // Save history to disk before closing
   SaveHistoryToDisk();
+
+  if (download_manager_)
+    download_manager_->SetOnChangeCallback(nullptr);
 
   view()->set_load_listener(nullptr);
   view()->set_view_listener(nullptr);
@@ -483,6 +495,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnRequestChangeURL"] = BindJSCallback(&UI::OnRequestChangeURL);
   global["OnAddressBarNavigate"] = BindJSCallback(&UI::OnAddressBarNavigate);
   global["OnOpenHistoryNewTab"] = BindJSCallback(&UI::OnOpenHistoryNewTab);
+  global["OnOpenDownloadsNewTab"] = BindJSCallback(&UI::OnOpenDownloadsNewTab);
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
   global["OnAddressBarFocus"] = BindJSCallback(&UI::OnAddressBarFocus);
   global["GetSuggestions"] = BindJSCallbackWithRetval(&UI::OnGetSuggestions);
@@ -626,6 +639,13 @@ void UI::OnOpenHistoryNewTab(const JSObject &obj, const JSArgs &args)
   RefPtr<View> child = CreateNewTabForChildView(String("file:///history.html"));
   if (child)
     child->LoadURL("file:///history.html");
+}
+
+void UI::OnOpenDownloadsNewTab(const JSObject &obj, const JSArgs &args)
+{
+  RefPtr<View> child = CreateNewTabForChildView(String("file:///downloads.html"));
+  if (child)
+    child->LoadURL("file:///downloads.html");
 }
 
 void UI::CreateNewTab()
@@ -813,7 +833,8 @@ void UI::RecordHistory(const String &url, const String &title)
   {
     if (e.url == u)
     {
-      if (!t.empty()) e.title = t;
+      if (!t.empty())
+        e.title = t;
       e.timestamp_ms = now_ms;
       e.visit_count = (e.visit_count + 1);
       found = true;
@@ -829,9 +850,16 @@ void UI::RecordHistory(const String &url, const String &title)
   if (history_.size() > 500)
   {
     // Find oldest
-    size_t idx = 0; uint64_t oldest = UINT64_MAX; size_t oldest_i = 0;
-    for (idx = 0; idx < history_.size(); ++idx) {
-      if (history_[idx].timestamp_ms < oldest) { oldest = history_[idx].timestamp_ms; oldest_i = idx; }
+    size_t idx = 0;
+    uint64_t oldest = UINT64_MAX;
+    size_t oldest_i = 0;
+    for (idx = 0; idx < history_.size(); ++idx)
+    {
+      if (history_[idx].timestamp_ms < oldest)
+      {
+        oldest = history_[idx].timestamp_ms;
+        oldest_i = idx;
+      }
     }
     history_.erase(history_.begin() + oldest_i);
   }
@@ -907,6 +935,55 @@ String UI::GetHistoryJSON()
 void UI::ClearHistory()
 {
   history_.clear();
+}
+
+String UI::GetDownloadsJSON()
+{
+  if (!download_manager_)
+    return String("{\"items\":[]}");
+  std::string json = download_manager_->GetDownloadsJSON();
+  return String(json.c_str());
+}
+
+void UI::ClearCompletedDownloads()
+{
+  if (!download_manager_)
+    return;
+  download_manager_->ClearFinishedDownloads();
+  NotifyDownloadsChanged();
+}
+
+bool UI::OpenDownloadItem(uint64_t id)
+{
+  if (!download_manager_)
+    return false;
+  return download_manager_->OpenDownload(static_cast<DownloadManager::DownloadId>(id));
+}
+
+bool UI::RevealDownloadItem(uint64_t id)
+{
+  if (!download_manager_)
+    return false;
+  return download_manager_->RevealDownload(static_cast<DownloadManager::DownloadId>(id));
+}
+
+void UI::NotifyDownloadsChanged()
+{
+  for (auto &entry : tabs_)
+  {
+    auto &tab = entry.second;
+    if (!tab)
+      continue;
+    RefPtr<View> view = tab->view();
+    if (!view)
+      continue;
+    auto url_u = view->url().utf8();
+    const char *url = url_u.data();
+    if (url && std::strstr(url, "downloads.html"))
+    {
+      view->EvaluateScript("(function(){ if(window.__ul_downloads_ready) window.__ul_downloads_ready(); })();", nullptr);
+    }
+  }
 }
 
 void UI::OnMenuOpen(const JSObject &obj, const JSArgs &args)
@@ -1355,9 +1432,11 @@ void UI::LoadHistoryFromDisk()
       if (colon2 != std::string::npos)
       {
         size_t num_start = colon2 + 1;
-        while (num_start < obj.size() && (obj[num_start] == ' ' || obj[num_start] == '\t')) num_start++;
+        while (num_start < obj.size() && (obj[num_start] == ' ' || obj[num_start] == '\t'))
+          num_start++;
         size_t num_end = num_start;
-        while (num_end < obj.size() && std::isdigit(obj[num_end])) num_end++;
+        while (num_end < obj.size() && std::isdigit(obj[num_end]))
+          num_end++;
         if (num_end > num_start)
           count = (uint32_t)std::stoul(obj.substr(num_start, num_end - num_start));
       }
@@ -1382,10 +1461,10 @@ void UI::SaveHistoryToDisk()
     if (i > 0)
       out << ",";
     const auto &entry = history_[i];
-  out << "{\"url\":\"" << jsonEscape(entry.url)
-    << "\",\"title\":\"" << jsonEscape(entry.title)
-    << "\",\"time\":" << entry.timestamp_ms
-    << ",\"count\":" << entry.visit_count << "}";
+    out << "{\"url\":\"" << jsonEscape(entry.url)
+        << "\",\"title\":\"" << jsonEscape(entry.title)
+        << "\",\"time\":" << entry.timestamp_ms
+        << ",\"count\":" << entry.visit_count << "}";
   }
   out << "]";
   out.close();
@@ -1398,28 +1477,38 @@ std::vector<std::string> UI::GetSuggestions(const std::string &input, int maxRes
     maxResults = 10;
 
   // We'll build (url, score) pairs, then sort by score
-  struct Scored { std::string url; double score; };
+  struct Scored
+  {
+    std::string url;
+    double score;
+  };
   std::vector<Scored> scored;
-  auto push_scored = [&](const std::string &u, double s){ scored.push_back({u,s}); };
+  auto push_scored = [&](const std::string &u, double s)
+  { scored.push_back({u, s}); };
 
   auto now_ms = (uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::system_clock::now().time_since_epoch()).count();
+                    std::chrono::system_clock::now().time_since_epoch())
+                    .count();
 
-  auto score_history = [&](const std::string &u, const HistoryEntry &e, const std::string &q)->double{
+  auto score_history = [&](const std::string &u, const HistoryEntry &e, const std::string &q) -> double
+  {
     std::string ul = u, ql = q;
     std::transform(ul.begin(), ul.end(), ul.begin(), ::tolower);
     std::transform(ql.begin(), ql.end(), ql.begin(), ::tolower);
     double prefix = 0.0, contains = 0.0;
     // check domain part prefix
-    size_t proto = ul.find("://"); size_t start = (proto==std::string::npos? 0: proto+3);
-    if (ul.find(ql, start) == start) prefix = 1.0; // strong boost for prefix
-    if (ul.find(ql) != std::string::npos) contains = 0.5;
+    size_t proto = ul.find("://");
+    size_t start = (proto == std::string::npos ? 0 : proto + 3);
+    if (ul.find(ql, start) == start)
+      prefix = 1.0; // strong boost for prefix
+    if (ul.find(ql) != std::string::npos)
+      contains = 0.5;
     // recency: within ~30 days fades to 0
-    double age_days = std::max<double>(0.0, (double)(now_ms - e.timestamp_ms) / (1000.0*60.0*60.0*24.0));
+    double age_days = std::max<double>(0.0, (double)(now_ms - e.timestamp_ms) / (1000.0 * 60.0 * 60.0 * 24.0));
     double recency = std::max(0.0, 1.0 - (age_days / 30.0));
     // frequency: log scale
     double freq = std::log(1.0 + (double)std::max<uint32_t>(1, e.visit_count)) / std::log(10.0);
-    return 2.0*prefix + 1.0*contains + 2.0*recency + 2.0*freq;
+    return 2.0 * prefix + 1.0 * contains + 2.0 * recency + 2.0 * freq;
   };
 
   // If no input, suggest top by recency/frequency
@@ -1430,20 +1519,25 @@ std::vector<std::string> UI::GetSuggestions(const std::string &input, int maxRes
     for (const auto &e : history_)
     {
       double s = score_history(e.url, e, std::string());
-      if (seen.insert(e.url).second) push_scored(e.url, s);
+      if (seen.insert(e.url).second)
+        push_scored(e.url, s);
     }
     // Sort by score desc
-    std::sort(scored.begin(), scored.end(), [](const Scored&a,const Scored&b){return a.score>b.score;});
+    std::sort(scored.begin(), scored.end(), [](const Scored &a, const Scored &b)
+              { return a.score > b.score; });
     for (const auto &p : scored)
     {
-      if ((int)suggestions.size() >= maxResults) break;
+      if ((int)suggestions.size() >= maxResults)
+        break;
       suggestions.push_back(p.url);
     }
     // Fill with popular sites
     for (const auto &site : popular_sites_)
     {
-      if ((int)suggestions.size() >= maxResults) break;
-      if (std::find(suggestions.begin(), suggestions.end(), site) == suggestions.end()) suggestions.push_back(site);
+      if ((int)suggestions.size() >= maxResults)
+        break;
+      if (std::find(suggestions.begin(), suggestions.end(), site) == suggestions.end())
+        suggestions.push_back(site);
     }
     return suggestions;
   }
@@ -1452,7 +1546,8 @@ std::vector<std::string> UI::GetSuggestions(const std::string &input, int maxRes
   std::transform(input_lower.begin(), input_lower.end(), input_lower.begin(), ::tolower);
 
   // Helper lambda to check if a URL matches the input
-  auto matches = [&input_lower](const std::string &url) -> bool {
+  auto matches = [&input_lower](const std::string &url) -> bool
+  {
     std::string url_lower = url;
     std::transform(url_lower.begin(), url_lower.end(), url_lower.begin(), ::tolower);
 
@@ -1477,7 +1572,8 @@ std::vector<std::string> UI::GetSuggestions(const std::string &input, int maxRes
       if (matches(e.url))
       {
         double s = score_history(e.url, e, input);
-        if (seen.insert(e.url).second) push_scored(e.url, s);
+        if (seen.insert(e.url).second)
+          push_scored(e.url, s);
       }
     }
   }
@@ -1488,19 +1584,26 @@ std::vector<std::string> UI::GetSuggestions(const std::string &input, int maxRes
     if (matches(site))
     {
       // Low baseline score; small prefix boost
-      double s = 0.6; std::string sl = site, il = input; std::transform(sl.begin(),sl.end(),sl.begin(),::tolower); std::transform(il.begin(),il.end(),il.begin(),::tolower);
-      if (sl.find(il) == sl.find("://") + 3) s += 0.6;
+      double s = 0.6;
+      std::string sl = site, il = input;
+      std::transform(sl.begin(), sl.end(), sl.begin(), ::tolower);
+      std::transform(il.begin(), il.end(), il.begin(), ::tolower);
+      if (sl.find(il) == sl.find("://") + 3)
+        s += 0.6;
       push_scored(site, s);
     }
   }
 
   // Sort by score and emit unique URLs
-  std::sort(scored.begin(), scored.end(), [](const Scored&a,const Scored&b){return a.score>b.score;});
+  std::sort(scored.begin(), scored.end(), [](const Scored &a, const Scored &b)
+            { return a.score > b.score; });
   std::unordered_set<std::string> emitted;
   for (const auto &p : scored)
   {
-    if ((int)suggestions.size() >= maxResults) break;
-    if (emitted.insert(p.url).second) suggestions.push_back(p.url);
+    if ((int)suggestions.size() >= maxResults)
+      break;
+    if (emitted.insert(p.url).second)
+      suggestions.push_back(p.url);
   }
   return suggestions;
 }
@@ -1524,7 +1627,8 @@ JSValue UI::OnGetSuggestions(const JSObject &obj, const JSArgs &args)
   std::string json = "[";
   for (size_t i = 0; i < suggestions.size(); ++i)
   {
-    if (i > 0) json += ",";
+    if (i > 0)
+      json += ",";
     if (suggestion_favicons_enabled_)
     {
       std::string u = suggestions[i];
@@ -1543,7 +1647,8 @@ JSValue UI::OnGetSuggestions(const JSObject &obj, const JSArgs &args)
         f = f8.data() ? f8.data() : "";
       }
       json += "{\"url\":\"" + jsonEscape(u) + "\"";
-      if (!f.empty()) json += ",\"favicon\":\"" + jsonEscape(f) + "\"";
+      if (!f.empty())
+        json += ",\"favicon\":\"" + jsonEscape(f) + "\"";
       json += "}";
     }
     else
@@ -1561,10 +1666,12 @@ std::string UI::GetOriginStringFromURL(const std::string &url)
 {
   // Extract scheme://host[:port]
   size_t scheme = url.find("://");
-  if (scheme == std::string::npos) return std::string();
+  if (scheme == std::string::npos)
+    return std::string();
   size_t host_start = scheme + 3;
   size_t slash = url.find('/', host_start);
-  if (slash == std::string::npos) return url; // whole string is origin
+  if (slash == std::string::npos)
+    return url; // whole string is origin
   return url.substr(0, slash);
 }
 
@@ -1589,24 +1696,158 @@ std::string UI::EnsureFaviconCacheDir()
 std::string UI::Base64Decode(const std::string &in)
 {
   static const int T[256] = {
-    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
-    -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,62,-1,-1,-1,63,
-    52,53,54,55,56,57,58,59,60,61,-1,-1,-1, 0,-1,-1,
-    -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,
-    15,16,17,18,19,20,21,22,23,24,25,-1,-1,-1,-1,-1,
-    -1,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
-    41,42,43,44,45,46,47,48,49,50,51,-1,-1,-1,-1,-1,
-    // rest -1
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      62,
+      -1,
+      -1,
+      -1,
+      63,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      -1,
+      -1,
+      -1,
+      0,
+      -1,
+      -1,
+      -1,
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      // rest -1
   };
-  std::string out; out.reserve(in.size()*3/4);
-  int val=0, valb=-8;
-  for (unsigned char c : in) {
+  std::string out;
+  out.reserve(in.size() * 3 / 4);
+  int val = 0, valb = -8;
+  for (unsigned char c : in)
+  {
     int d = -1;
-    if (c < 128) d = T[c];
-    if (d == -1) { if (c=='=') break; else continue; }
-    val = (val<<6) + d; valb += 6;
-    if (valb>=0) { out.push_back(char((val>>valb)&0xFF)); valb-=8; }
+    if (c < 128)
+      d = T[c];
+    if (d == -1)
+    {
+      if (c == '=')
+        break;
+      else
+        continue;
+    }
+    val = (val << 6) + d;
+    valb += 6;
+    if (valb >= 0)
+    {
+      out.push_back(char((val >> valb) & 0xFF));
+      valb -= 8;
+    }
   }
   return out;
 }
@@ -1617,23 +1858,41 @@ void UI::LoadFaviconDiskCache()
   // Ensure directory exists
   EnsureFaviconCacheDir();
   std::ifstream in("data/favicons/index.json", std::ios::in | std::ios::binary);
-  if (!in.is_open()) return;
-  std::ostringstream ss; ss << in.rdbuf(); std::string txt = ss.str(); in.close();
+  if (!in.is_open())
+    return;
+  std::ostringstream ss;
+  ss << in.rdbuf();
+  std::string txt = ss.str();
+  in.close();
   // Parse simple object { "origin": "file:///...", ... }
   size_t pos = 0;
-  while (true) {
-    size_t k1 = txt.find('"', pos); if (k1==std::string::npos) break;
-    size_t k2 = txt.find('"', k1+1); if (k2==std::string::npos) break;
-    std::string key = txt.substr(k1+1, k2-k1-1);
-    size_t c = txt.find(':', k2+1); if (c==std::string::npos) break;
-    size_t v1 = txt.find('"', c+1); if (v1==std::string::npos) break;
-    size_t v2 = txt.find('"', v1+1); if (v2==std::string::npos) break;
-    std::string val = txt.substr(v1+1, v2-v1-1);
-    if (!key.empty() && !val.empty()) favicon_file_cache_[key] = val;
-    pos = v2+1;
-    if (favicon_file_cache_.size() > favicon_cache_limit_) break;
+  while (true)
+  {
+    size_t k1 = txt.find('"', pos);
+    if (k1 == std::string::npos)
+      break;
+    size_t k2 = txt.find('"', k1 + 1);
+    if (k2 == std::string::npos)
+      break;
+    std::string key = txt.substr(k1 + 1, k2 - k1 - 1);
+    size_t c = txt.find(':', k2 + 1);
+    if (c == std::string::npos)
+      break;
+    size_t v1 = txt.find('"', c + 1);
+    if (v1 == std::string::npos)
+      break;
+    size_t v2 = txt.find('"', v1 + 1);
+    if (v2 == std::string::npos)
+      break;
+    std::string val = txt.substr(v1 + 1, v2 - v1 - 1);
+    if (!key.empty() && !val.empty())
+      favicon_file_cache_[key] = val;
+    pos = v2 + 1;
+    if (favicon_file_cache_.size() > favicon_cache_limit_)
+      break;
   }
-  if (favicon_file_cache_.size() > favicon_cache_limit_) {
+  if (favicon_file_cache_.size() > favicon_cache_limit_)
+  {
     PruneFaviconDiskCacheToLimit();
     SaveFaviconDiskCache();
   }
@@ -1643,11 +1902,15 @@ void UI::SaveFaviconDiskCache()
 {
   EnsureFaviconCacheDir();
   std::ofstream out("data/favicons/index.json", std::ios::out | std::ios::binary | std::ios::trunc);
-  if (!out.is_open()) return;
+  if (!out.is_open())
+    return;
   out << "{";
   bool first = true;
-  for (auto &p : favicon_file_cache_) {
-    if (!first) out << ","; first=false;
+  for (auto &p : favicon_file_cache_)
+  {
+    if (!first)
+      out << ",";
+    first = false;
     out << "\"" << jsonEscape(p.first) << "\":\"" << jsonEscape(p.second) << "\"";
   }
   out << "}";
@@ -1657,40 +1920,62 @@ void UI::SaveFaviconDiskCache()
 void UI::OnFaviconReady(const JSObject &obj, const JSArgs &args)
 {
   // args: url, dataUrl (data:image/png;base64,....)
-  if (args.size() < 2 || !args[0].IsString() || !args[1].IsString()) return;
-  if (!suggestion_favicons_enabled_) return;
+  if (args.size() < 2 || !args[0].IsString() || !args[1].IsString())
+    return;
+  if (!suggestion_favicons_enabled_)
+    return;
   ultralight::String url_ul = args[0].ToString();
   ultralight::String data_ul = args[1].ToString();
-  auto u8 = url_ul.utf8(); std::string url = u8.data() ? u8.data() : "";
-  auto d8 = data_ul.utf8(); std::string data = d8.data() ? d8.data() : "";
-  if (url.empty() || data.empty()) return;
+  auto u8 = url_ul.utf8();
+  std::string url = u8.data() ? u8.data() : "";
+  auto d8 = data_ul.utf8();
+  std::string data = d8.data() ? d8.data() : "";
+  if (url.empty() || data.empty())
+    return;
   std::string origin = GetOriginStringFromURL(url);
-  if (origin.empty()) return;
+  if (origin.empty())
+    return;
 
   // Respect cache size limit with smarter eviction based on origin score
   double new_score = GetOriginScore(origin);
-  if (favicon_file_cache_.find(origin) == favicon_file_cache_.end() && favicon_file_cache_.size() >= favicon_cache_limit_) {
+  if (favicon_file_cache_.find(origin) == favicon_file_cache_.end() && favicon_file_cache_.size() >= favicon_cache_limit_)
+  {
     // Find the lowest-score existing origin
-    std::string worst_origin; double worst_score = 1e18; bool found=false;
-    for (const auto &p : favicon_file_cache_) {
+    std::string worst_origin;
+    double worst_score = 1e18;
+    bool found = false;
+    for (const auto &p : favicon_file_cache_)
+    {
       double s = GetOriginScore(p.first);
-      if (!found || s < worst_score) { worst_score = s; worst_origin = p.first; found=true; }
+      if (!found || s < worst_score)
+      {
+        worst_score = s;
+        worst_origin = p.first;
+        found = true;
+      }
     }
-    if (!found || new_score <= worst_score) {
+    if (!found || new_score <= worst_score)
+    {
       // New origin is not better than the worst cached one; skip caching
       return;
     }
     // Evict worst
     auto itw = favicon_file_cache_.find(worst_origin);
-    if (itw != favicon_file_cache_.end()) {
+    if (itw != favicon_file_cache_.end())
+    {
       // Try delete file on disk
       std::string furl = itw->second;
       std::string path;
       const std::string prefix = "file:///";
-      if (furl.rfind(prefix, 0) == 0) {
+      if (furl.rfind(prefix, 0) == 0)
+      {
         path = furl.substr(prefix.size());
 #ifdef _WIN32
-        for (auto &ch : path) { if (ch=='/') ch='\\'; }
+        for (auto &ch : path)
+        {
+          if (ch == '/')
+            ch = '\\';
+        }
 #endif
         std::remove(path.c_str());
       }
@@ -1699,20 +1984,25 @@ void UI::OnFaviconReady(const JSObject &obj, const JSArgs &args)
   }
 
   // Expect data URL like data:image/png;base64,....
-  size_t comma = data.find(","); if (comma == std::string::npos) return;
-  std::string b64 = data.substr(comma+1);
+  size_t comma = data.find(",");
+  if (comma == std::string::npos)
+    return;
+  std::string b64 = data.substr(comma + 1);
   std::string bytes = Base64Decode(b64);
-  if (bytes.size() < 8) return;
+  if (bytes.size() < 8)
+    return;
 
   std::string dir = EnsureFaviconCacheDir();
   // Hash filename from origin
-  std::hash<std::string> hasher; size_t h = hasher(origin);
+  std::hash<std::string> hasher;
+  size_t h = hasher(origin);
   std::ostringstream path;
   path << dir << "/" << std::hex << h << ".png";
   std::string file = path.str();
   // Write file
   std::ofstream f(file, std::ios::out | std::ios::binary | std::ios::trunc);
-  if (!f.is_open()) return;
+  if (!f.is_open())
+    return;
   f.write(bytes.data(), (std::streamsize)bytes.size());
   f.close();
   // Store as file:/// absolute URL
@@ -1721,7 +2011,11 @@ void UI::OnFaviconReady(const JSObject &obj, const JSArgs &args)
   _getcwd(cwd_buf, sizeof(cwd_buf));
   std::string abs = std::string("file:///") + std::string(cwd_buf) + "/" + file;
   // replace backslashes
-  for (auto &ch : abs) { if (ch=='\\') ch='/'; }
+  for (auto &ch : abs)
+  {
+    if (ch == '\\')
+      ch = '/';
+  }
 #else
   getcwd(cwd_buf, sizeof(cwd_buf));
   std::string abs = std::string("file://") + std::string(cwd_buf) + "/" + file;
@@ -1733,41 +2027,60 @@ void UI::OnFaviconReady(const JSObject &obj, const JSArgs &args)
 double UI::GetOriginScore(const std::string &origin)
 {
   // Combine recency and frequency across history entries that match this origin
-  if (origin.empty()) return 0.0;
+  if (origin.empty())
+    return 0.0;
   auto now_ms = (uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::system_clock::now().time_since_epoch()).count();
+                    std::chrono::system_clock::now().time_since_epoch())
+                    .count();
   double total = 0.0;
-  for (const auto &e : history_) {
-    if (GetOriginStringFromURL(e.url) != origin) continue;
-    double age_days = std::max<double>(0.0, (double)(now_ms - e.timestamp_ms) / (1000.0*60.0*60.0*24.0));
+  for (const auto &e : history_)
+  {
+    if (GetOriginStringFromURL(e.url) != origin)
+      continue;
+    double age_days = std::max<double>(0.0, (double)(now_ms - e.timestamp_ms) / (1000.0 * 60.0 * 60.0 * 24.0));
     double recency = std::max(0.0, 1.0 - (age_days / 30.0));
     double freq = std::log(1.0 + (double)std::max<uint32_t>(1, e.visit_count)) / std::log(10.0);
-    total += (2.0*recency + 2.0*freq);
+    total += (2.0 * recency + 2.0 * freq);
   }
   return total;
 }
 
 void UI::PruneFaviconDiskCacheToLimit()
 {
-  if (favicon_file_cache_.size() <= favicon_cache_limit_) return;
+  if (favicon_file_cache_.size() <= favicon_cache_limit_)
+    return;
   // Collect and sort by score desc
-  std::vector<std::pair<std::string,double>> arr; arr.reserve(favicon_file_cache_.size());
-  for (const auto &p : favicon_file_cache_) {
+  std::vector<std::pair<std::string, double>> arr;
+  arr.reserve(favicon_file_cache_.size());
+  for (const auto &p : favicon_file_cache_)
+  {
     arr.emplace_back(p.first, GetOriginScore(p.first));
   }
-  std::sort(arr.begin(), arr.end(), [](const auto &a, const auto &b){ return a.second > b.second; });
+  std::sort(arr.begin(), arr.end(), [](const auto &a, const auto &b)
+            { return a.second > b.second; });
   // Determine origins to keep
   std::unordered_set<std::string> keep;
-  for (size_t i=0; i<arr.size() && i<favicon_cache_limit_; ++i) keep.insert(arr[i].first);
+  for (size_t i = 0; i < arr.size() && i < favicon_cache_limit_; ++i)
+    keep.insert(arr[i].first);
   // Remove the rest (and try delete files)
-  for (auto it = favicon_file_cache_.begin(); it != favicon_file_cache_.end(); ) {
-    if (keep.find(it->first) != keep.end()) { ++it; continue; }
+  for (auto it = favicon_file_cache_.begin(); it != favicon_file_cache_.end();)
+  {
+    if (keep.find(it->first) != keep.end())
+    {
+      ++it;
+      continue;
+    }
     std::string furl = it->second;
     const std::string prefix = "file:///";
-    if (furl.rfind(prefix, 0) == 0) {
+    if (furl.rfind(prefix, 0) == 0)
+    {
       std::string path = furl.substr(prefix.size());
 #ifdef _WIN32
-      for (auto &ch : path) { if (ch=='/') ch='\\'; }
+      for (auto &ch : path)
+      {
+        if (ch == '/')
+          ch = '\\';
+      }
 #endif
       std::remove(path.c_str());
     }
@@ -1779,12 +2092,22 @@ void UI::LoadSuggestionsFaviconsFlag()
 {
   suggestion_favicons_enabled_ = true; // default
   std::ifstream in("assets/suggestions_favicons.txt", std::ios::in | std::ios::binary);
-  if (!in.is_open()) return;
-  std::ostringstream ss; ss << in.rdbuf(); std::string txt = ss.str(); in.close();
+  if (!in.is_open())
+    return;
+  std::ostringstream ss;
+  ss << in.rdbuf();
+  std::string txt = ss.str();
+  in.close();
   // Normalize
-  std::string s; s.reserve(txt.size());
-  for (char c: txt){ if (!std::isspace((unsigned char)c)) s += (char)std::tolower((unsigned char)c); }
-  if (s == "off" || s == "0" || s == "false") suggestion_favicons_enabled_ = false;
+  std::string s;
+  s.reserve(txt.size());
+  for (char c : txt)
+  {
+    if (!std::isspace((unsigned char)c))
+      s += (char)std::tolower((unsigned char)c);
+  }
+  if (s == "off" || s == "0" || s == "false")
+    suggestion_favicons_enabled_ = false;
 }
 
 void UI::ShowSuggestionsOverlay(int x, int y, int width, const ultralight::String &json_items)
@@ -1852,7 +2175,8 @@ void UI::OnSuggestionPick(const JSObject &obj, const JSArgs &args)
   HideSuggestionsOverlay();
   // Navigate like pressing Enter on the address bar
   std::string url = s.utf8().data() ? s.utf8().data() : "";
-  if (url.empty()) return;
+  if (url.empty())
+    return;
   // If second arg is "newtab", open in a new tab
   bool open_new_tab = false;
   if (args.size() >= 2 && args[1].IsString())
@@ -1865,7 +2189,8 @@ void UI::OnSuggestionPick(const JSObject &obj, const JSArgs &args)
   if (open_new_tab)
   {
     RefPtr<View> child = CreateNewTabForChildView(s);
-    if (child) child->LoadURL(s);
+    if (child)
+      child->LoadURL(s);
     return;
   }
   if (!tabs_.empty())

@@ -1,0 +1,345 @@
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Downloads</title>
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23222' d='M5 20h14v-2H5v2m7-18l-5 6h3v6h4v-6h3l-5-6z'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" type="text/css" href="ui.css">
+    <style>
+        * {
+            box-sizing: border-box;
+            transition: all 0.2s ease-in-out;
+        }
+
+        :root {
+            color-scheme: light dark;
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            background: var(--bg, #f6f7f9);
+            color: var(--fg, #111);
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 32px auto;
+            padding: 0 16px;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        h1 {
+            font-size: 20px;
+            margin: 0;
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            background: white;
+            color: inherit;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background: #f2f2f2;
+        }
+
+        .list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .item {
+            padding: 14px 16px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.85);
+            border: 1px solid rgba(0, 0, 0, 0.07);
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+        }
+
+        .item h2 {
+            margin: 0 0 8px 0;
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .meta {
+            font-size: 12px;
+            color: #666;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .status {
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .progress {
+            position: relative;
+            height: 6px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress span {
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 0%;
+            background: linear-gradient(90deg, #6366f1, #38bdf8);
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .actions .btn {
+            font-size: 12px;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 48px 10px;
+            color: #666;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: #121212;
+                color: #e5e7eb;
+            }
+
+            .item {
+                background: rgba(18, 18, 18, 0.7);
+                border-color: rgba(255, 255, 255, 0.05);
+            }
+
+            .btn {
+                background: rgba(255, 255, 255, 0.08);
+                color: inherit;
+                border-color: rgba(255, 255, 255, 0.1);
+            }
+
+            .btn:hover {
+                background: rgba(255, 255, 255, 0.12);
+            }
+
+            .meta {
+                color: #9ca3af;
+            }
+
+            .empty {
+                color: #9ca3af;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Downloads</h1>
+            <div class="controls">
+                <button id="clear-btn" class="btn">Clear finished</button>
+            </div>
+        </header>
+        <section id="content">
+            <div id="empty" class="empty">No downloads yet.</div>
+            <div id="list" class="list"></div>
+        </section>
+    </div>
+
+    <script>
+        function fmtBytes(bytes) {
+            if (bytes === null || bytes === undefined || bytes < 0) return '';
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            let value = bytes;
+            let unit = 0;
+            while (value >= 1024 && unit < units.length - 1) {
+                value /= 1024;
+                unit++;
+            }
+            return value.toFixed(value >= 10 ? 0 : 1) + ' ' + units[unit];
+        }
+
+        function fmtTime(ms) {
+            if (!ms) return '';
+            try {
+                return new Date(ms).toLocaleString();
+            } catch (e) {
+                return '';
+            }
+        }
+
+        function render(data) {
+            const list = document.getElementById('list');
+            const empty = document.getElementById('empty');
+            list.innerHTML = '';
+            const items = (data && data.items) || [];
+            if (!items.length) {
+                empty.style.display = 'block';
+                return;
+            }
+            empty.style.display = 'none';
+
+            for (const item of items) {
+                const card = document.createElement('div');
+                card.className = 'item';
+
+                const title = document.createElement('h2');
+                title.textContent = item.filename || '(unknown file)';
+                card.appendChild(title);
+
+                const meta = document.createElement('div');
+                meta.className = 'meta';
+                const status = document.createElement('span');
+                status.className = 'status';
+                status.textContent = item.status || 'pending';
+                meta.appendChild(status);
+
+                if (item.total > 0) {
+                    const size = document.createElement('span');
+                    size.textContent = fmtBytes(item.received) + ' / ' + fmtBytes(item.total);
+                    meta.appendChild(size);
+                } else if (item.received > 0) {
+                    const size = document.createElement('span');
+                    size.textContent = fmtBytes(item.received);
+                    meta.appendChild(size);
+                }
+
+                if (item.url) {
+                    const urlSpan = document.createElement('span');
+                    urlSpan.textContent = item.url;
+                    meta.appendChild(urlSpan);
+                }
+
+                const started = fmtTime(item.startedAt);
+                if (started) {
+                    const startSpan = document.createElement('span');
+                    startSpan.textContent = 'Started: ' + started;
+                    meta.appendChild(startSpan);
+                }
+                const finished = fmtTime(item.finishedAt);
+                if (finished) {
+                    const finishSpan = document.createElement('span');
+                    finishSpan.textContent = 'Finished: ' + finished;
+                    meta.appendChild(finishSpan);
+                }
+                if (item.error) {
+                    const errSpan = document.createElement('span');
+                    errSpan.textContent = item.error;
+                    meta.appendChild(errSpan);
+                }
+
+                card.appendChild(meta);
+
+                if (item.status === 'in-progress') {
+                    const progress = document.createElement('div');
+                    progress.className = 'progress';
+                    const bar = document.createElement('span');
+                    let percent = 0;
+                    if (item.total > 0) {
+                        percent = Math.min(100, Math.max(0, (item.received / item.total) * 100));
+                    } else if (item.received > 0) {
+                        percent = 100;
+                    }
+                    bar.style.width = percent.toFixed(1) + '%';
+                    progress.appendChild(bar);
+                    card.appendChild(progress);
+                }
+
+                const actions = document.createElement('div');
+                actions.className = 'actions';
+
+                if (item.canOpen) {
+                    const openBtn = document.createElement('button');
+                    openBtn.className = 'btn';
+                    openBtn.textContent = 'Open';
+                    openBtn.addEventListener('click', () => {
+                        try { if (window.NativeOpenDownload) NativeOpenDownload(item.id); } catch { }
+                    });
+                    actions.appendChild(openBtn);
+                }
+
+                if (item.canReveal) {
+                    const revealBtn = document.createElement('button');
+                    revealBtn.className = 'btn';
+                    revealBtn.textContent = 'Show in folder';
+                    revealBtn.addEventListener('click', () => {
+                        try { if (window.NativeRevealDownload) NativeRevealDownload(item.id); } catch { }
+                    });
+                    actions.appendChild(revealBtn);
+                }
+
+                card.appendChild(actions);
+                list.appendChild(card);
+            }
+        }
+
+        function refresh() {
+            try {
+                if (window.NativeGetDownloads) {
+                    const json = NativeGetDownloads();
+                    const data = JSON.parse(json || '{"items":[]}');
+                    render(data);
+                    return;
+                }
+            } catch (e) { }
+            render({ items: [] });
+        }
+
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            try { if (window.NativeClearDownloads) NativeClearDownloads(); } catch { }
+            refresh();
+        });
+
+        window.__ul_downloads_ready = function () {
+            refresh();
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            let tries = 0;
+            const tick = () => {
+                if (window.NativeGetDownloads) { refresh(); return; }
+                if (++tries < 20) setTimeout(tick, 100);
+            };
+            tick();
+        });
+
+        window.addEventListener('focus', () => refresh());
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+        setInterval(refresh, 1500);
+    </script>
+</body>
+
+</html>

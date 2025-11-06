@@ -87,6 +87,12 @@ public:
   JSValue JS_IsDarkModeEnabled(const JSObject &obj, const JSArgs &args);
   JSValue JS_GetAppInfo(const JSObject &obj, const JSArgs &args);
 
+  // Downloads page callbacks
+  JSValue OnDownloadsGetData(const JSObject &obj, const JSArgs &args);
+  void OnDownloadsClear(const JSObject &obj, const JSArgs &args);
+  void OnDownloadsOpen(const JSObject &obj, const JSArgs &args);
+  void OnDownloadsReveal(const JSObject &obj, const JSArgs &args);
+
   // Lightweight Quick Inspector callbacks
   void OnQuickInspectorClose(const JSObject &obj, const JSArgs &args);
   void OnQuickInspectorOpenDevtools(const JSObject &obj, const JSArgs &args);

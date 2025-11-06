@@ -13,6 +13,7 @@ using namespace ultralight;
 
 class Console;
 class AdBlocker; // forward declaration, optional dependency
+class DownloadManager;
 
 /**
  * Browser UI implementation. Renders the toolbar/addressbar/tabs in top pane.
@@ -54,6 +55,7 @@ public:
   void OnAddressBarNavigate(const JSObject &obj, const JSArgs &args);
   // Open History page in a new tab (used by menu button and shortcuts)
   void OnOpenHistoryNewTab(const JSObject &obj, const JSArgs &args);
+  void OnOpenDownloadsNewTab(const JSObject &obj, const JSArgs &args);
   void OnAddressBarBlur(const JSObject &obj, const JSArgs &args);
   void OnAddressBarFocus(const JSObject &obj, const JSArgs &args);
   void OnMenuOpen(const JSObject &obj, const JSArgs &args);
@@ -68,6 +70,7 @@ public:
   void OnSuggestClose(const JSObject &obj, const JSArgs &args);
 
   RefPtr<Window> window() { return window_; }
+  DownloadManager *download_manager() { return download_manager_.get(); }
 
 protected:
   void CreateNewTab();
@@ -94,6 +97,13 @@ protected:
   void RecordHistory(const String &url, const String &title);
   String GetHistoryJSON();
   void ClearHistory();
+
+  // Downloads management helpers
+  String GetDownloadsJSON();
+  void ClearCompletedDownloads();
+  bool OpenDownloadItem(uint64_t id);
+  bool RevealDownloadItem(uint64_t id);
+  void NotifyDownloadsChanged();
 
   // Suggestions / persistence helpers
   void LoadPopularSites();
@@ -137,6 +147,7 @@ protected:
   // Optional ad/tracker blocker references (may be unused in this build)
   AdBlocker *adblock_ = nullptr;
   AdBlocker *trackerblock_ = nullptr;
+  std::unique_ptr<DownloadManager> download_manager_;
   // Transient context menu state
   std::pair<int, int> pending_ctx_position_ = {0, 0};
   ultralight::String pending_ctx_info_json_;
