@@ -66,6 +66,7 @@ private:
         DownloadId id = 0;
         std::string url;
         std::string display_name;
+        std::string preferred_name;
         std::filesystem::path path;
         int64_t expected_bytes = -1;
         int64_t received_bytes = 0;
@@ -74,6 +75,8 @@ private:
         std::chrono::system_clock::time_point finished_at;
         std::string error;
         uint64_t sequence = 0;
+        bool suppress_ui = false;
+        bool placeholder = false;
     };
 
     struct ActiveDownload
