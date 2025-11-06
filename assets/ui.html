@@ -227,6 +227,10 @@
             // Debounce helper
             let suggTimer = null;
             function scheduleSuggest() {
+                if (window.__ul_settings && window.__ul_settings.enable_suggestions === false) {
+                    hideSuggestions();
+                    return;
+                }
                 if (suggTimer) clearTimeout(suggTimer);
                 suggTimer = setTimeout(updateSuggestions, 80);
             }
@@ -239,6 +243,7 @@
             }
 
             function showSuggestions(items) {
+                if (window.__ul_settings && window.__ul_settings.enable_suggestions === false) { hideSuggestions(); return; }
                 if (!items || !items.length) { hideSuggestions(); return; }
                 const r = address.getBoundingClientRect();
                 // Request temporary UI overlay growth so the panel isn't clipped
@@ -275,6 +280,7 @@
             function renderSuggestions(items) { suggActiveIndex = -1; showSuggestions(items); }
 
             function updateSuggestions() {
+                if (window.__ul_settings && window.__ul_settings.enable_suggestions === false) { hideSuggestions(); return; }
                 const q = address.value.trim();
                 if (!q) { hideSuggestions(); return; }
                 try {
@@ -385,6 +391,11 @@
             function updateBadge() {
                 if (!toggleBtn || !badge) return;
                 try {
+                    if (window.__ul_settings && window.__ul_settings.show_download_badge === false) {
+                        toggleBtn.classList.remove('badge-visible');
+                        badge.textContent = '';
+                        return;
+                    }
                     if (typeof GetDownloadsSnapshot === 'function') {
                         const raw = GetDownloadsSnapshot();
                         const data = JSON.parse(raw || '{"items":[]}');
