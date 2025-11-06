@@ -473,7 +473,7 @@ bool DownloadManager::PruneStaleRequestsLocked(std::unique_lock<std::mutex> &loc
         bool has_active_stream = active_.find(it->first) != active_.end();
         bool is_stale = (now - it->second.started_at) > kMaxPendingAge;
 
-            if (it->second.placeholder && is_requested && !has_active_stream && is_stale)
+        if (it->second.placeholder && is_requested && !has_active_stream && is_stale)
         {
             it = records_.erase(it);
             removed = true;

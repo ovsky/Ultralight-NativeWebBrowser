@@ -66,7 +66,7 @@ private:
         DownloadId id = 0;
         std::string url;
         std::string display_name;
-    std::string preferred_name;
+        std::string preferred_name;
         std::filesystem::path path;
         int64_t expected_bytes = -1;
         int64_t received_bytes = 0;
