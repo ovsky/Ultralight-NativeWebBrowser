@@ -82,6 +82,33 @@ svg#icon_defs path {
      border-radius: 100%;
 }
 
+#toggle-downloads {
+     position: relative;
+}
+
+#toggle-downloads .downloads-badge {
+     position: absolute;
+     top: 2px;
+     right: 2px;
+     min-width: 12px;
+     height: 12px;
+     line-height: 12px;
+     font-size: 9px;
+     font-weight: 600;
+     border-radius: 999px;
+     background: #ff6b6b;
+     color: #fff;
+     text-align: center;
+     padding: 0 3px;
+     display: none;
+     pointer-events: none;
+     overflow: visible !important;
+}
+
+#toggle-downloads.badge-visible .downloads-badge {
+     display: inline-block;
+}
+
 /* AdBlock toggle coloring: enabled => purple-blue, disabled => grey (inherited) */
 #toggle-adblock:not(.disabled) {
      color: #6C63FF;
@@ -135,7 +162,7 @@ svg#icon_defs path {
      background: #2b2b38;
      border: 1px solid #313146;
      border-radius: 8px;
-     box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
      padding: 4px 0;
      z-index: 2000;
      color: #e2e1ea;

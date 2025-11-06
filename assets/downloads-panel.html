@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Downloads Preview</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            transition: all 0.2s ease-in-out;
+        }
+
+        :root {
+            color-scheme: light dark;
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            color: #ecebfd;
+            background: transparent;
+        }
+
+        #downloads-root {
+            position: fixed;
+            inset: 0;
+        }
+
+        #downloads-dropdown {
+            position: fixed;
+            top: 12px;
+            right: 10px;
+            width: 320px;
+            max-height: 380px;
+            background: rgba(35, 35, 48, 0.96);
+            border: 1px solid rgba(84, 84, 120, 0.55);
+            border-radius: 12px;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            backdrop-filter: blur(12px);
+            transform: translateY(-12px);
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.18s ease, opacity 0.18s ease;
+        }
+
+        body.is-visible #downloads-dropdown {
+            transform: translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        body.is-closing #downloads-dropdown {
+            transform: translateY(-12px);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #f5f4ff;
+        }
+
+        .btn {
+            padding: 6px 10px;
+            border-radius: 7px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: transparent;
+            color: inherit;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 6px 0;
+        }
+
+        .item {
+            padding: 10px 16px;
+        }
+
+        .item+.item {
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .name {
+            margin: 0 0 4px 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: #fdfcff;
+            word-break: break-word;
+        }
+
+        .meta {
+            font-size: 11px;
+            color: #a1a5c4;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .meta span {
+            white-space: nowrap;
+        }
+
+        .status-pill {
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: rgba(124, 104, 238, 0.18);
+            color: #a99eff;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .status-pill.completed {
+            background: rgba(96, 204, 118, 0.18);
+            color: #8fffb3;
+        }
+
+        .status-pill.failed {
+            background: rgba(254, 98, 98, 0.18);
+            color: #ffb0b0;
+        }
+
+        .status-pill.waiting {
+            background: rgba(255, 193, 94, 0.18);
+            color: #ffd9a3;
+        }
+
+        .progress {
+            position: relative;
+            height: 4px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            overflow: hidden;
+        }
+
+        .progress span {
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 0%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #6366f1, #38bdf8);
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .actions .btn {
+            font-size: 11px;
+            padding: 5px 9px;
+        }
+
+        .link-btn {
+            background: none;
+            border: none;
+            color: #7da3ff;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 0;
+        }
+
+        .link-btn:hover {
+            text-decoration: underline;
+        }
+
+        footer {
+            padding: 10px 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .empty {
+            padding: 36px 16px;
+            text-align: center;
+            color: #9ba0bf;
+            font-size: 12px;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: default;
+        }
+
+        @media (prefers-color-scheme: light) {
+            #downloads-dropdown {
+                background: rgba(245, 246, 252, 0.98);
+                color: #1d2033;
+                border-color: rgba(169, 176, 205, 0.5);
+            }
+
+            header h1 {
+                color: #2c2f45;
+            }
+
+            .meta {
+                color: #5d6280;
+            }
+
+            .status-pill.completed {
+                color: #0a7b4f;
+                background: rgba(10, 123, 79, 0.18);
+            }
+
+            .status-pill.failed {
+                color: #c62828;
+                background: rgba(198, 40, 40, 0.18);
+            }
+
+            .status-pill.waiting {
+                color: #b86b00;
+                background: rgba(216, 143, 22, 0.18);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="downloads-root">
+        <div id="downloads-dropdown" role="dialog" aria-label="Downloads preview">
+            <header>
+                <h1>Downloads</h1>
+                <button id="close-panel" class="btn" type="button">Close</button>
+            </header>
+            <div id="downloads-list" class="list"></div>
+            <div id="downloads-empty" class="empty">No downloads yet.</div>
+            <footer>
+                <button id="downloads-clear" class="btn" type="button">Clear finished</button>
+                <button id="open-downloads-page" class="link-btn" type="button">Open downloads page</button>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        const MAX_ITEMS = 8;
+        let isClosing = false;
+
+        function closePanel() {
+            if (isClosing) return;
+            isClosing = true;
+            document.body.classList.remove('is-visible');
+            document.body.classList.add('is-closing');
+            setTimeout(() => {
+                try { if (window.OnDownloadsOverlayClose) OnDownloadsOverlayClose(); } catch { }
+                document.body.classList.remove('is-closing');
+                isClosing = false;
+            }, 160);
+        }
+
+        function fmtBytes(bytes) {
+            if (bytes === null || bytes === undefined || bytes < 0) return '';
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            let value = bytes;
+            let unit = 0;
+            while (value >= 1024 && unit < units.length - 1) {
+                value /= 1024;
+                unit++;
+            }
+            return value.toFixed(value >= 10 ? 0 : 1) + ' ' + units[unit];
+        }
+
+        function statusLabel(status) {
+            switch ((status || '').toLowerCase()) {
+                case 'completed':
+                    return { text: 'completed', className: 'completed' };
+                case 'failed':
+                    return { text: 'failed', className: 'failed' };
+                case 'cancelled':
+                    return { text: 'paused', className: 'waiting' };
+                case 'in-progress':
+                    return { text: 'downloading', className: '' };
+                case 'requested':
+                    return { text: 'waiting', className: 'waiting' };
+                default:
+                    return { text: status || 'pending', className: '' };
+            }
+        }
+
+        function render(data) {
+            const list = document.getElementById('downloads-list');
+            const empty = document.getElementById('downloads-empty');
+            list.innerHTML = '';
+            const items = (data && Array.isArray(data.items)) ? data.items.slice().reverse() : [];
+            if (!items.length) {
+                empty.style.display = 'block';
+                return;
+            }
+            empty.style.display = 'none';
+
+            const subset = items.slice(0, MAX_ITEMS);
+            let hasFinished = false;
+
+            for (const item of subset) {
+                const card = document.createElement('div');
+                card.className = 'item';
+
+                const name = document.createElement('div');
+                name.className = 'name';
+                name.textContent = item.filename || '(unknown file)';
+                card.appendChild(name);
+
+                const meta = document.createElement('div');
+                meta.className = 'meta';
+                const statusInfo = statusLabel(item.status);
+                const statusSpan = document.createElement('span');
+                statusSpan.className = 'status-pill ' + statusInfo.className;
+                statusSpan.textContent = statusInfo.text;
+                meta.appendChild(statusSpan);
+
+                const sizeSpan = document.createElement('span');
+                if (item.total > 0)
+                    sizeSpan.textContent = fmtBytes(item.received) + ' / ' + fmtBytes(item.total);
+                else if (item.received > 0)
+                    sizeSpan.textContent = fmtBytes(item.received);
+                if (sizeSpan.textContent)
+                    meta.appendChild(sizeSpan);
+
+                if (item.error) {
+                    const errSpan = document.createElement('span');
+                    errSpan.textContent = item.error;
+                    meta.appendChild(errSpan);
+                }
+
+                card.appendChild(meta);
+
+                const isDownloading = item.status === 'in-progress';
+                const isCompletedState = item.status === 'completed' || item.status === 'failed' || item.status === 'cancelled';
+
+                if (isDownloading) {
+                    const progress = document.createElement('div');
+                    progress.className = 'progress';
+                    const bar = document.createElement('span');
+                    let percent = 0;
+                    if (item.total > 0)
+                        percent = Math.min(100, Math.max(0, (item.received / item.total) * 100));
+                    else if (item.received > 0)
+                        percent = 100;
+                    bar.style.width = percent.toFixed(1) + '%';
+                    progress.appendChild(bar);
+                    card.appendChild(progress);
+                }
+
+                const actions = document.createElement('div');
+                actions.className = 'actions';
+
+                if (item.canOpen) {
+                    hasFinished = true;
+                    const openBtn = document.createElement('button');
+                    openBtn.className = 'btn';
+                    openBtn.type = 'button';
+                    openBtn.textContent = 'Open';
+                    openBtn.addEventListener('click', () => {
+                        try { if (window.NativeOpenDownload) NativeOpenDownload(item.id); } catch { }
+                    });
+                    actions.appendChild(openBtn);
+                }
+
+                if (item.canReveal) {
+                    hasFinished = true;
+                    const revealBtn = document.createElement('button');
+                    revealBtn.className = 'btn';
+                    revealBtn.type = 'button';
+                    revealBtn.textContent = 'Show in folder';
+                    revealBtn.addEventListener('click', () => {
+                        try { if (window.NativeRevealDownload) NativeRevealDownload(item.id); } catch { }
+                    });
+                    actions.appendChild(revealBtn);
+                }
+
+                if (isDownloading) {
+                    const pauseBtn = document.createElement('button');
+                    pauseBtn.className = 'btn';
+                    pauseBtn.type = 'button';
+                    pauseBtn.textContent = 'Pause';
+                    pauseBtn.addEventListener('click', () => {
+                        try { if (window.NativePauseDownload) NativePauseDownload(item.id); } catch { }
+                        refresh();
+                    });
+                    actions.appendChild(pauseBtn);
+                } else {
+                    if (isCompletedState)
+                        hasFinished = true;
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'btn';
+                    removeBtn.type = 'button';
+                    removeBtn.textContent = 'Remove';
+                    removeBtn.addEventListener('click', () => {
+                        try { if (window.NativeRemoveDownload) NativeRemoveDownload(item.id); } catch { }
+                        refresh();
+                    });
+                    actions.appendChild(removeBtn);
+                }
+
+                if (actions.childElementCount)
+                    card.appendChild(actions);
+
+                list.appendChild(card);
+            }
+
+            document.getElementById('downloads-clear').disabled = !hasFinished;
+        }
+
+        function refresh() {
+            try {
+                if (window.NativeGetDownloads) {
+                    const json = NativeGetDownloads();
+                    const data = JSON.parse(json || '{"items":[]}');
+                    render(data);
+                    return;
+                }
+            } catch (e) { }
+            render({ items: [] });
+        }
+
+        window.__ul_downloads_panel_refresh = function () {
+            refresh();
+        };
+
+        document.getElementById('downloads-clear').addEventListener('click', () => {
+            try { if (window.NativeClearDownloads) NativeClearDownloads(); } catch { }
+            refresh();
+        });
+
+        document.getElementById('open-downloads-page').addEventListener('click', () => {
+            try { if (window.OnOpenDownloadsNewTab) OnOpenDownloadsNewTab(); } catch { }
+            closePanel();
+        });
+
+        document.getElementById('close-panel').addEventListener('click', () => closePanel());
+
+        const root = document.getElementById('downloads-root');
+        const dropdown = document.getElementById('downloads-dropdown');
+        root.addEventListener('click', (e) => {
+            if (e.target === root)
+                closePanel();
+        });
+        dropdown.addEventListener('click', (e) => e.stopPropagation());
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closePanel();
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.body.classList.remove('is-closing');
+            requestAnimationFrame(() => document.body.classList.add('is-visible'));
+            let tries = 0;
+            const tick = () => {
+                if (window.NativeGetDownloads) { refresh(); return; }
+                if (++tries < 20) setTimeout(tick, 80);
+            };
+            tick();
+        });
+
+        setInterval(refresh, 1500);
+    </script>
+</body>
+
+</html>

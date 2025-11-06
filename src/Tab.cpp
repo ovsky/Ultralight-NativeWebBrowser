@@ -1,5 +1,6 @@
 #include "Tab.h"
 #include "UI.h"
+#include "DownloadManager.h"
 #include <iostream>
 #include <string>
 #include <cstdio>
@@ -13,12 +14,14 @@ Tab::Tab(UI *ui, uint64_t id, uint32_t width, uint32_t height, int x, int y)
   overlay_ = Overlay::Create(ui->window_, width, height, x, y);
   view()->set_view_listener(this);
   view()->set_load_listener(this);
+  view()->set_download_listener(ui->download_manager());
 }
 
 Tab::~Tab()
 {
   view()->set_view_listener(nullptr);
   view()->set_load_listener(nullptr);
+  view()->set_download_listener(nullptr);
 }
 
 void Tab::Show()
@@ -56,6 +59,7 @@ void Tab::ToggleInspector()
     {
       iv->set_load_listener(this);
       iv->set_view_listener(this);
+      iv->set_download_listener(ui_->download_manager());
       iv->LoadURL("file:///quick-inspector.html");
     }
   }
@@ -214,7 +218,10 @@ RefPtr<View> Tab::OnCreateInspectorView(ultralight::View *caller, bool is_local,
     Resize(container_width_, container_height_);
     inspector_overlay_->Show();
   }
-  return inspector_overlay_->view();
+  auto iv = inspector_overlay_->view();
+  if (iv)
+    iv->set_download_listener(ui_->download_manager());
+  return iv;
 }
 
 void Tab::OnBeginLoading(View *caller, uint64_t frame_id, bool is_main_frame, const String &url)
@@ -383,6 +390,19 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
       global["NativeClearHistory"] = BindJSCallback(&Tab::OnHistoryClear);
       // Notify the page JS that native bridge is ready so it can refresh now
       caller->EvaluateScript("(function(){ if (window.__ul_history_ready) window.__ul_history_ready(); })();", nullptr);
+    }
+    else if (c && std::strstr(c, "downloads.html"))
+    {
+      RefPtr<JSContext> ctx = caller->LockJSContext();
+      SetJSContext(ctx->ctx());
+      JSObject global = JSGlobalObject();
+      global["NativeGetDownloads"] = BindJSCallbackWithRetval(&Tab::OnDownloadsGetData);
+      global["NativeClearDownloads"] = BindJSCallback(&Tab::OnDownloadsClear);
+      global["NativeOpenDownload"] = BindJSCallback(&Tab::OnDownloadsOpen);
+      global["NativeRevealDownload"] = BindJSCallback(&Tab::OnDownloadsReveal);
+      caller->EvaluateScript("(function(){ if (window.__ul_downloads_ready) window.__ul_downloads_ready(); })();", nullptr);
+      if (ui_)
+        ui_->NotifyDownloadsChanged();
     }
     else if (c && std::strstr(c, "quick-inspector.html"))
     {
@@ -868,6 +888,35 @@ JSValue Tab::JS_GetAppInfo(const JSObject &obj, const JSArgs &args)
   // Minimal app info
   std::string json = std::string("{\"name\":\"Ultralight-WebBrowser\",\"version\":\"1.0\"}");
   return JSValue(String(json.c_str()));
+}
+
+JSValue Tab::OnDownloadsGetData(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_)
+    return JSValue(String("{\"items\":[]}"));
+  return JSValue(ui_->GetDownloadsJSON());
+}
+
+void Tab::OnDownloadsClear(const JSObject &obj, const JSArgs &args)
+{
+  if (ui_)
+    ui_->ClearCompletedDownloads();
+}
+
+void Tab::OnDownloadsOpen(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || args.empty())
+    return;
+  uint64_t id = static_cast<uint64_t>((double)args[0]);
+  ui_->OpenDownloadItem(id);
+}
+
+void Tab::OnDownloadsReveal(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || args.empty())
+    return;
+  uint64_t id = static_cast<uint64_t>((double)args[0]);
+  ui_->RevealDownloadItem(id);
 }
 
 void Tab::OnOpenContextMenu(const JSObject &obj, const JSArgs &args)

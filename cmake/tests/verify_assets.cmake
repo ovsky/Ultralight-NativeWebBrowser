@@ -12,7 +12,7 @@ if(NOT EXISTS "${ASSETS_DIR}")
   message(FATAL_ERROR "assets/ folder not found at ${ASSETS_DIR}")
 endif()
 
-foreach(req IN ITEMS ui.html ui.css ui.js new_tab_page.html about.html release_notes.html)
+foreach(req IN ITEMS ui.html ui.css ui.js new_tab_page.html about.html release_notes.html downloads.html downloads-panel.html)
   if(NOT EXISTS "${ASSETS_DIR}/${req}")
     message(FATAL_ERROR "Required asset missing: ${req}")
   endif()
