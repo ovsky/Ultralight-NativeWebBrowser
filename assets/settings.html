@@ -84,6 +84,7 @@
         }
 
         button {
+            position: relative;
             border-radius: var(--radius-sm);
             padding: 10px 18px;
             font-size: 13.5px;
@@ -116,6 +117,28 @@
 
         button.primary:hover {
             background: linear-gradient(120deg, #608aff, var(--accent));
+        }
+
+        button[disabled] {
+            opacity: 0.45;
+            cursor: not-allowed;
+            pointer-events: none;
+            box-shadow: none;
+            transform: none;
+        }
+
+        button.primary[data-dirty="true"] {
+            background: linear-gradient(120deg, #6a8bff, var(--accent));
+            box-shadow: 0 20px 42px rgba(80, 128, 255, 0.38);
+        }
+
+        button.primary[data-dirty="true"]::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            box-shadow: 0 0 0 1px rgba(135, 163, 255, 0.6) inset;
+            pointer-events: none;
         }
 
         .layout {
@@ -225,6 +248,16 @@
             cursor: pointer;
         }
 
+        .setting-row.is-dirty {
+            border-color: rgba(135, 163, 255, 0.55);
+            background: rgba(58, 70, 120, 0.28);
+            box-shadow: inset 0 0 0 1px rgba(110, 130, 210, 0.32);
+        }
+
+        .setting-row.is-dirty .setting-copy strong {
+            color: var(--accent);
+        }
+
         .setting-copy strong {
             display: block;
             font-size: 14px;
@@ -257,6 +290,16 @@
             color: var(--text-muted);
             font-size: 13.5px;
             text-align: center;
+        }
+
+        code {
+            font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+            font-size: 12.5px;
+            background: rgba(34, 38, 64, 0.76);
+            padding: 2px 6px;
+            border-radius: 6px;
+            border: 1px solid rgba(134, 148, 220, 0.25);
+            color: var(--text);
         }
 
         @media (max-width: 1024px) {
@@ -309,14 +352,12 @@
         <header class="page-hero">
             <div class="hero-copy">
                 <h1>Browser Settings</h1>
-                <p>Fine-tune how Ultralight looks, behaves, and protects your privacy. Changes apply instantly and
-                    persist
-                    between sessions.</p>
+                <p>Fine-tune how Ultralight looks, behaves, and protects your privacy. Changes apply instantly while
+                    you browse. Use Save to keep them for future sessions.</p>
             </div>
             <div class="hero-actions">
                 <button id="restore-defaults" type="button">Restore defaults</button>
-                <button id="close-settings" type="button">Close</button>
-                <button id="apply-settings" class="primary" type="button">Done</button>
+                <button id="save-settings" class="primary" type="button" disabled>Save changes</button>
             </div>
         </header>
 
@@ -469,16 +510,27 @@
         </div>
 
         <footer class="page-footer">
-            Changes save automatically. You can close this tab when you are done.
+            Unsaved changes stay in this tab until you press Save. Stored at <code id="settings-save-path">data/settings.json</code>.
         </footer>
     </main>
 
     <script>
         (function () {
             const restoreBtn = document.getElementById('restore-defaults');
-            const closeBtn = document.getElementById('close-settings');
-            const doneBtn = document.getElementById('apply-settings');
+            const saveBtn = document.getElementById('save-settings');
             const inputs = Array.from(document.querySelectorAll('input[type="checkbox"][data-key]'));
+            const rowsByKey = new Map();
+            inputs.forEach((input) => {
+                const key = input.getAttribute('data-key');
+                const row = input.closest('.setting-row');
+                if (key && row) {
+                    rowsByKey.set(key, row);
+                }
+            });
+
+            let baselineValues = {};
+            let currentValues = {};
+            let isDirty = false;
 
             function normalizePayload(payload) {
                 if (typeof payload === 'string') {
@@ -487,15 +539,98 @@
                 return (payload && typeof payload === 'object') ? payload : null;
             }
 
-            function applySettingsState(payload) {
-                const state = normalizePayload(payload);
-                if (!state) return;
-                inputs.forEach((input) => {
-                    const key = input.getAttribute('data-key');
-                    if (Object.prototype.hasOwnProperty.call(state, key)) {
-                        input.checked = !!state[key];
+            function coercePayload(payload) {
+                const parsed = normalizePayload(payload);
+                if (!parsed) return null;
+                const values = (parsed.values && typeof parsed.values === 'object') ? parsed.values : parsed;
+                const meta = (parsed.meta && typeof parsed.meta === 'object') ? parsed.meta : {};
+                if (!Array.isArray(meta.catalog) && Array.isArray(parsed.catalog)) {
+                    meta.catalog = parsed.catalog;
+                }
+                return { values, meta };
+            }
+
+            function hasDiff(next, baseline) {
+                const keys = new Set([
+                    ...Object.keys(next || {}),
+                    ...Object.keys(baseline || {})
+                ]);
+                for (const key of keys) {
+                    if (!!next[key] !== !!baseline[key]) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            function updateDirtyRows(dirtyKeys) {
+                const dirty = new Set(Array.isArray(dirtyKeys) ? dirtyKeys : []);
+                rowsByKey.forEach((row, key) => {
+                    if (dirty.has(key)) {
+                        row.classList.add('is-dirty');
+                    } else {
+                        row.classList.remove('is-dirty');
                     }
                 });
+            }
+
+            function updateSavePath(path) {
+                const el = document.getElementById('settings-save-path');
+                if (el && typeof path === 'string' && path.length) {
+                    el.textContent = path;
+                }
+            }
+
+            function updateSaveButtonState() {
+                if (!saveBtn) return;
+                saveBtn.disabled = !isDirty;
+                if (isDirty) {
+                    saveBtn.dataset.dirty = 'true';
+                } else {
+                    delete saveBtn.dataset.dirty;
+                }
+            }
+
+            function applySettingsState(payload) {
+                const coerced = coercePayload(payload);
+                if (!coerced) return;
+                const { values, meta } = coerced;
+
+                currentValues = Object.assign({}, values);
+
+                inputs.forEach((input) => {
+                    const key = input.getAttribute('data-key');
+                    if (key && Object.prototype.hasOwnProperty.call(values, key)) {
+                        input.checked = !!values[key];
+                    }
+                });
+
+                if (meta && Array.isArray(meta.dirty_keys)) {
+                    updateDirtyRows(meta.dirty_keys);
+                } else {
+                    updateDirtyRows([]);
+                }
+
+                const baselineMarker = meta && meta.baseline === true;
+                if (baselineMarker || Object.keys(baselineValues).length === 0) {
+                    baselineValues = Object.assign({}, values);
+                }
+
+                if (meta && typeof meta.dirty === 'boolean') {
+                    isDirty = meta.dirty;
+                } else {
+                    isDirty = hasDiff(values, baselineValues);
+                }
+
+                if (!isDirty && meta && Array.isArray(meta.dirty_keys) && meta.dirty_keys.length) {
+                    isDirty = true;
+                }
+
+                if (meta && typeof meta.storage_path === 'string') {
+                    updateSavePath(meta.storage_path);
+                }
+
+                updateSaveButtonState();
             }
 
             function pushSetting(key, value) {
@@ -512,30 +647,54 @@
                 } catch (e) { /* ignore */ }
             }
 
+            function markRowDirty(key) {
+                const row = rowsByKey.get(key);
+                if (row) {
+                    row.classList.add('is-dirty');
+                }
+            }
+
             inputs.forEach((input) => {
                 input.addEventListener('change', () => {
                     const key = input.getAttribute('data-key');
                     if (!key) return;
+                    currentValues[key] = !!input.checked;
+                    markRowDirty(key);
+                    isDirty = true;
+                    updateSaveButtonState();
                     pushSetting(key, input.checked);
                 });
             });
 
-            restoreBtn.addEventListener('click', () => {
-                if (!window.OnRestoreSettingsDefaults) return;
-                try {
-                    const raw = OnRestoreSettingsDefaults();
-                    applySettingsState(raw);
-                } catch (e) { /* ignore */ }
-            });
-
-            function closePanel() {
-                if (window.OnCloseSettingsPanel) {
-                    try { OnCloseSettingsPanel(); } catch (e) { /* ignore */ }
-                }
+            if (restoreBtn) {
+                restoreBtn.addEventListener('click', () => {
+                    if (!window.OnRestoreSettingsDefaults) return;
+                    try {
+                        const raw = OnRestoreSettingsDefaults();
+                        applySettingsState(raw);
+                    } catch (e) { /* ignore */ }
+                });
             }
 
-            closeBtn.addEventListener('click', closePanel);
-            doneBtn.addEventListener('click', closePanel);
+            function requestSave() {
+                if (!saveBtn || saveBtn.disabled) return;
+                if (window.OnSaveSettings) {
+                    try { OnSaveSettings(); } catch (e) { /* ignore */ }
+                }
+                saveBtn.disabled = true;
+                delete saveBtn.dataset.dirty;
+            }
+
+            if (saveBtn) {
+                saveBtn.addEventListener('click', requestSave);
+            }
+
+            document.addEventListener('keydown', (event) => {
+                if ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === 's') {
+                    event.preventDefault();
+                    requestSave();
+                }
+            });
 
             window.applySettingsState = applySettingsState;
 
@@ -544,13 +703,6 @@
             });
 
             window.addEventListener('focus', refreshSnapshot);
-
-            document.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape') {
-                    event.preventDefault();
-                    closePanel();
-                }
-            });
 
             refreshSnapshot();
         })();

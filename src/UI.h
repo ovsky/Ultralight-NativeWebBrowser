@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <filesystem>
 
 using ultralight::JSArgs;
 using ultralight::JSFunction;
@@ -27,6 +28,25 @@ public:
   // Overload retained for compatibility; adblockers are optional and may be unused.
   UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker);
   ~UI();
+
+  struct BrowserSettings
+  {
+    bool launch_dark_theme = false;
+    bool enable_adblock = true;
+    bool log_blocked_requests = false;
+    bool enable_suggestions = true;
+    bool enable_suggestion_favicons = true;
+    bool show_download_badge = true;
+    bool auto_open_download_panel = true;
+    bool clear_history_on_exit = false;
+    bool experimental_transparent_toolbar = false;
+    bool experimental_compact_tabs = false;
+    bool reduce_motion = false;
+    bool high_contrast_ui = false;
+    bool vibrant_window_theme = false;
+    bool operator==(const BrowserSettings &other) const;
+    bool operator!=(const BrowserSettings &other) const { return !(*this == other); }
+  };
 
   // Inherited from WindowListener
   virtual bool OnKeyEvent(const ultralight::KeyEvent &evt) override;
@@ -78,6 +98,7 @@ public:
   ultralight::JSValue OnGetSettings(const JSObject &obj, const JSArgs &args);
   void OnUpdateSetting(const JSObject &obj, const JSArgs &args);
   ultralight::JSValue OnRestoreSettingsDefaults(const JSObject &obj, const JSArgs &args);
+  void OnSaveSettings(const JSObject &obj, const JSArgs &args);
   // Suggestions callback (address bar autocomplete)
   ultralight::JSValue OnGetSuggestions(const JSObject &obj, const JSArgs &args);
   // Adjust UI overlay height for suggestions dropdown
@@ -88,6 +109,8 @@ public:
   DownloadManager *download_manager() { return download_manager_.get(); }
 
 protected:
+  static std::filesystem::path SettingsDirectory();
+  static std::filesystem::path SettingsFilePath();
   void CreateNewTab();
   RefPtr<View> CreateNewTabForChildView(const String &url);
   void UpdateTabTitle(uint64_t id, const String &title);
@@ -126,16 +149,18 @@ protected:
   void NotifyDownloadsChanged();
   void OnNewDownloadStarted();
   void SyncAdblockStateToUI();
-  void SyncSettingsStateToUI();
-  void ApplySettings(bool initial);
+  void SyncSettingsStateToUI(bool snapshot_is_baseline = false);
+  void ApplySettings(bool initial, bool snapshot_is_baseline);
   void SetDarkModeEnabled(bool enabled);
   void LoadSettingsFromDisk();
-  void SaveSettingsToDisk();
+  bool SaveSettingsToDisk();
   void EnsureDataDirectoryExists();
   void RestoreSettingsToDefaults();
   std::string BuildSettingsJSON() const;
+  std::string BuildSettingsPayload(bool snapshot_is_baseline) const;
   bool ParseSettingsBool(const std::string &buffer, const char *key, bool fallback) const;
   void HandleSettingMutation(const std::string &key, bool value);
+  void UpdateSettingsDirtyFlag();
 
   // Suggestions / persistence helpers
   void LoadPopularSites();
@@ -265,22 +290,10 @@ protected:
   void LoadShortcuts();
   bool RunShortcutAction(const std::string &action);
 
-  struct BrowserSettings
-  {
-    bool launch_dark_theme = false;
-    bool enable_adblock = true;
-    bool log_blocked_requests = false;
-    bool enable_suggestions = true;
-    bool enable_suggestion_favicons = true;
-    bool show_download_badge = true;
-    bool auto_open_download_panel = true;
-    bool clear_history_on_exit = false;
-    bool experimental_transparent_toolbar = false;
-    bool experimental_compact_tabs = false;
-    bool reduce_motion = false;
-    bool high_contrast_ui = false;
-    bool vibrant_window_theme = false;
-  } settings_;
+  BrowserSettings settings_;
+
+  BrowserSettings saved_settings_;
+  bool settings_dirty_ = false;
 
   friend class Tab;
 };

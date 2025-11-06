@@ -8,8 +8,14 @@
 #include <cctype>
 #include <algorithm>
 #include <unordered_set>
+#include <unordered_map>
 #include <cstdio>
 #include <filesystem>
+#include <iomanip>
+#include <ctime>
+#include <array>
+#include <vector>
+#include <cstdlib>
 #include "DownloadManager.h"
 #include "AdBlocker.h"
 #ifdef _WIN32
@@ -26,6 +32,103 @@ static UI *g_ui = 0;
 namespace
 {
   constexpr int kDownloadsOverlaySpacing = 8;
+
+  struct SettingDescriptor
+  {
+    const char *key;
+    const char *name;
+    const char *description;
+    const char *category;
+    const char *note;
+    bool UI::BrowserSettings::*member;
+    bool default_value;
+  };
+
+  constexpr std::array<SettingDescriptor, 13> kSettingsCatalog = {
+      SettingDescriptor{"launch_dark_theme", "Launch in dark theme",
+                        "Start Ultralight with dark chrome, toolbars, and tabs by default.",
+                        "appearance", nullptr, &UI::BrowserSettings::launch_dark_theme, false},
+      SettingDescriptor{"enable_adblock", "Enable ad blocking",
+                        "Filter network requests using bundled block lists to hide intrusive ads.",
+                        "privacy", nullptr, &UI::BrowserSettings::enable_adblock, true},
+      SettingDescriptor{"log_blocked_requests", "Log blocked requests",
+                        "Write each blocked network request to the console for debugging rules.",
+                        "privacy", nullptr, &UI::BrowserSettings::log_blocked_requests, false},
+      SettingDescriptor{"enable_suggestions", "Show address bar suggestions",
+                        "Surface history matches and popular sites while typing in the address bar.",
+                        "suggestions", nullptr, &UI::BrowserSettings::enable_suggestions, true},
+      SettingDescriptor{"enable_suggestion_favicons", "Show favicons in suggestions",
+                        "Display site icons next to suggestion rows whenever an icon is available.",
+                        "suggestions", nullptr, &UI::BrowserSettings::enable_suggestion_favicons, true},
+      SettingDescriptor{"show_download_badge", "Show download badge",
+                        "Highlight the toolbar downloads button whenever transfers are active.",
+                        "downloads", nullptr, &UI::BrowserSettings::show_download_badge, true},
+      SettingDescriptor{"auto_open_download_panel", "Open downloads panel automatically",
+                        "Pop open the quick downloads overlay as soon as a new download begins.",
+                        "downloads", nullptr, &UI::BrowserSettings::auto_open_download_panel, true},
+      SettingDescriptor{"clear_history_on_exit", "Clear history on exit",
+                        "Remove browsing history when Ultralight closes and skip saving new visits.",
+                        "privacy", nullptr, &UI::BrowserSettings::clear_history_on_exit, false},
+      SettingDescriptor{"experimental_transparent_toolbar", "Transparent toolbar",
+                        "Blend the toolbar into page content with a translucent, glass-like surface.",
+                        "appearance", "Experimental", &UI::BrowserSettings::experimental_transparent_toolbar, false},
+      SettingDescriptor{"experimental_compact_tabs", "Compact tabs",
+                        "Reduce tab height and spacing so more tabs stay visible without scrolling.",
+                        "appearance", "Experimental", &UI::BrowserSettings::experimental_compact_tabs, false},
+      SettingDescriptor{"reduce_motion", "Reduce motion effects",
+                        "Limit animated transitions and parallax flourishes for a calmer experience.",
+                        "accessibility", nullptr, &UI::BrowserSettings::reduce_motion, false},
+      SettingDescriptor{"high_contrast_ui", "High contrast UI",
+                        "Boost contrast for overlays, menus, and dialogs to improve readability.",
+                        "accessibility", nullptr, &UI::BrowserSettings::high_contrast_ui, false},
+      SettingDescriptor{"vibrant_window_theme", "Vibrant window theme",
+                        "Apply a subtle color wash to the window frame for a livelier finish.",
+                        "appearance", nullptr, &UI::BrowserSettings::vibrant_window_theme, false}};
+
+  inline std::string ToIso8601UTC(const std::chrono::system_clock::time_point &tp)
+  {
+    std::time_t raw = std::chrono::system_clock::to_time_t(tp);
+    std::tm utc_tm{};
+#if defined(_WIN32)
+    gmtime_s(&utc_tm, &raw);
+#else
+    gmtime_r(&raw, &utc_tm);
+#endif
+    std::ostringstream oss;
+    oss << std::put_time(&utc_tm, "%Y-%m-%dT%H:%M:%SZ");
+    return oss.str();
+  }
+
+  inline std::string EscapeJson(const std::string &input)
+  {
+    std::string out;
+    out.reserve(input.size() + 8);
+    for (char c : input)
+    {
+      switch (c)
+      {
+      case '\\':
+        out += "\\\\";
+        break;
+      case '"':
+        out += "\\\"";
+        break;
+      case '\n':
+        out += "\\n";
+        break;
+      case '\r':
+        out += "\\r";
+        break;
+      case '\t':
+        out += "\\t";
+        break;
+      default:
+        out += c;
+        break;
+      }
+    }
+    return out;
+  }
 }
 
 UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
@@ -49,7 +152,7 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
   LoadSuggestionsFaviconsFlag();
   EnsureDataDirectoryExists();
   LoadSettingsFromDisk();
-  ApplySettings(true);
+  ApplySettings(true, true);
 
   // Load keyboard shortcuts mapping
   LoadShortcuts();
@@ -86,7 +189,7 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
   LoadSuggestionsFaviconsFlag();
   EnsureDataDirectoryExists();
   LoadSettingsFromDisk();
-  ApplySettings(true);
+  ApplySettings(true, true);
 
   // Load keyboard shortcuts mapping
   LoadShortcuts();
@@ -114,7 +217,8 @@ UI::~UI()
   {
     SaveHistoryToDisk();
   }
-  SaveSettingsToDisk();
+  if (settings_dirty_)
+    SaveSettingsToDisk();
 
   if (download_manager_)
     download_manager_->SetOnChangeCallback(nullptr);
@@ -536,6 +640,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["GetSettingsSnapshot"] = BindJSCallbackWithRetval(&UI::OnGetSettings);
   global["OnUpdateSetting"] = BindJSCallback(&UI::OnUpdateSetting);
   global["OnRestoreSettingsDefaults"] = BindJSCallbackWithRetval(&UI::OnRestoreSettingsDefaults);
+  global["OnSaveSettings"] = BindJSCallback(&UI::OnSaveSettings);
   if (is_ctx_view)
   {
     // context menu overlay actions
@@ -593,15 +698,15 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     applySettingsPanel = global["applySettingsState"];
     if (applySettingsPanel)
     {
-      std::string json = BuildSettingsJSON();
-      applySettingsPanel({String(json.c_str())});
+      std::string payload = BuildSettingsPayload(true);
+      applySettingsPanel({String(payload.c_str())});
     }
   }
 
   if (!is_menu_view && !is_ctx_view && !is_sugg_view && !is_downloads_overlay_view && !is_settings_page_view)
   {
     SyncAdblockStateToUI();
-    SyncSettingsStateToUI();
+    SyncSettingsStateToUI(true);
     CreateNewTab();
   }
 }
@@ -1295,8 +1400,8 @@ void UI::OnCloseSettingsPanel(const JSObject &, const JSArgs &)
 
 ultralight::JSValue UI::OnGetSettings(const JSObject &, const JSArgs &)
 {
-  std::string json = BuildSettingsJSON();
-  return ultralight::JSValue(json.c_str());
+  std::string payload = BuildSettingsPayload(false);
+  return ultralight::JSValue(payload.c_str());
 }
 
 void UI::OnUpdateSetting(const JSObject &, const JSArgs &args)
@@ -1339,9 +1444,17 @@ void UI::OnUpdateSetting(const JSObject &, const JSArgs &args)
 ultralight::JSValue UI::OnRestoreSettingsDefaults(const JSObject &, const JSArgs &)
 {
   RestoreSettingsToDefaults();
-  ApplySettings(false);
-  std::string json = BuildSettingsJSON();
-  return ultralight::JSValue(json.c_str());
+  UpdateSettingsDirtyFlag();
+  ApplySettings(false, false);
+  UpdateSettingsDirtyFlag();
+  std::string payload = BuildSettingsPayload(false);
+  return ultralight::JSValue(payload.c_str());
+}
+
+void UI::OnSaveSettings(const JSObject &, const JSArgs &)
+{
+  bool saved = SaveSettingsToDisk();
+  SyncSettingsStateToUI(saved);
 }
 
 ultralight::JSValue UI::OnGetDarkModeEnabled(const JSObject &obj, const JSArgs &args)
@@ -1372,8 +1485,9 @@ void UI::SyncAdblockStateToUI()
   }
 }
 
-void UI::SyncSettingsStateToUI()
+void UI::SyncSettingsStateToUI(bool snapshot_is_baseline)
 {
+  UpdateSettingsDirtyFlag();
   std::string json = BuildSettingsJSON();
   ultralight::String json_str(json.c_str());
 
@@ -1403,8 +1517,9 @@ void UI::SyncSettingsStateToUI()
 
     if (settings_view)
     {
+      std::string payload = BuildSettingsPayload(snapshot_is_baseline);
       RefPtr<JSContext> lock(settings_view->LockJSContext());
-      applySettingsPanel({json_str});
+      applySettingsPanel({String(payload.c_str())});
     }
     else
     {
@@ -1413,7 +1528,7 @@ void UI::SyncSettingsStateToUI()
   }
 }
 
-void UI::ApplySettings(bool initial)
+void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
 {
   SetDarkModeEnabled(settings_.launch_dark_theme);
 
@@ -1444,9 +1559,8 @@ void UI::ApplySettings(bool initial)
     HideSuggestionsOverlay();
 
   SyncAdblockStateToUI();
-  if (!initial)
-    SaveSettingsToDisk();
-  SyncSettingsStateToUI();
+  UpdateSettingsDirtyFlag();
+  SyncSettingsStateToUI(snapshot_is_baseline);
 }
 
 void UI::SetDarkModeEnabled(bool enabled)
@@ -1491,6 +1605,7 @@ void UI::EnsureDataDirectoryExists()
   namespace fs = std::filesystem;
   std::error_code ec;
   fs::create_directories("data", ec);
+  fs::create_directories(SettingsDirectory(), ec);
 }
 
 void UI::RestoreSettingsToDefaults()
@@ -1529,159 +1644,219 @@ void UI::LoadSettingsFromDisk()
 {
   RestoreSettingsToDefaults();
 
-  std::ifstream in("data/settings.json", std::ios::in | std::ios::binary);
-  if (!in.is_open())
-    return;
+  auto apply_from_stream = [&](std::istream &stream)
+  {
+    std::ostringstream ss;
+    ss << stream.rdbuf();
+    std::string content = ss.str();
 
-  std::ostringstream ss;
-  ss << in.rdbuf();
-  std::string content = ss.str();
-  in.close();
+    for (const auto &desc : kSettingsCatalog)
+    {
+      bool fallback = settings_.*(desc.member);
+      settings_.*(desc.member) = ParseSettingsBool(content, desc.key, fallback);
+    }
+  };
 
-  settings_.launch_dark_theme = ParseSettingsBool(content, "launch_dark_theme", settings_.launch_dark_theme);
-  settings_.enable_adblock = ParseSettingsBool(content, "enable_adblock", settings_.enable_adblock);
-  settings_.log_blocked_requests = ParseSettingsBool(content, "log_blocked_requests", settings_.log_blocked_requests);
-  settings_.enable_suggestions = ParseSettingsBool(content, "enable_suggestions", settings_.enable_suggestions);
-  settings_.enable_suggestion_favicons = ParseSettingsBool(content, "enable_suggestion_favicons", settings_.enable_suggestion_favicons);
-  settings_.show_download_badge = ParseSettingsBool(content, "show_download_badge", settings_.show_download_badge);
-  settings_.auto_open_download_panel = ParseSettingsBool(content, "auto_open_download_panel", settings_.auto_open_download_panel);
-  settings_.clear_history_on_exit = ParseSettingsBool(content, "clear_history_on_exit", settings_.clear_history_on_exit);
-  settings_.experimental_transparent_toolbar = ParseSettingsBool(content, "experimental_transparent_toolbar", settings_.experimental_transparent_toolbar);
-  settings_.experimental_compact_tabs = ParseSettingsBool(content, "experimental_compact_tabs", settings_.experimental_compact_tabs);
-  settings_.reduce_motion = ParseSettingsBool(content, "reduce_motion", settings_.reduce_motion);
-  settings_.high_contrast_ui = ParseSettingsBool(content, "high_contrast_ui", settings_.high_contrast_ui);
-  settings_.vibrant_window_theme = ParseSettingsBool(content, "vibrant_window_theme", settings_.vibrant_window_theme);
+  bool loaded_primary = false;
+  bool migrated_from_legacy = false;
+
+  {
+    std::ifstream in(SettingsFilePath(), std::ios::in | std::ios::binary);
+    if (in.is_open())
+    {
+      apply_from_stream(in);
+      in.close();
+      loaded_primary = true;
+    }
+  }
+
+  if (!loaded_primary)
+  {
+    std::ifstream legacy("data/settings.json", std::ios::in | std::ios::binary);
+    if (legacy.is_open())
+    {
+      apply_from_stream(legacy);
+      legacy.close();
+      migrated_from_legacy = true;
+    }
+  }
+
+  saved_settings_ = settings_;
+  settings_dirty_ = false;
+
+  if (migrated_from_legacy)
+  {
+    // Persist immediately to the new storage location so future loads use it.
+    SaveSettingsToDisk();
+  }
 }
 
-void UI::SaveSettingsToDisk()
+bool UI::SaveSettingsToDisk()
 {
   EnsureDataDirectoryExists();
-  std::ofstream out("data/settings.json", std::ios::out | std::ios::binary | std::ios::trunc);
+  std::ofstream out(SettingsFilePath(), std::ios::out | std::ios::binary | std::ios::trunc);
   if (!out.is_open())
-    return;
-  out << BuildSettingsJSON();
+    return false;
+
+  BrowserSettings defaults;
+  std::string timestamp = ToIso8601UTC(std::chrono::system_clock::now());
+  std::string storage_path = SettingsFilePath().string();
+
+  out << "{\n";
+  out << "  \"values\": " << BuildSettingsJSON() << ",\n";
+  out << "  \"meta\": {\n";
+  out << "    \"updated_at\": \"" << timestamp << "\",\n";
+  out << "    \"dirty\": false,\n";
+  out << "    \"storage_path\": \"" << EscapeJson(storage_path) << "\",\n";
+  out << "    \"settings\": [\n";
+
+  for (size_t i = 0; i < kSettingsCatalog.size(); ++i)
+  {
+    const auto &desc = kSettingsCatalog[i];
+    bool current = settings_.*(desc.member);
+    bool default_value = defaults.*(desc.member);
+    const char *name_raw = desc.name ? desc.name : "";
+    const char *desc_raw = desc.description ? desc.description : "";
+    const char *category_raw = desc.category ? desc.category : "";
+    const char *note_raw = (desc.note && *desc.note) ? desc.note : nullptr;
+
+    out << "      {\"key\":\"" << desc.key << "\",";
+    out << "\"name\":\"" << EscapeJson(name_raw) << "\",";
+    out << "\"description\":\"" << EscapeJson(desc_raw) << "\",";
+    out << "\"category\":\"" << EscapeJson(category_raw) << "\",";
+    out << "\"value\":" << (current ? "true" : "false") << ",";
+    out << "\"default\":" << (default_value ? "true" : "false");
+    if (note_raw)
+      out << ",\"note\":\"" << EscapeJson(note_raw) << "\"";
+    out << "}";
+    if (i + 1 < kSettingsCatalog.size())
+      out << ",";
+    out << "\n";
+  }
+
+  out << "    ]\n";
+  out << "  }\n";
+  out << "}\n";
+  out.flush();
+  bool ok = out.good();
   out.close();
+
+  if (ok)
+  {
+    saved_settings_ = settings_;
+    settings_dirty_ = false;
+  }
+
+  return ok;
 }
 
 std::string UI::BuildSettingsJSON() const
 {
   std::ostringstream ss;
   ss << "{";
-  ss << "\"launch_dark_theme\":" << (settings_.launch_dark_theme ? "true" : "false") << ",";
-  ss << "\"enable_adblock\":" << (settings_.enable_adblock ? "true" : "false") << ",";
-  ss << "\"log_blocked_requests\":" << (settings_.log_blocked_requests ? "true" : "false") << ",";
-  ss << "\"enable_suggestions\":" << (settings_.enable_suggestions ? "true" : "false") << ",";
-  ss << "\"enable_suggestion_favicons\":" << (settings_.enable_suggestion_favicons ? "true" : "false") << ",";
-  ss << "\"show_download_badge\":" << (settings_.show_download_badge ? "true" : "false") << ",";
-  ss << "\"auto_open_download_panel\":" << (settings_.auto_open_download_panel ? "true" : "false") << ",";
-  ss << "\"clear_history_on_exit\":" << (settings_.clear_history_on_exit ? "true" : "false") << ",";
-  ss << "\"experimental_transparent_toolbar\":" << (settings_.experimental_transparent_toolbar ? "true" : "false") << ",";
-  ss << "\"experimental_compact_tabs\":" << (settings_.experimental_compact_tabs ? "true" : "false") << ",";
-  ss << "\"reduce_motion\":" << (settings_.reduce_motion ? "true" : "false") << ",";
-  ss << "\"high_contrast_ui\":" << (settings_.high_contrast_ui ? "true" : "false") << ",";
-  ss << "\"vibrant_window_theme\":" << (settings_.vibrant_window_theme ? "true" : "false") << "}";
+  for (size_t i = 0; i < kSettingsCatalog.size(); ++i)
+  {
+    const auto &desc = kSettingsCatalog[i];
+    bool value = settings_.*(desc.member);
+    if (i > 0)
+      ss << ",";
+    ss << "\"" << desc.key << "\":" << (value ? "true" : "false");
+  }
+  ss << "}";
   return ss.str();
+}
+
+std::string UI::BuildSettingsPayload(bool snapshot_is_baseline) const
+{
+  std::string values_json = BuildSettingsJSON();
+  BrowserSettings defaults;
+  std::vector<const char *> dirty_keys;
+  dirty_keys.reserve(kSettingsCatalog.size());
+
+  std::string storage_path = SettingsFilePath().string();
+
+  for (const auto &desc : kSettingsCatalog)
+  {
+    bool current = settings_.*(desc.member);
+    bool saved = saved_settings_.*(desc.member);
+    if (current != saved)
+      dirty_keys.push_back(desc.key);
+  }
+
+  std::ostringstream ss;
+  ss << "{";
+  ss << "\"values\":" << values_json << ",";
+  ss << "\"meta\":{";
+  ss << "\"dirty\":" << (settings_dirty_ ? "true" : "false") << ",";
+  ss << "\"baseline\":" << (snapshot_is_baseline ? "true" : "false") << ",";
+  ss << "\"storage_path\":\"" << EscapeJson(storage_path) << "\",";
+  ss << "\"dirty_keys\":[";
+  for (size_t i = 0; i < dirty_keys.size(); ++i)
+  {
+    if (i > 0)
+      ss << ",";
+    ss << "\"" << dirty_keys[i] << "\"";
+  }
+  ss << "],";
+  ss << "\"catalog\":[";
+  for (size_t i = 0; i < kSettingsCatalog.size(); ++i)
+  {
+    const auto &desc = kSettingsCatalog[i];
+    if (i > 0)
+      ss << ",";
+    bool current = settings_.*(desc.member);
+    bool default_value = defaults.*(desc.member);
+    bool saved_value = saved_settings_.*(desc.member);
+    ss << "{";
+    ss << "\"key\":\"" << desc.key << "\",";
+    const char *name_raw = desc.name ? desc.name : "";
+    const char *desc_raw = desc.description ? desc.description : "";
+    const char *category_raw = desc.category ? desc.category : "";
+    const char *note_raw = (desc.note && *desc.note) ? desc.note : nullptr;
+    ss << "\"name\":\"" << EscapeJson(name_raw) << "\",";
+    ss << "\"description\":\"" << EscapeJson(desc_raw) << "\",";
+    ss << "\"category\":\"" << EscapeJson(category_raw) << "\",";
+    ss << "\"value\":" << (current ? "true" : "false") << ",";
+    ss << "\"default\":" << (default_value ? "true" : "false") << ",";
+    ss << "\"saved\":" << (saved_value ? "true" : "false");
+    if (note_raw)
+      ss << ",\"note\":\"" << EscapeJson(note_raw) << "\"";
+    ss << "}";
+  }
+  ss << "]";
+  ss << "}";
+  ss << "}";
+  return ss.str();
+}
+
+void UI::UpdateSettingsDirtyFlag()
+{
+  settings_dirty_ = (settings_ != saved_settings_);
 }
 
 void UI::HandleSettingMutation(const std::string &key, bool value)
 {
-  bool changed = false;
-  if (key == "launch_dark_theme")
+  const SettingDescriptor *descriptor = nullptr;
+  for (const auto &entry : kSettingsCatalog)
   {
-    if (settings_.launch_dark_theme == value)
-      return;
-    settings_.launch_dark_theme = value;
-    changed = true;
-  }
-  else if (key == "enable_adblock")
-  {
-    if (settings_.enable_adblock == value)
-      return;
-    settings_.enable_adblock = value;
-    changed = true;
-  }
-  else if (key == "log_blocked_requests")
-  {
-    if (settings_.log_blocked_requests == value)
-      return;
-    settings_.log_blocked_requests = value;
-    changed = true;
-  }
-  else if (key == "enable_suggestions")
-  {
-    if (settings_.enable_suggestions == value)
-      return;
-    settings_.enable_suggestions = value;
-    changed = true;
-  }
-  else if (key == "enable_suggestion_favicons")
-  {
-    if (settings_.enable_suggestion_favicons == value)
-      return;
-    settings_.enable_suggestion_favicons = value;
-    changed = true;
-  }
-  else if (key == "show_download_badge")
-  {
-    if (settings_.show_download_badge == value)
-      return;
-    settings_.show_download_badge = value;
-    changed = true;
-  }
-  else if (key == "auto_open_download_panel")
-  {
-    if (settings_.auto_open_download_panel == value)
-      return;
-    settings_.auto_open_download_panel = value;
-    changed = true;
-  }
-  else if (key == "clear_history_on_exit")
-  {
-    if (settings_.clear_history_on_exit == value)
-      return;
-    settings_.clear_history_on_exit = value;
-    changed = true;
-  }
-  else if (key == "experimental_transparent_toolbar")
-  {
-    if (settings_.experimental_transparent_toolbar == value)
-      return;
-    settings_.experimental_transparent_toolbar = value;
-    changed = true;
-  }
-  else if (key == "experimental_compact_tabs")
-  {
-    if (settings_.experimental_compact_tabs == value)
-      return;
-    settings_.experimental_compact_tabs = value;
-    changed = true;
-  }
-  else if (key == "reduce_motion")
-  {
-    if (settings_.reduce_motion == value)
-      return;
-    settings_.reduce_motion = value;
-    changed = true;
-  }
-  else if (key == "high_contrast_ui")
-  {
-    if (settings_.high_contrast_ui == value)
-      return;
-    settings_.high_contrast_ui = value;
-    changed = true;
-  }
-  else if (key == "vibrant_window_theme")
-  {
-    if (settings_.vibrant_window_theme == value)
-      return;
-    settings_.vibrant_window_theme = value;
-    changed = true;
+    if (key == entry.key)
+    {
+      descriptor = &entry;
+      break;
+    }
   }
 
-  if (!changed)
+  if (!descriptor)
     return;
 
-  ApplySettings(false);
+  bool &field = settings_.*(descriptor->member);
+  if (field == value)
+    return;
+
+  field = value;
+  UpdateSettingsDirtyFlag();
+  ApplySettings(false, false);
+  UpdateSettingsDirtyFlag();
 
   if (key == "clear_history_on_exit")
   {
@@ -2908,4 +3083,44 @@ void UI::OnNewDownloadStarted()
 
   downloads_overlay_user_dismissed_ = false;
   ShowDownloadsOverlay();
+}
+
+bool UI::BrowserSettings::operator==(const BrowserSettings &other) const
+{
+  return launch_dark_theme == other.launch_dark_theme &&
+         enable_adblock == other.enable_adblock &&
+         log_blocked_requests == other.log_blocked_requests &&
+         enable_suggestions == other.enable_suggestions &&
+         enable_suggestion_favicons == other.enable_suggestion_favicons &&
+         show_download_badge == other.show_download_badge &&
+         auto_open_download_panel == other.auto_open_download_panel &&
+         clear_history_on_exit == other.clear_history_on_exit &&
+         experimental_transparent_toolbar == other.experimental_transparent_toolbar &&
+         experimental_compact_tabs == other.experimental_compact_tabs &&
+         reduce_motion == other.reduce_motion &&
+         high_contrast_ui == other.high_contrast_ui &&
+         vibrant_window_theme == other.vibrant_window_theme;
+}
+
+std::filesystem::path UI::SettingsDirectory()
+{
+  namespace fs = std::filesystem;
+#if defined(_WIN32)
+  if (const char *appdata = std::getenv("APPDATA"); appdata && *appdata)
+    return fs::path(appdata) / "UltralightWebBrowser";
+#elif defined(__APPLE__)
+  if (const char *home = std::getenv("HOME"); home && *home)
+    return fs::path(home) / "Library/Application Support/UltralightWebBrowser";
+#else
+  if (const char *xdg = std::getenv("XDG_CONFIG_HOME"); xdg && *xdg)
+    return fs::path(xdg) / "UltralightWebBrowser";
+  if (const char *home = std::getenv("HOME"); home && *home)
+    return fs::path(home) / ".config/UltralightWebBrowser";
+#endif
+  return fs::current_path() / "data";
+}
+
+std::filesystem::path UI::SettingsFilePath()
+{
+  return SettingsDirectory() / "settings.json";
 }
