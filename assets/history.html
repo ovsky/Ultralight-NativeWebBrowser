@@ -15,17 +15,26 @@
             color-scheme: light dark;
         }
 
+        html,
+        body {
+            height: 100%;
+            overflow-x: hidden;
+            overflow-y: auto !important;
+        }
+
         body {
             margin: 0;
             font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
             background: var(--bg, #f6f7f9);
             color: var(--fg, #111);
+            min-height: 100vh;
         }
 
         .container {
             max-width: 900px;
             margin: 32px auto;
-            padding: 0 16px;
+            padding: 0 16px 48px;
+            overflow: visible !important;
         }
 
         header {

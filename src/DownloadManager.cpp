@@ -95,6 +95,15 @@ bool DownloadManager::OnRequestDownload(ultralight::View *caller, DownloadId id,
     auto &record = GetOrCreateRecordLocked(id);
     record.url = ToStdString(url);
     record.status = Status::Requested;
+    record.error.clear();
+    record.finished_at = {};
+    record.path.clear();
+    record.expected_bytes = -1;
+    record.received_bytes = 0;
+    if (record.display_name.empty())
+    {
+        record.display_name = SanitizeFilename(DeriveFilename(record.url, ""));
+    }
     record.started_at = std::chrono::system_clock::now();
     NotifyChangeLocked(lock);
     return true;
@@ -112,6 +121,8 @@ void DownloadManager::OnBeginDownload(ultralight::View *caller, DownloadId id, c
     record.expected_bytes = expected_content_length;
     record.received_bytes = 0;
     record.started_at = std::chrono::system_clock::now();
+    record.error.clear();
+    record.finished_at = {};
 
     EnsureDirectoryExists();
 
@@ -129,6 +140,7 @@ void DownloadManager::OnBeginDownload(ultralight::View *caller, DownloadId id, c
     {
         record.status = Status::Failed;
         record.error = "Failed to open file for writing";
+        record.path.clear();
         NotifyChangeLocked(lock);
         return;
     }
@@ -149,6 +161,10 @@ void DownloadManager::OnReceiveDataForDownload(ultralight::View *caller, Downloa
         return;
 
     auto &active = it->second;
+    if (active.record && active.record->status == Status::Requested)
+        active.record->status = Status::InProgress;
+    if (active.record && active.record->display_name.empty())
+        active.record->display_name = SanitizeFilename(DeriveFilename(active.record->url, ""));
     if (active.stream && active.stream->is_open() && data && data->size())
     {
         active.stream->write(reinterpret_cast<const char *>(data->data()), static_cast<std::streamsize>(data->size()));
@@ -161,12 +177,17 @@ void DownloadManager::OnReceiveDataForDownload(ultralight::View *caller, Downloa
 void DownloadManager::OnFinishDownload(ultralight::View *caller, DownloadId id)
 {
     std::unique_lock<std::mutex> lock(mutex_);
-    auto it = active_.find(id);
     auto rec = FindRecordLocked(id);
-    if (rec && rec->status != Status::Failed && rec->status != Status::Cancelled)
-        rec->status = Status::Completed;
     if (rec)
+    {
+        if (rec->status != Status::Failed && rec->status != Status::Cancelled)
+            rec->status = Status::Completed;
+        if (rec->expected_bytes >= 0 && rec->received_bytes < rec->expected_bytes)
+            rec->received_bytes = rec->expected_bytes;
+        if (rec->display_name.empty())
+            rec->display_name = SanitizeFilename(DeriveFilename(rec->url, ""));
         rec->finished_at = std::chrono::system_clock::now();
+    }
 
     CloseStreamLocked(id, false);
     NotifyChangeLocked(lock);
@@ -180,7 +201,10 @@ void DownloadManager::OnFailDownload(ultralight::View *caller, DownloadId id)
     {
         rec->status = Status::Failed;
         rec->error = "Download failed";
+        if (rec->display_name.empty())
+            rec->display_name = SanitizeFilename(DeriveFilename(rec->url, ""));
         rec->finished_at = std::chrono::system_clock::now();
+        rec->path.clear();
     }
 
     CloseStreamLocked(id, true);

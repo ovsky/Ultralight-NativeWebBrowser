@@ -73,6 +73,12 @@
                 <path d="M12 2l7 3v5c0 5-3.4 9.7-7 11-3.6-1.3-7-6-7-11V5l7-3z" fill="currentColor" />
             </svg>
         </span>
+        <span id="toggle-downloads" class="icon" title="Downloads">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path d="M5 20h14v-2H5v2zm7-16l-5 6h3v6h4v-6h3l-5-6z" fill="currentColor" />
+            </svg>
+            <span id="downloads-badge" class="downloads-badge"></span>
+        </span>
         <!-- Overflow menu (three dots) -->
         <span id="toggle-menu" class="icon" title="Customize and control">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -138,6 +144,11 @@
             document.querySelector('#toggle-tools').addEventListener('click', event => OnToggleTools());
             const abBtn = document.querySelector('#toggle-adblock');
             if (abBtn) abBtn.addEventListener('click', event => { if (window.OnToggleAdblock) OnToggleAdblock(); });
+            const downloadsBtn = document.querySelector('#toggle-downloads');
+            if (downloadsBtn) downloadsBtn.addEventListener('click', event => {
+                event.stopPropagation();
+                if (window.OnDownloadsOverlayToggle) OnDownloadsOverlayToggle();
+            });
             var address = document.querySelector('#address');
             address.onkeypress = (function (e) {
                 if (e.which == '13') {
@@ -296,6 +307,47 @@
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape' && isMenuOpen()) closeMenu();
             });
+        })();
+
+        (function initDownloadsPreview() {
+            const toggleBtn = document.getElementById('toggle-downloads');
+            const badge = document.getElementById('downloads-badge');
+
+            function closePanel() {
+                if (window.OnDownloadsOverlayClose) OnDownloadsOverlayClose();
+            }
+
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#toggle-downloads')) closePanel();
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closePanel();
+            });
+
+            function updateBadge() {
+                if (!toggleBtn || !badge) return;
+                try {
+                    if (typeof GetDownloadsSnapshot === 'function') {
+                        const raw = GetDownloadsSnapshot();
+                        const data = JSON.parse(raw || '{"items":[]}');
+                        const items = Array.isArray(data.items) ? data.items : [];
+                        const active = items.filter(item => item.status === 'in-progress' || item.status === 'requested').length;
+                        if (active > 0) {
+                            badge.textContent = active > 9 ? '9+' : String(active);
+                            toggleBtn.classList.add('badge-visible');
+                        } else {
+                            toggleBtn.classList.remove('badge-visible');
+                        }
+                    }
+                } catch (e) {
+                    toggleBtn.classList.remove('badge-visible');
+                }
+            }
+
+            window.__ul_update_downloads_badge = updateBadge;
+            updateBadge();
+            setInterval(updateBadge, 2000);
         })();
     </script>
 </body>

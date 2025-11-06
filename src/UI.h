@@ -60,8 +60,14 @@ public:
   void OnAddressBarFocus(const JSObject &obj, const JSArgs &args);
   void OnMenuOpen(const JSObject &obj, const JSArgs &args);
   void OnMenuClose(const JSObject &obj, const JSArgs &args);
+  void OnDownloadsOverlayToggle(const JSObject &obj, const JSArgs &args);
+  void OnDownloadsOverlayClose(const JSObject &obj, const JSArgs &args);
   void OnContextMenuAction(const JSObject &obj, const JSArgs &args);
   void OnToggleDarkMode(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnDownloadsOverlayGet(const JSObject &obj, const JSArgs &args);
+  void OnDownloadsOverlayClear(const JSObject &obj, const JSArgs &args);
+  void OnDownloadsOverlayOpenItem(const JSObject &obj, const JSArgs &args);
+  void OnDownloadsOverlayRevealItem(const JSObject &obj, const JSArgs &args);
   ultralight::JSValue OnGetDarkModeEnabled(const JSObject &obj, const JSArgs &args);
   // Suggestions callback (address bar autocomplete)
   ultralight::JSValue OnGetSuggestions(const JSObject &obj, const JSArgs &args);
@@ -87,6 +93,8 @@ protected:
   void AdjustUIHeight(uint32_t new_height);
   void ShowMenuOverlay();
   void HideMenuOverlay();
+  void ShowDownloadsOverlay();
+  void HideDownloadsOverlay();
   void ShowContextMenuOverlay(int x, int y, const ultralight::String &json_info);
   void HideContextMenuOverlay();
   // Suggestions overlay (above all UI)
@@ -141,6 +149,7 @@ protected:
   int base_ui_height_;
   int tab_height_;
   RefPtr<Overlay> menu_overlay_;
+  RefPtr<Overlay> downloads_overlay_;
   RefPtr<Overlay> context_menu_overlay_;
   RefPtr<Overlay> suggestions_overlay_;
   float scale_;

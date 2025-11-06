@@ -94,6 +94,11 @@ UI::~UI()
   if (download_manager_)
     download_manager_->SetOnChangeCallback(nullptr);
 
+  HideMenuOverlay();
+  HideDownloadsOverlay();
+  HideContextMenuOverlay();
+  HideSuggestionsOverlay();
+
   view()->set_load_listener(nullptr);
   view()->set_view_listener(nullptr);
   g_ui = nullptr;
@@ -439,8 +444,9 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   bool is_menu_view = url_utf8.data() && std::strstr(url_utf8.data(), "menu.html") != nullptr;
   bool is_ctx_view = url_utf8.data() && std::strstr(url_utf8.data(), "contextmenu.html") != nullptr;
   bool is_sugg_view = url_utf8.data() && std::strstr(url_utf8.data(), "suggestions.html") != nullptr;
+  bool is_downloads_overlay_view = url_utf8.data() && std::strstr(url_utf8.data(), "downloads-panel.html") != nullptr;
 
-  if (!is_menu_view && !is_ctx_view && !is_sugg_view)
+  if (!is_menu_view && !is_ctx_view && !is_sugg_view && !is_downloads_overlay_view)
   {
     // Only main UI view has these functions
     updateBack = global["updateBack"];
@@ -462,6 +468,8 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnToggleTools"] = BindJSCallback(&UI::OnToggleTools);
   global["OnMenuOpen"] = BindJSCallback(&UI::OnMenuOpen);
   global["OnMenuClose"] = BindJSCallback(&UI::OnMenuClose);
+  global["OnDownloadsOverlayToggle"] = BindJSCallback(&UI::OnDownloadsOverlayToggle);
+  global["OnDownloadsOverlayClose"] = BindJSCallback(&UI::OnDownloadsOverlayClose);
   global["OnToggleDarkMode"] = BindJSCallback(&UI::OnToggleDarkMode);
   global["GetDarkModeEnabled"] = BindJSCallbackWithRetval(&UI::OnGetDarkModeEnabled);
   if (is_ctx_view)
@@ -496,6 +504,8 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnAddressBarNavigate"] = BindJSCallback(&UI::OnAddressBarNavigate);
   global["OnOpenHistoryNewTab"] = BindJSCallback(&UI::OnOpenHistoryNewTab);
   global["OnOpenDownloadsNewTab"] = BindJSCallback(&UI::OnOpenDownloadsNewTab);
+  global["GetDownloadsSnapshot"] = BindJSCallbackWithRetval(&UI::OnDownloadsOverlayGet);
+  global["ClearDownloadsSnapshot"] = BindJSCallback(&UI::OnDownloadsOverlayClear);
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
   global["OnAddressBarFocus"] = BindJSCallback(&UI::OnAddressBarFocus);
   global["GetSuggestions"] = BindJSCallbackWithRetval(&UI::OnGetSuggestions);
@@ -504,7 +514,15 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnSuggestOpen"] = BindJSCallback(&UI::OnSuggestOpen);
   global["OnSuggestClose"] = BindJSCallback(&UI::OnSuggestClose);
 
-  if (!is_menu_view && !is_ctx_view && !is_sugg_view)
+  if (is_downloads_overlay_view)
+  {
+    global["NativeGetDownloads"] = BindJSCallbackWithRetval(&UI::OnDownloadsOverlayGet);
+    global["NativeClearDownloads"] = BindJSCallback(&UI::OnDownloadsOverlayClear);
+    global["NativeOpenDownload"] = BindJSCallback(&UI::OnDownloadsOverlayOpenItem);
+    global["NativeRevealDownload"] = BindJSCallback(&UI::OnDownloadsOverlayRevealItem);
+  }
+
+  if (!is_menu_view && !is_ctx_view && !is_sugg_view && !is_downloads_overlay_view)
   {
     CreateNewTab();
   }
@@ -984,6 +1002,98 @@ void UI::NotifyDownloadsChanged()
       view->EvaluateScript("(function(){ if(window.__ul_downloads_ready) window.__ul_downloads_ready(); })();", nullptr);
     }
   }
+
+  if (downloads_overlay_ && downloads_overlay_->view())
+  {
+    downloads_overlay_->view()->EvaluateScript("(function(){ if(window.__ul_downloads_panel_refresh) window.__ul_downloads_panel_refresh(); })();", nullptr);
+  }
+
+  if (overlay_ && overlay_->view())
+  {
+    overlay_->view()->EvaluateScript("(function(){ if(window.__ul_update_downloads_badge) window.__ul_update_downloads_badge(); })();", nullptr);
+  }
+}
+
+ultralight::JSValue UI::OnDownloadsOverlayGet(const JSObject &, const JSArgs &)
+{
+  return ultralight::JSValue(GetDownloadsJSON());
+}
+
+void UI::OnDownloadsOverlayClear(const JSObject &, const JSArgs &)
+{
+  ClearCompletedDownloads();
+}
+
+void UI::OnDownloadsOverlayOpenItem(const JSObject &, const JSArgs &args)
+{
+  if (args.empty())
+    return;
+  uint64_t id = static_cast<uint64_t>((double)args[0]);
+  OpenDownloadItem(id);
+}
+
+void UI::OnDownloadsOverlayRevealItem(const JSObject &, const JSArgs &args)
+{
+  if (args.empty())
+    return;
+  uint64_t id = static_cast<uint64_t>((double)args[0]);
+  RevealDownloadItem(id);
+}
+
+void UI::OnDownloadsOverlayToggle(const JSObject &, const JSArgs &)
+{
+  if (downloads_overlay_)
+    HideDownloadsOverlay();
+  else
+    ShowDownloadsOverlay();
+}
+
+void UI::OnDownloadsOverlayClose(const JSObject &, const JSArgs &)
+{
+  HideDownloadsOverlay();
+}
+
+void UI::ShowDownloadsOverlay()
+{
+  if (downloads_overlay_)
+    return;
+
+  ultralight::ViewConfig cfg;
+  cfg.is_transparent = true;
+  cfg.initial_device_scale = window_->scale();
+  if (overlay_ && overlay_->view())
+  {
+    cfg.is_accelerated = overlay_->view()->is_accelerated();
+    cfg.display_id = overlay_->view()->display_id();
+  }
+
+  auto view = App::instance()->renderer()->CreateView(window_->width(), window_->height(), cfg, nullptr);
+  downloads_overlay_ = Overlay::Create(window_, view, 0, 0);
+  downloads_overlay_->Show();
+  downloads_overlay_->Focus();
+  view->set_load_listener(this);
+  view->set_view_listener(this);
+  view->LoadURL("file:///downloads-panel.html");
+}
+
+void UI::HideDownloadsOverlay()
+{
+  if (!downloads_overlay_)
+    return;
+
+  downloads_overlay_->Hide();
+  downloads_overlay_->Unfocus();
+  if (overlay_)
+    overlay_->Focus();
+
+  auto view = downloads_overlay_->view();
+  if (view)
+  {
+    view->set_load_listener(nullptr);
+    view->set_view_listener(nullptr);
+  }
+
+  downloads_overlay_ = nullptr;
 }
 
 void UI::OnMenuOpen(const JSObject &obj, const JSArgs &args)
