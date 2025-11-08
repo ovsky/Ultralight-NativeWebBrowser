@@ -1,31 +1,31 @@
 <!doctype html>
-<html>
+<html lang="en">
 
 <head>
     <meta charset="utf-8">
-    <title>Browser Settings</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ultralight Browser Settings</title>
     <style>
-        *
-        {
-            transition: all 0.2s ease-in-out;
-        }
         :root {
             color-scheme: dark;
-            --bg-gradient: radial-gradient(circle at 20% 15%, rgba(73, 92, 169, 0.38) 0%, rgba(22, 28, 66, 0.92) 46%, rgba(9, 11, 28, 0.96) 100%);
-            --surface: rgba(18, 20, 38, 0.9);
-            --surface-muted: rgba(20, 24, 48, 0.82);
-            --border: rgba(119, 134, 206, 0.24);
-            --border-strong: rgba(132, 144, 220, 0.35);
-            --text: #e7ecff;
-            --text-muted: rgba(205, 215, 255, 0.68);
-            --accent: #87a3ff;
-            --accent-strong: #4f7dff;
-            --shadow-lg: 0 30px 60px rgba(4, 8, 24, 0.68);
-            --shadow-md: 0 14px 32px rgba(6, 12, 32, 0.55);
-            --radius-lg: 22px;
-            --radius-md: 16px;
+            --bg: #0e0f18;
+            --bg-accent: radial-gradient(circle at 20% 15%, rgba(105, 126, 220, 0.3), rgba(14, 15, 24, 0.95) 58%);
+            --surface: rgba(25, 26, 38, 0.92);
+            --surface-alt: rgba(32, 32, 48, 0.92);
+            --surface-raised: rgba(45, 46, 68, 0.82);
+            --border: rgba(122, 140, 228, 0.26);
+            --border-soft: rgba(120, 132, 210, 0.18);
+            --text: #f5f6ff;
+            --text-muted: rgba(201, 205, 238, 0.74);
+            --accent: #7c8aff;
+            --accent-strong: #5663ff;
+            --accent-soft: rgba(120, 136, 255, 0.18);
+            --shadow-lg: 0 32px 72px rgba(2, 2, 30, 0.58);
+            --shadow-md: 0 16px 40px rgba(6, 8, 35, 0.45);
+            --shadow-sm: 0 8px 20px rgba(6, 10, 32, 0.32);
+            --radius-lg: 28px;
+            --radius-md: 20px;
             --radius-sm: 12px;
-            scroll-behavior: smooth;
         }
 
         * {
@@ -34,167 +34,164 @@
 
         body {
             margin: 0;
+            padding: 56px 24px 64px;
             min-height: 100vh;
-            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-            font-size: 14px;
-            line-height: 1.6;
-            background: var(--bg-gradient);
+            display: flex;
+            justify-content: center;
+            background: var(--bg);
+            background-image: var(--bg-accent);
+            font-family: "Segoe UI", -apple-system, system-ui, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
             color: var(--text);
-            padding: 56px 28px 72px;
         }
 
         main {
-            width: min(1120px, 100%);
-            margin: 0 auto;
-            background: var(--surface);
+            width: min(1040px, 100%);
+            background: linear-gradient(155deg, rgba(25, 26, 38, 0.94), rgba(18, 20, 34, 0.96));
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow-lg);
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            backdrop-filter: blur(18px);
         }
 
-        header.page-hero {
-            padding: clamp(28px, 4vw, 44px);
-            border-bottom: 1px solid var(--border);
+        header.page-header {
             display: flex;
-            flex-wrap: wrap;
-            gap: 28px;
-            justify-content: space-between;
             align-items: flex-start;
+            justify-content: space-between;
+            gap: 32px;
+            padding: 40px clamp(28px, 4vw, 56px) 36px;
+            background: linear-gradient(140deg, rgba(42, 46, 86, 0.78), rgba(26, 28, 52, 0.94));
+            border-bottom: 1px solid var(--border);
         }
 
-        header.page-hero h1 {
-            margin: 0 0 12px;
-            font-size: clamp(26px, 3vw, 32px);
-            font-weight: 600;
+        header.page-header h1 {
+            margin: 0 0 10px;
+            font-size: 28px;
+            letter-spacing: 0.02em;
         }
 
-        header.page-hero p {
+        header.page-header p {
             margin: 0;
-            max-width: 600px;
+            font-size: 14px;
+            line-height: 1.65;
             color: var(--text-muted);
+            max-width: 520px;
         }
 
-        .hero-actions {
+        .header-actions {
             display: flex;
             gap: 12px;
             flex-wrap: wrap;
         }
 
         button {
-            position: relative;
-            border-radius: var(--radius-sm);
-            padding: 10px 18px;
-            font-size: 13.5px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+            appearance: none;
             border: 1px solid var(--border);
-            background: rgba(34, 40, 72, 0.72);
-            color: inherit;
+            border-radius: 999px;
+            padding: 10px 20px;
+            font-size: 13px;
+            letter-spacing: 0.02em;
+            font-weight: 600;
+            color: var(--text);
+            background: rgba(18, 20, 32, 0.85);
+            box-shadow: var(--shadow-sm);
+            cursor: pointer;
+            transition: transform 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
         }
 
-        button:hover {
+        button:hover:not(:disabled) {
+            background: rgba(40, 42, 68, 0.92);
             transform: translateY(-1px);
-            box-shadow: var(--shadow-md);
-            background: rgba(46, 54, 92, 0.86);
-            border-color: var(--border-strong);
         }
 
-        button:active {
+        button:active:not(:disabled) {
             transform: translateY(0);
+            box-shadow: none;
+        }
+
+        button:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        button:disabled {
+            cursor: default;
+            opacity: 0.45;
             box-shadow: none;
         }
 
         button.primary {
             background: linear-gradient(120deg, var(--accent-strong), var(--accent));
-            border-color: rgba(135, 163, 255, 0.55);
-            color: #fff;
-            box-shadow: 0 16px 36px rgba(78, 126, 255, 0.32);
+            border-color: rgba(130, 150, 255, 0.4);
+            color: #f8f8fe;
         }
 
-        button.primary:hover {
-            background: linear-gradient(120deg, #608aff, var(--accent));
-        }
-
-        button[disabled] {
-            opacity: 0.45;
-            cursor: not-allowed;
-            pointer-events: none;
-            box-shadow: none;
-            transform: none;
+        button.primary:hover:not(:disabled) {
+            background: linear-gradient(120deg, #6070ff, #8c9bff);
         }
 
         button.primary[data-dirty="true"] {
-            background: linear-gradient(120deg, #6a8bff, var(--accent));
-            box-shadow: 0 20px 42px rgba(80, 128, 255, 0.38);
+            box-shadow: 0 0 0 2px rgba(124, 138, 255, 0.18), var(--shadow-md);
         }
 
-        button.primary[data-dirty="true"]::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            border-radius: inherit;
-            box-shadow: 0 0 0 1px rgba(135, 163, 255, 0.6) inset;
-            pointer-events: none;
-        }
-
-        .layout {
+        .page-body {
             display: grid;
-            grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
+            grid-template-columns: 240px 1fr;
             gap: 32px;
-            padding: clamp(26px, 4vw, 42px);
-            background: rgba(13, 16, 34, 0.78);
+            padding: clamp(24px, 3vw, 38px) clamp(28px, 4vw, 56px) clamp(40px, 5vw, 60px);
         }
 
-        .toc {
+        nav.toc {
             position: sticky;
-            top: 32px;
+            top: 40px;
             align-self: start;
-            background: var(--surface-muted);
+            background: var(--surface-alt);
             border: 1px solid var(--border);
             border-radius: var(--radius-md);
-            padding: 20px 18px;
-            box-shadow: var(--shadow-md);
+            padding: 22px 20px;
+            box-shadow: var(--shadow-sm);
         }
 
-        .toc h2 {
+        nav.toc h2 {
             margin: 0 0 12px;
-            font-size: 13px;
-            letter-spacing: 0.14em;
+            font-size: 12px;
+            letter-spacing: 0.18em;
+            color: rgba(190, 198, 248, 0.62);
             text-transform: uppercase;
-            color: rgba(190, 202, 255, 0.62);
         }
 
-        .toc ul {
+        nav.toc ul {
             list-style: none;
-            margin: 0;
             padding: 0;
+            margin: 0;
             display: grid;
-            gap: 6px;
+            gap: 8px;
         }
 
-        .toc a {
+        nav.toc a {
             display: block;
-            padding: 8px 12px;
-            border-radius: 10px;
+            padding: 9px 12px;
+            border-radius: 12px;
             color: inherit;
             text-decoration: none;
-            font-weight: 500;
-            transition: background-color 0.12s ease, transform 0.12s ease;
+            font-weight: 600;
+            font-size: 13px;
+            letter-spacing: 0.01em;
+            transition: background 0.12s ease, transform 0.12s ease;
         }
 
-        .toc a:hover,
-        .toc a:focus-visible {
-            background: rgba(136, 158, 255, 0.16);
+        nav.toc a:hover,
+        nav.toc a:focus-visible {
+            background: var(--accent-soft);
             outline: none;
             transform: translateX(4px);
         }
 
-        .content {
-            display: grid;
+        .settings-content {
+            display: flex;
+            flex-direction: column;
             gap: 26px;
         }
 
@@ -202,146 +199,181 @@
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: var(--radius-md);
-            padding: 24px clamp(22px, 3vw, 32px);
-            box-shadow: var(--shadow-md);
-            scroll-margin-top: 72px;
+            padding: 28px clamp(22px, 4vw, 36px);
+            box-shadow: var(--shadow-sm);
+            scroll-margin-top: 88px;
         }
 
         section.settings-section h2 {
             margin: 0 0 6px;
-            font-size: 15px;
+            font-size: 16px;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: rgba(182, 195, 255, 0.8);
+            color: rgba(190, 198, 248, 0.82);
         }
 
-        section.settings-section p.section-hint {
-            margin: 0 0 16px;
-            color: var(--text-muted);
+        section.settings-section .section-hint {
+            margin: 0 0 18px;
             font-size: 13px;
+            line-height: 1.6;
+            color: var(--text-muted);
         }
 
         .settings-list {
-            display: grid;
-            gap: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
         }
 
         .setting-row {
             display: grid;
-            grid-template-columns: auto 1fr;
-            gap: 16px;
-            align-items: flex-start;
-            padding: 14px 0;
-            border-top: 1px solid rgba(140, 156, 230, 0.18);
+            grid-template-columns: 42px 1fr;
+            gap: 18px;
+            align-items: center;
+            padding: 16px;
+            border-radius: var(--radius-sm);
+            border: 1px solid rgba(120, 138, 230, 0.14);
+            background: rgba(28, 30, 48, 0.68);
+            transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
         }
 
-        .setting-row:first-of-type {
-            border-top: none;
-            padding-top: 0;
+        .setting-row:hover {
+            border-color: rgba(124, 138, 255, 0.42);
+            background: rgba(34, 36, 58, 0.82);
         }
 
         .setting-row input[type="checkbox"] {
-            margin-top: 4px;
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
             accent-color: var(--accent);
             cursor: pointer;
         }
 
-        .setting-row.is-dirty {
-            border-color: rgba(135, 163, 255, 0.55);
-            background: rgba(58, 70, 120, 0.28);
-            box-shadow: inset 0 0 0 1px rgba(110, 130, 210, 0.32);
+        .setting-row input[type="checkbox"]:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 3px;
         }
 
-        .setting-row.is-dirty .setting-copy strong {
-            color: var(--accent);
+        .setting-copy {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
 
-        .setting-copy strong {
-            display: block;
-            font-size: 14px;
+        .setting-title-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .setting-title {
+            font-size: 15px;
             font-weight: 600;
-            margin-bottom: 4px;
         }
 
-        .setting-copy span {
-            font-size: 13px;
-            color: var(--text-muted);
-            line-height: 1.65;
-        }
-
-        .setting-flair {
-            display: inline-block;
-            margin-left: 8px;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            padding: 2px 6px;
+        .setting-note {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 7px;
             border-radius: 999px;
-            background: rgba(132, 144, 220, 0.2);
+            background: rgba(124, 138, 255, 0.22);
             color: var(--accent);
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .setting-description {
+            display: block;
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text-muted);
+        }
+
+        .setting-row-dirty {
+            border-color: rgba(130, 150, 255, 0.75);
+            background: rgba(48, 52, 88, 0.85);
+            box-shadow: inset 0 0 0 1px rgba(146, 162, 255, 0.4);
         }
 
         footer.page-footer {
-            padding: 18px clamp(28px, 4vw, 44px) 26px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 20px;
+            align-items: center;
+            justify-content: center;
+            padding: 20px clamp(20px, 4vw, 48px) 28px;
+            background: rgba(18, 19, 32, 0.92);
             border-top: 1px solid var(--border);
-            background: rgba(12, 15, 32, 0.88);
+            font-size: 13px;
             color: var(--text-muted);
-            font-size: 13.5px;
-            text-align: center;
         }
 
         code {
             font-family: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
-            font-size: 12.5px;
-            background: rgba(34, 38, 64, 0.76);
+            font-size: 12px;
             padding: 2px 6px;
-            border-radius: 6px;
-            border: 1px solid rgba(134, 148, 220, 0.25);
+            border-radius: 8px;
+            background: rgba(28, 30, 48, 0.92);
+            border: 1px solid rgba(132, 148, 226, 0.28);
             color: var(--text);
         }
 
-        @media (max-width: 1024px) {
-            .layout {
-                grid-template-columns: minmax(0, 1fr);
+        a {
+            color: inherit;
+        }
+
+        @media (max-width: 980px) {
+            .page-body {
+                grid-template-columns: 1fr;
+                gap: 24px;
             }
 
-            .toc {
+            nav.toc {
                 position: static;
-                order: 2;
+                order: -1;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            nav.toc ul {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            nav.toc a {
+                padding: 8px 14px;
             }
         }
 
-        @media (max-width: 720px) {
+        @media (max-width: 640px) {
             body {
-                padding: 32px 16px 44px;
+                padding: 28px 16px 40px;
             }
 
-            main {
-                border-radius: 18px;
-            }
-
-            header.page-hero {
+            header.page-header {
                 flex-direction: column;
+                align-items: stretch;
             }
 
-            .hero-actions button {
+            .header-actions {
+                justify-content: flex-start;
+            }
+
+            button {
                 width: 100%;
                 justify-content: center;
             }
 
-            section.settings-section {
-                padding-left: clamp(18px, 6vw, 24px);
-                padding-right: clamp(18px, 6vw, 24px);
-            }
-
             .setting-row {
                 grid-template-columns: 1fr;
+                padding: 18px;
             }
 
             .setting-row input[type="checkbox"] {
-                margin-top: 0;
+                justify-self: flex-start;
             }
         }
     </style>
@@ -349,204 +381,270 @@
 
 <body>
     <main>
-        <header class="page-hero">
-            <div class="hero-copy">
+        <header class="page-header">
+            <div class="header-copy">
                 <h1>Browser Settings</h1>
-                <p>Fine-tune how Ultralight looks, behaves, and protects your privacy. Changes apply instantly while
-                    you browse. Use Save to keep them for future sessions.</p>
+                <p>Fine-tune how Ultralight looks, behaves, and protects your browsing. Changes apply immediately; use
+                    Save to keep them for the next launch.</p>
             </div>
-            <div class="hero-actions">
-                <button id="restore-defaults" type="button">Restore defaults</button>
-                <button id="save-settings" class="primary" type="button" disabled>Save changes</button>
+            <div class="header-actions">
+                <button id="restore-defaults" type="button">Restore Defaults</button>
+                <button id="save-settings" class="primary" type="button" disabled>Save Changes</button>
             </div>
         </header>
-
-        <div class="layout">
+        <div class="page-body">
             <nav class="toc" aria-label="Settings sections">
-                <h2>Jump to</h2>
-                <ul>
-                    <li><a href="#appearance">Appearance</a></li>
-                    <li><a href="#accessibility">Accessibility &amp; Motion</a></li>
-                    <li><a href="#privacy">Privacy &amp; Content</a></li>
-                    <li><a href="#suggestions">Suggestions</a></li>
-                    <li><a href="#downloads">Downloads</a></li>
-                </ul>
+                <h2>Sections</h2>
+                <ul id="section-links"></ul>
             </nav>
-
-            <div class="content">
-                <section class="settings-section" id="appearance" aria-labelledby="appearance-heading">
-                    <h2 id="appearance-heading">Appearance</h2>
-                    <p class="section-hint">Personalize the chrome and window treatments to match your workspace.</p>
-                    <div class="settings-list">
-                        <label class="setting-row">
-                            <input type="checkbox" data-key="launch_dark_theme">
-                            <div class="setting-copy">
-                                <strong>Launch in dark theme</strong>
-                                <span>Start Ultralight with rich dark UI accents across the toolbar, panels, and
-                                    menus.</span>
-                            </div>
-                        </label>
-                        <label class="setting-row">
-                            <input type="checkbox" data-key="experimental_transparent_toolbar">
-                            <div class="setting-copy">
-                                <strong>Transparent toolbar<span class="setting-flair">Experimental</span></strong>
-                                <span>Blend the toolbar into page content with a translucent, glass-like finish.</span>
-                            </div>
-                        </label>
-                        <label class="setting-row">
-                            <input type="checkbox" data-key="experimental_compact_tabs">
-                            <div class="setting-copy">
-                                <strong>Compact tabs<span class="setting-flair">Experimental</span></strong>
-                                <span>Reduce tab height and spacing so more tabs remain visible without
-                                    scrolling.</span>
-                            </div>
-                        </label>
-                        <label class="setting-row">
-                            <input type="checkbox" data-key="vibrant_window_theme">
-                            <div class="setting-copy">
-                                <strong>Vibrant window theme</strong>
-                                <span>Apply a subtle color wash to window chrome for a livelier, app-like finish.</span>
-                            </div>
-                        </label>
-                    </div>
-                </section>
-
-                <section class="settings-section" id="accessibility" aria-labelledby="accessibility-heading">
-                    <h2 id="accessibility-heading">Accessibility &amp; Motion</h2>
-                    <p class="section-hint">Make the interface calmer and more legible for sensitive eyes.</p>
-                    <div class="settings-list">
-                        <label class="setting-row">
-                            <input type="checkbox" data-key="reduce_motion">
-                            <div class="setting-copy">
-                                <strong>Reduce motion effects</strong>
-                                <span>Limit animated transitions and parallax flourishes to keep navigation
-                                    steady.</span>
-                            </div>
-                        </label>
-                        <label class="setting-row">
-                            <input type="checkbox" data-key="high_contrast_ui">
-                            <div class="setting-copy">
-                                <strong>High contrast UI</strong>
-                                <span>Boost contrast for overlays, menus, and dialogs to improve readability.</span>
-                            </div>
-                        </label>
-                    </div>
-                </section>
-
-                <section class="settings-section" id="privacy" aria-labelledby="privacy-heading">
-                    <h2 id="privacy-heading">Privacy &amp; Content</h2>
-                    <p class="section-hint">Control how Ultralight filters requests and retains your browsing history.
-                    </p>
-                    <div class="settings-list">
-                        <label class="setting-row">
-                            <input type="checkbox" data-key="enable_adblock">
-                            <div class="setting-copy">
-                                <strong>Enable ad blocking</strong>
-                                <span>Filter network requests with the bundled block lists to hide intrusive ads and
-                                    trackers.</span>
-                            </div>
-                        </label>
-                        <label class="setting-row">
-                            <input type="checkbox" data-key="log_blocked_requests">
-                            <div class="setting-copy">
-                                <strong>Log blocked requests</strong>
-                                <span>Write details about each blocked request to the console for debugging filter
-                                    rules.</span>
-                            </div>
-                        </label>
-                        <label class="setting-row">
-                            <input type="checkbox" data-key="clear_history_on_exit">
-                            <div class="setting-copy">
-                                <strong>Clear history on exit</strong>
-                                <span>Remove browsing history whenever the browser closes and skip saving new
-                                    visits.</span>
-                            </div>
-                        </label>
-                    </div>
-                </section>
-
-                <section class="settings-section" id="suggestions" aria-labelledby="suggestions-heading">
-                    <h2 id="suggestions-heading">Suggestions</h2>
-                    <p class="section-hint">Fine-tune the autocomplete results that appear while typing.</p>
-                    <div class="settings-list">
-                        <label class="setting-row">
-                            <input type="checkbox" data-key="enable_suggestions">
-                            <div class="setting-copy">
-                                <strong>Show address bar suggestions</strong>
-                                <span>Surface history matches and popular sites as you type in the address field.</span>
-                            </div>
-                        </label>
-                        <label class="setting-row">
-                            <input type="checkbox" data-key="enable_suggestion_favicons">
-                            <div class="setting-copy">
-                                <strong>Show favicons in suggestions</strong>
-                                <span>Display site icons next to suggestion rows whenever an icon is available.</span>
-                            </div>
-                        </label>
-                    </div>
-                </section>
-
-                <section class="settings-section" id="downloads" aria-labelledby="downloads-heading">
-                    <h2 id="downloads-heading">Downloads</h2>
-                    <p class="section-hint">Choose how the browser notifies you about downloads as they progress.</p>
-                    <div class="settings-list">
-                        <label class="setting-row">
-                            <input type="checkbox" data-key="show_download_badge">
-                            <div class="setting-copy">
-                                <strong>Show download badge</strong>
-                                <span>Highlight the toolbar downloads button whenever transfers are active.</span>
-                            </div>
-                        </label>
-                        <label class="setting-row">
-                            <input type="checkbox" data-key="auto_open_download_panel">
-                            <div class="setting-copy">
-                                <strong>Open downloads panel automatically</strong>
-                                <span>Pop open the quick downloads overlay as soon as a new download begins.</span>
-                            </div>
-                        </label>
-                    </div>
-                </section>
-            </div>
+            <div class="settings-content" id="settings-content" aria-live="polite"></div>
         </div>
-
         <footer class="page-footer">
-            Unsaved changes stay in this tab until you press Save. Stored at <code id="settings-save-path">data/settings.json</code>.
+            <span>Unsaved changes stay in this tab until you press Save.</span>
+            <span>Stored at <code id="settings-save-path">data/settings.json</code>.</span>
         </footer>
     </main>
-
     <script>
         (function () {
+            'use strict';
+
+            const KNOWN_CATEGORIES = [
+                {
+                    id: 'appearance',
+                    title: 'Appearance',
+                    description: 'Adjust the chrome, window treatments, and visual polish to match your workspace.'
+                },
+                {
+                    id: 'accessibility',
+                    title: 'Accessibility & Motion',
+                    description: 'Reduce motion and boost contrast so the interface stays comfortable on every display.'
+                },
+                {
+                    id: 'privacy',
+                    title: 'Privacy & Content',
+                    description: 'Choose how Ultralight filters requests, records history, and handles background activity.'
+                },
+                {
+                    id: 'suggestions',
+                    title: 'Suggestions',
+                    description: 'Control the address bar helper so it surfaces only the hints you find useful.'
+                },
+                {
+                    id: 'downloads',
+                    title: 'Downloads',
+                    description: 'Decide how download progress and notifications appear while files transfer.'
+                }
+            ];
+
             const restoreBtn = document.getElementById('restore-defaults');
             const saveBtn = document.getElementById('save-settings');
-            const inputs = Array.from(document.querySelectorAll('input[type="checkbox"][data-key]'));
+            const contentRoot = document.getElementById('settings-content');
+            const tocList = document.getElementById('section-links');
+            const savePathEl = document.getElementById('settings-save-path');
+
             const rowsByKey = new Map();
-            inputs.forEach((input) => {
-                const key = input.getAttribute('data-key');
-                const row = input.closest('.setting-row');
-                if (key && row) {
-                    rowsByKey.set(key, row);
-                }
-            });
+            const inputsByKey = new Map();
+            const defaultsByKey = new Map();
 
             let baselineValues = {};
             let currentValues = {};
             let isDirty = false;
+            let lastCatalogSignature = '';
+
+            function fallbackCategory(id) {
+                if (!id) {
+                    return { id: 'misc', title: 'Other', description: '' };
+                }
+                const normalized = String(id);
+                const title = normalized.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+                return { id: normalized, title: title.trim() || 'Other', description: '' };
+            }
+
+            function stringifyCatalog(entries) {
+                return entries.map((entry) => {
+                    if (!entry) return '';
+                    const key = entry.key ? String(entry.key) : '';
+                    const category = entry.category ? String(entry.category) : '';
+                    const name = entry.name ? String(entry.name) : '';
+                    const note = entry.note ? String(entry.note) : '';
+                    const description = entry.description ? String(entry.description) : '';
+                    return key + '|' + category + '|' + name + '|' + note + '|' + description;
+                }).join(';');
+            }
+
+            function groupCatalog(entries) {
+                const groups = new Map();
+                entries.forEach((entry) => {
+                    if (!entry || !entry.key) return;
+                    const category = entry.category ? String(entry.category) : 'misc';
+                    if (!groups.has(category)) {
+                        groups.set(category, []);
+                    }
+                    groups.get(category).push(entry);
+                });
+                groups.forEach((items) => {
+                    items.sort((a, b) => {
+                        const aName = (a.name || a.key || '').toLowerCase();
+                        const bName = (b.name || b.key || '').toLowerCase();
+                        return aName.localeCompare(bName);
+                    });
+                });
+                return groups;
+            }
+
+            function renderCatalog(entries) {
+                if (!Array.isArray(entries)) return;
+
+                const signature = stringifyCatalog(entries);
+                if (signature === lastCatalogSignature && rowsByKey.size) {
+                    defaultsByKey.clear();
+                    entries.forEach((entry) => {
+                        if (entry && entry.key && typeof entry.default === 'boolean') {
+                            defaultsByKey.set(String(entry.key), !!entry.default);
+                        }
+                    });
+                    return;
+                }
+                lastCatalogSignature = signature;
+
+                const groups = groupCatalog(entries);
+                const ordered = [];
+                KNOWN_CATEGORIES.forEach((info) => {
+                    if (groups.has(info.id)) {
+                        ordered.push({ info, entries: groups.get(info.id) });
+                        groups.delete(info.id);
+                    }
+                });
+
+                Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0])).forEach(([id, items]) => {
+                    ordered.push({ info: fallbackCategory(id), entries: items });
+                });
+
+                contentRoot.textContent = '';
+                tocList.textContent = '';
+                rowsByKey.clear();
+                inputsByKey.clear();
+                defaultsByKey.clear();
+
+                ordered.forEach(({ info, entries: categoryEntries }) => {
+                    if (!categoryEntries.length) return;
+
+                    const section = document.createElement('section');
+                    section.className = 'settings-section';
+                    section.id = info.id;
+                    section.setAttribute('aria-labelledby', info.id + '-heading');
+
+                    const heading = document.createElement('h2');
+                    heading.id = info.id + '-heading';
+                    heading.textContent = info.title || 'Settings';
+                    section.appendChild(heading);
+
+                    if (info.description) {
+                        const hint = document.createElement('p');
+                        hint.className = 'section-hint';
+                        hint.textContent = info.description;
+                        section.appendChild(hint);
+                    }
+
+                    const list = document.createElement('div');
+                    list.className = 'settings-list';
+                    list.dataset.settingsCategory = info.id;
+                    section.appendChild(list);
+
+                    categoryEntries.forEach((entry) => {
+                        if (!entry || !entry.key) return;
+                        const key = String(entry.key);
+
+                        const row = document.createElement('label');
+                        row.className = 'setting-row';
+                        row.dataset.settingKey = key;
+
+                        const input = document.createElement('input');
+                        input.type = 'checkbox';
+                        input.dataset.key = key;
+                        const inputId = 'setting-toggle-' + key;
+                        input.id = inputId;
+                        row.appendChild(input);
+
+                        const copy = document.createElement('div');
+                        copy.className = 'setting-copy';
+
+                        const titleLine = document.createElement('div');
+                        titleLine.className = 'setting-title-line';
+
+                        const title = document.createElement('span');
+                        title.className = 'setting-title';
+                        title.id = key + '-title';
+                        title.textContent = entry.name || key;
+                        titleLine.appendChild(title);
+
+                        const note = document.createElement('span');
+                        note.className = 'setting-note';
+                        if (entry.note) {
+                            note.textContent = entry.note;
+                            note.hidden = false;
+                        } else {
+                            note.hidden = true;
+                        }
+                        titleLine.appendChild(note);
+                        copy.appendChild(titleLine);
+
+                        const description = document.createElement('span');
+                        description.className = 'setting-description';
+                        description.id = key + '-description';
+                        description.textContent = entry.description || '';
+                        copy.appendChild(description);
+
+                        row.appendChild(copy);
+                        list.appendChild(row);
+
+                        rowsByKey.set(key, row);
+                        inputsByKey.set(key, input);
+                        if (typeof entry.default === 'boolean') {
+                            defaultsByKey.set(key, !!entry.default);
+                        }
+
+                        input.setAttribute('aria-labelledby', title.id);
+                        input.setAttribute('aria-describedby', description.id);
+
+                        input.addEventListener('change', () => {
+                            if (input.disabled) return;
+                            const checked = !!input.checked;
+                            currentValues[key] = checked;
+                            markRowDirty(key);
+                            isDirty = true;
+                            updateSaveButtonState();
+                            pushSetting(key, checked);
+                        });
+                    });
+
+                    contentRoot.appendChild(section);
+
+                    const li = document.createElement('li');
+                    const link = document.createElement('a');
+                    link.href = '#' + info.id;
+                    link.textContent = info.title || 'Settings';
+                    li.appendChild(link);
+                    tocList.appendChild(li);
+                });
+            }
 
             function normalizePayload(payload) {
                 if (typeof payload === 'string') {
-                    try { return JSON.parse(payload || '{}'); } catch (e) { return null; }
+                    try {
+                        return JSON.parse(payload || '{}');
+                    } catch (err) {
+                        return null;
+                    }
                 }
-                return (payload && typeof payload === 'object') ? payload : null;
+                return payload && typeof payload === 'object' ? payload : null;
             }
 
             function coercePayload(payload) {
                 const parsed = normalizePayload(payload);
                 if (!parsed) return null;
-                const values = (parsed.values && typeof parsed.values === 'object') ? parsed.values : parsed;
-                const meta = (parsed.meta && typeof parsed.meta === 'object') ? parsed.meta : {};
-                if (!Array.isArray(meta.catalog) && Array.isArray(parsed.catalog)) {
-                    meta.catalog = parsed.catalog;
-                }
+                const values = parsed.values && typeof parsed.values === 'object' ? parsed.values : {};
+                const meta = parsed.meta && typeof parsed.meta === 'object' ? parsed.meta : {};
                 return { values, meta };
             }
 
@@ -564,21 +662,20 @@
             }
 
             function updateDirtyRows(dirtyKeys) {
-                const dirty = new Set(Array.isArray(dirtyKeys) ? dirtyKeys : []);
+                const dirtySet = new Set(Array.isArray(dirtyKeys) ? dirtyKeys.map(String) : []);
                 rowsByKey.forEach((row, key) => {
-                    if (dirty.has(key)) {
-                        row.classList.add('is-dirty');
+                    if (dirtySet.has(key)) {
+                        row.classList.add('setting-row-dirty');
                     } else {
-                        row.classList.remove('is-dirty');
+                        row.classList.remove('setting-row-dirty');
                     }
                 });
             }
 
-            function updateSavePath(path) {
-                const el = document.getElementById('settings-save-path');
-                if (el && typeof path === 'string' && path.length) {
-                    el.textContent = path;
-                }
+            function markRowDirty(key) {
+                const row = rowsByKey.get(key);
+                if (!row) return;
+                row.classList.add('setting-row-dirty');
             }
 
             function updateSaveButtonState() {
@@ -591,18 +688,49 @@
                 }
             }
 
+            function updateSavePath(path) {
+                if (!savePathEl || typeof path !== 'string') return;
+                if (path.length) {
+                    savePathEl.textContent = path;
+                }
+            }
+
+            function pushSetting(key, value) {
+                if (typeof window.OnUpdateSetting !== 'function') return;
+                try {
+                    window.OnUpdateSetting(String(key || ''), !!value);
+                } catch (err) {
+                    /* ignore bridge failures */
+                }
+            }
+
             function applySettingsState(payload) {
                 const coerced = coercePayload(payload);
                 if (!coerced) return;
                 const { values, meta } = coerced;
 
-                currentValues = Object.assign({}, values);
+                if (meta && Array.isArray(meta.catalog)) {
+                    renderCatalog(meta.catalog);
+                    meta.catalog.forEach((entry) => {
+                        if (entry && entry.key && typeof entry.default === 'boolean') {
+                            defaultsByKey.set(String(entry.key), !!entry.default);
+                        }
+                    });
+                }
 
-                inputs.forEach((input) => {
-                    const key = input.getAttribute('data-key');
-                    if (key && Object.prototype.hasOwnProperty.call(values, key)) {
-                        input.checked = !!values[key];
+                currentValues = {};
+
+                inputsByKey.forEach((input, key) => {
+                    let nextValue;
+                    if (Object.prototype.hasOwnProperty.call(values, key)) {
+                        nextValue = !!values[key];
+                    } else if (defaultsByKey.has(key)) {
+                        nextValue = defaultsByKey.get(key);
+                    } else {
+                        nextValue = !!input.checked;
                     }
+                    input.checked = nextValue;
+                    currentValues[key] = nextValue;
                 });
 
                 if (meta && Array.isArray(meta.dirty_keys)) {
@@ -611,78 +739,64 @@
                     updateDirtyRows([]);
                 }
 
-                const baselineMarker = meta && meta.baseline === true;
-                if (baselineMarker || Object.keys(baselineValues).length === 0) {
-                    baselineValues = Object.assign({}, values);
+                if (meta && typeof meta.storage_path === 'string') {
+                    updateSavePath(meta.storage_path);
+                }
+
+                if ((meta && meta.baseline === true) || !Object.keys(baselineValues).length) {
+                    baselineValues = Object.assign({}, currentValues);
                 }
 
                 if (meta && typeof meta.dirty === 'boolean') {
                     isDirty = meta.dirty;
                 } else {
-                    isDirty = hasDiff(values, baselineValues);
+                    isDirty = hasDiff(currentValues, baselineValues);
                 }
 
                 if (!isDirty && meta && Array.isArray(meta.dirty_keys) && meta.dirty_keys.length) {
                     isDirty = true;
                 }
 
-                if (meta && typeof meta.storage_path === 'string') {
-                    updateSavePath(meta.storage_path);
-                }
-
                 updateSaveButtonState();
             }
 
-            function pushSetting(key, value) {
-                if (window.OnUpdateSetting) {
-                    try { OnUpdateSetting(String(key || ''), !!value); } catch (e) { /* ignore */ }
-                }
-            }
-
             function refreshSnapshot() {
-                if (!window.GetSettingsSnapshot) return;
+                if (typeof window.GetSettingsSnapshot !== 'function') return;
                 try {
-                    const raw = GetSettingsSnapshot();
-                    applySettingsState(raw);
-                } catch (e) { /* ignore */ }
-            }
-
-            function markRowDirty(key) {
-                const row = rowsByKey.get(key);
-                if (row) {
-                    row.classList.add('is-dirty');
+                    const payload = window.GetSettingsSnapshot();
+                    applySettingsState(payload);
+                } catch (err) {
+                    /* ignore bridge failures */
                 }
             }
 
-            inputs.forEach((input) => {
-                input.addEventListener('change', () => {
-                    const key = input.getAttribute('data-key');
-                    if (!key) return;
-                    currentValues[key] = !!input.checked;
-                    markRowDirty(key);
-                    isDirty = true;
-                    updateSaveButtonState();
-                    pushSetting(key, input.checked);
-                });
-            });
-
-            if (restoreBtn) {
-                restoreBtn.addEventListener('click', () => {
-                    if (!window.OnRestoreSettingsDefaults) return;
-                    try {
-                        const raw = OnRestoreSettingsDefaults();
-                        applySettingsState(raw);
-                    } catch (e) { /* ignore */ }
-                });
+            function requestDefaults() {
+                if (typeof window.OnRestoreSettingsDefaults !== 'function') return;
+                try {
+                    const payload = window.OnRestoreSettingsDefaults();
+                    applySettingsState(payload);
+                } catch (err) {
+                    /* ignore bridge failures */
+                }
             }
 
             function requestSave() {
                 if (!saveBtn || saveBtn.disabled) return;
-                if (window.OnSaveSettings) {
-                    try { OnSaveSettings(); } catch (e) { /* ignore */ }
+                if (typeof window.OnSaveSettings === 'function') {
+                    try {
+                        window.OnSaveSettings();
+                    } catch (err) {
+                        /* ignore bridge failures */
+                    }
                 }
-                saveBtn.disabled = true;
-                delete saveBtn.dataset.dirty;
+                isDirty = false;
+                rowsByKey.forEach((row) => row.classList.remove('setting-row-dirty'));
+                baselineValues = Object.assign({}, currentValues);
+                updateSaveButtonState();
+            }
+
+            if (restoreBtn) {
+                restoreBtn.addEventListener('click', requestDefaults);
             }
 
             if (saveBtn) {
@@ -696,13 +810,15 @@
                 }
             });
 
-            window.applySettingsState = applySettingsState;
-
             document.addEventListener('visibilitychange', () => {
-                if (!document.hidden) refreshSnapshot();
+                if (!document.hidden) {
+                    refreshSnapshot();
+                }
             });
 
             window.addEventListener('focus', refreshSnapshot);
+
+            window.applySettingsState = applySettingsState;
 
             refreshSnapshot();
         })();

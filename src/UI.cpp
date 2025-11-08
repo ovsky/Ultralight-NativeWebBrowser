@@ -44,7 +44,7 @@ namespace
     bool default_value;
   };
 
-  constexpr std::array<SettingDescriptor, 13> kSettingsCatalog = {
+  constexpr std::array<SettingDescriptor, 13> kFallbackSettingsCatalog = {
       SettingDescriptor{"launch_dark_theme", "Launch in dark theme",
                         "Start Ultralight with dark chrome, toolbars, and tabs by default.",
                         "appearance", nullptr, &UI::BrowserSettings::launch_dark_theme, false},
@@ -84,6 +84,284 @@ namespace
       SettingDescriptor{"vibrant_window_theme", "Vibrant window theme",
                         "Apply a subtle color wash to the window frame for a livelier finish.",
                         "appearance", nullptr, &UI::BrowserSettings::vibrant_window_theme, false}};
+
+  struct ParsedCatalogEntry
+  {
+    std::string key;
+    std::string name;
+    std::string description;
+    std::string category;
+    std::string note;
+    bool has_note = false;
+    bool has_default = false;
+    bool default_value = false;
+  };
+
+  struct RuntimeSettingDescriptor
+  {
+    std::string key;
+    std::string name;
+    std::string description;
+    std::string category;
+    std::string note;
+    bool UI::BrowserSettings::*member = nullptr;
+    bool default_value = false;
+  };
+
+  std::vector<RuntimeSettingDescriptor> g_settings_catalog;
+  std::unordered_map<std::string, size_t> g_settings_index;
+  bool g_settings_initialized = false;
+
+  std::string::size_type FindMatchingBrace(const std::string &text, std::string::size_type open_pos)
+  {
+    size_t depth = 0;
+    for (size_t i = open_pos; i < text.size(); ++i)
+    {
+      char c = text[i];
+      if (c == '{')
+        ++depth;
+      else if (c == '}')
+      {
+        if (depth == 0)
+          return std::string::npos;
+        --depth;
+        if (depth == 0)
+          return i;
+      }
+      else if (c == '"')
+      {
+        // Skip quoted strings entirely (handle escapes)
+        ++i;
+        bool escape = false;
+        for (; i < text.size(); ++i)
+        {
+          char qc = text[i];
+          if (escape)
+          {
+            escape = false;
+            continue;
+          }
+          if (qc == '\\')
+          {
+            escape = true;
+            continue;
+          }
+          if (qc == '"')
+            break;
+        }
+      }
+    }
+    return std::string::npos;
+  }
+
+  bool ExtractJsonStringField(const std::string &object, const char *field, std::string &out)
+  {
+    if (!field)
+      return false;
+    std::string needle = std::string("\"") + field + "\"";
+    size_t pos = object.find(needle);
+    if (pos == std::string::npos)
+      return false;
+    pos = object.find(':', pos + needle.size());
+    if (pos == std::string::npos)
+      return false;
+    ++pos;
+    while (pos < object.size() && std::isspace(static_cast<unsigned char>(object[pos])))
+      ++pos;
+    if (pos >= object.size())
+      return false;
+    if (object[pos] == 'n' || object[pos] == 'N')
+    {
+      // Treat explicit null as absence
+      if (object.compare(pos, 4, "null") == 0 || object.compare(pos, 4, "NULL") == 0)
+        return false;
+    }
+    if (object[pos] != '"')
+      return false;
+    ++pos;
+    std::string value;
+    bool escape = false;
+    while (pos < object.size())
+    {
+      char c = object[pos++];
+      if (escape)
+      {
+        escape = false;
+        switch (c)
+        {
+        case '"':
+          value.push_back('"');
+          break;
+        case '\\':
+          value.push_back('\\');
+          break;
+        case 'n':
+          value.push_back('\n');
+          break;
+        case 'r':
+          value.push_back('\r');
+          break;
+        case 't':
+          value.push_back('\t');
+          break;
+        default:
+          value.push_back(c);
+          break;
+        }
+        continue;
+      }
+      if (c == '\\')
+      {
+        escape = true;
+        continue;
+      }
+      if (c == '"')
+        break;
+      value.push_back(c);
+    }
+    out = std::move(value);
+    return true;
+  }
+
+  bool ExtractJsonBoolField(const std::string &object, const char *field, bool &out)
+  {
+    if (!field)
+      return false;
+    std::string needle = std::string("\"") + field + "\"";
+    size_t pos = object.find(needle);
+    if (pos == std::string::npos)
+      return false;
+    pos = object.find(':', pos + needle.size());
+    if (pos == std::string::npos)
+      return false;
+    ++pos;
+    while (pos < object.size() && std::isspace(static_cast<unsigned char>(object[pos])))
+      ++pos;
+    if (pos >= object.size())
+      return false;
+    if (object.compare(pos, 4, "true") == 0 || object[pos] == '1')
+    {
+      out = true;
+      return true;
+    }
+    if (object.compare(pos, 5, "false") == 0 || object[pos] == '0')
+    {
+      out = false;
+      return true;
+    }
+    return false;
+  }
+
+  void LoadSettingsCatalogFromFile(std::unordered_map<std::string, ParsedCatalogEntry> &out)
+  {
+    std::ifstream in("assets/settings_catalog.json", std::ios::in | std::ios::binary);
+    if (!in.is_open())
+      return;
+    std::ostringstream ss;
+    ss << in.rdbuf();
+    std::string json = ss.str();
+    in.close();
+
+    size_t pos = 0;
+    while (pos < json.size())
+    {
+      size_t open = json.find('{', pos);
+      if (open == std::string::npos)
+        break;
+      size_t close = FindMatchingBrace(json, open);
+      if (close == std::string::npos)
+        break;
+      std::string object = json.substr(open, close - open + 1);
+      pos = close + 1;
+
+      ParsedCatalogEntry entry;
+      if (!ExtractJsonStringField(object, "key", entry.key) || entry.key.empty())
+        continue;
+      ExtractJsonStringField(object, "name", entry.name);
+      ExtractJsonStringField(object, "description", entry.description);
+      ExtractJsonStringField(object, "category", entry.category);
+      std::string noteValue;
+      if (ExtractJsonStringField(object, "note", noteValue))
+      {
+        entry.note = std::move(noteValue);
+        entry.has_note = true;
+      }
+      else if (object.find("\"note\"") != std::string::npos)
+      {
+        // note was present but null
+        entry.note.clear();
+        entry.has_note = true;
+      }
+      bool defValue = false;
+      if (ExtractJsonBoolField(object, "default", defValue))
+      {
+        entry.has_default = true;
+        entry.default_value = defValue;
+      }
+
+      out[entry.key] = std::move(entry);
+    }
+  }
+
+  void EnsureSettingsCatalogInitialized()
+  {
+    if (g_settings_initialized)
+      return;
+    g_settings_initialized = true;
+
+    std::unordered_map<std::string, ParsedCatalogEntry> parsed_entries;
+    LoadSettingsCatalogFromFile(parsed_entries);
+
+    g_settings_catalog.clear();
+    g_settings_index.clear();
+    g_settings_catalog.reserve(kFallbackSettingsCatalog.size());
+
+    for (const auto &fallback : kFallbackSettingsCatalog)
+    {
+      RuntimeSettingDescriptor runtime;
+      runtime.key = fallback.key ? fallback.key : "";
+      runtime.name = fallback.name ? fallback.name : runtime.key;
+      runtime.description = fallback.description ? fallback.description : "";
+      runtime.category = fallback.category ? fallback.category : "";
+      runtime.note = fallback.note ? fallback.note : "";
+      runtime.member = fallback.member;
+      runtime.default_value = fallback.default_value;
+
+      auto it = parsed_entries.find(runtime.key);
+      if (it != parsed_entries.end())
+      {
+        const ParsedCatalogEntry &meta = it->second;
+        if (!meta.name.empty())
+          runtime.name = meta.name;
+        if (!meta.description.empty())
+          runtime.description = meta.description;
+        if (!meta.category.empty())
+          runtime.category = meta.category;
+        if (meta.has_note)
+          runtime.note = meta.note;
+        if (meta.has_default)
+          runtime.default_value = meta.default_value;
+      }
+
+      g_settings_index[runtime.key] = g_settings_catalog.size();
+      g_settings_catalog.push_back(std::move(runtime));
+    }
+  }
+
+  const std::vector<RuntimeSettingDescriptor> &GetSettingsCatalog()
+  {
+    EnsureSettingsCatalogInitialized();
+    return g_settings_catalog;
+  }
+
+  const RuntimeSettingDescriptor *FindSettingDescriptor(const std::string &key)
+  {
+    EnsureSettingsCatalogInitialized();
+    auto it = g_settings_index.find(key);
+    if (it == g_settings_index.end())
+      return nullptr;
+    return &g_settings_catalog[it->second];
+  }
 
   inline std::string ToIso8601UTC(const std::chrono::system_clock::time_point &tp)
   {
@@ -1611,6 +1889,13 @@ void UI::EnsureDataDirectoryExists()
 void UI::RestoreSettingsToDefaults()
 {
   settings_ = BrowserSettings();
+  const auto &catalog = GetSettingsCatalog();
+  for (const auto &entry : catalog)
+  {
+    if (!entry.member)
+      continue;
+    settings_.*(entry.member) = entry.default_value;
+  }
 }
 
 bool UI::ParseSettingsBool(const std::string &buffer, const char *key, bool fallback) const
@@ -1650,10 +1935,13 @@ void UI::LoadSettingsFromDisk()
     ss << stream.rdbuf();
     std::string content = ss.str();
 
-    for (const auto &desc : kSettingsCatalog)
+    const auto &catalog = GetSettingsCatalog();
+    for (const auto &desc : catalog)
     {
+      if (!desc.member)
+        continue;
       bool fallback = settings_.*(desc.member);
-      settings_.*(desc.member) = ParseSettingsBool(content, desc.key, fallback);
+      settings_.*(desc.member) = ParseSettingsBool(content, desc.key.c_str(), fallback);
     }
   };
 
@@ -1698,7 +1986,7 @@ bool UI::SaveSettingsToDisk()
   if (!out.is_open())
     return false;
 
-  BrowserSettings defaults;
+  const auto &catalog = GetSettingsCatalog();
   std::string timestamp = ToIso8601UTC(std::chrono::system_clock::now());
   std::string storage_path = SettingsFilePath().string();
 
@@ -1710,29 +1998,32 @@ bool UI::SaveSettingsToDisk()
   out << "    \"storage_path\": \"" << EscapeJson(storage_path) << "\",\n";
   out << "    \"settings\": [\n";
 
-  for (size_t i = 0; i < kSettingsCatalog.size(); ++i)
+  bool first_entry = true;
+  for (size_t i = 0; i < catalog.size(); ++i)
   {
-    const auto &desc = kSettingsCatalog[i];
+    const auto &desc = catalog[i];
+    if (!desc.member)
+      continue;
     bool current = settings_.*(desc.member);
-    bool default_value = defaults.*(desc.member);
-    const char *name_raw = desc.name ? desc.name : "";
-    const char *desc_raw = desc.description ? desc.description : "";
-    const char *category_raw = desc.category ? desc.category : "";
-    const char *note_raw = (desc.note && *desc.note) ? desc.note : nullptr;
+    bool default_value = desc.default_value;
 
-    out << "      {\"key\":\"" << desc.key << "\",";
-    out << "\"name\":\"" << EscapeJson(name_raw) << "\",";
-    out << "\"description\":\"" << EscapeJson(desc_raw) << "\",";
-    out << "\"category\":\"" << EscapeJson(category_raw) << "\",";
+    if (!first_entry)
+      out << ",\n";
+
+    out << "      {\"key\":\"" << EscapeJson(desc.key) << "\",";
+    out << "\"name\":\"" << EscapeJson(desc.name) << "\",";
+    out << "\"description\":\"" << EscapeJson(desc.description) << "\",";
+    out << "\"category\":\"" << EscapeJson(desc.category) << "\",";
     out << "\"value\":" << (current ? "true" : "false") << ",";
     out << "\"default\":" << (default_value ? "true" : "false");
-    if (note_raw)
-      out << ",\"note\":\"" << EscapeJson(note_raw) << "\"";
+    if (!desc.note.empty())
+      out << ",\"note\":\"" << EscapeJson(desc.note) << "\"";
     out << "}";
-    if (i + 1 < kSettingsCatalog.size())
-      out << ",";
-    out << "\n";
+    first_entry = false;
   }
+
+  if (!first_entry)
+    out << "\n";
 
   out << "    ]\n";
   out << "  }\n";
@@ -1754,13 +2045,17 @@ std::string UI::BuildSettingsJSON() const
 {
   std::ostringstream ss;
   ss << "{";
-  for (size_t i = 0; i < kSettingsCatalog.size(); ++i)
+  const auto &catalog = GetSettingsCatalog();
+  bool first = true;
+  for (const auto &desc : catalog)
   {
-    const auto &desc = kSettingsCatalog[i];
+    if (!desc.member)
+      continue;
     bool value = settings_.*(desc.member);
-    if (i > 0)
+    if (!first)
       ss << ",";
-    ss << "\"" << desc.key << "\":" << (value ? "true" : "false");
+    ss << "\"" << EscapeJson(desc.key) << "\":" << (value ? "true" : "false");
+    first = false;
   }
   ss << "}";
   return ss.str();
@@ -1769,18 +2064,20 @@ std::string UI::BuildSettingsJSON() const
 std::string UI::BuildSettingsPayload(bool snapshot_is_baseline) const
 {
   std::string values_json = BuildSettingsJSON();
-  BrowserSettings defaults;
+  const auto &catalog = GetSettingsCatalog();
   std::vector<const char *> dirty_keys;
-  dirty_keys.reserve(kSettingsCatalog.size());
+  dirty_keys.reserve(catalog.size());
 
   std::string storage_path = SettingsFilePath().string();
 
-  for (const auto &desc : kSettingsCatalog)
+  for (const auto &desc : catalog)
   {
+    if (!desc.member)
+      continue;
     bool current = settings_.*(desc.member);
     bool saved = saved_settings_.*(desc.member);
     if (current != saved)
-      dirty_keys.push_back(desc.key);
+      dirty_keys.push_back(desc.key.c_str());
   }
 
   std::ostringstream ss;
@@ -1799,29 +2096,28 @@ std::string UI::BuildSettingsPayload(bool snapshot_is_baseline) const
   }
   ss << "],";
   ss << "\"catalog\":[";
-  for (size_t i = 0; i < kSettingsCatalog.size(); ++i)
+  bool first = true;
+  for (const auto &desc : catalog)
   {
-    const auto &desc = kSettingsCatalog[i];
-    if (i > 0)
+    if (!desc.member)
+      continue;
+    if (!first)
       ss << ",";
     bool current = settings_.*(desc.member);
-    bool default_value = defaults.*(desc.member);
+    bool default_value = desc.default_value;
     bool saved_value = saved_settings_.*(desc.member);
     ss << "{";
-    ss << "\"key\":\"" << desc.key << "\",";
-    const char *name_raw = desc.name ? desc.name : "";
-    const char *desc_raw = desc.description ? desc.description : "";
-    const char *category_raw = desc.category ? desc.category : "";
-    const char *note_raw = (desc.note && *desc.note) ? desc.note : nullptr;
-    ss << "\"name\":\"" << EscapeJson(name_raw) << "\",";
-    ss << "\"description\":\"" << EscapeJson(desc_raw) << "\",";
-    ss << "\"category\":\"" << EscapeJson(category_raw) << "\",";
+    ss << "\"key\":\"" << EscapeJson(desc.key) << "\",";
+    ss << "\"name\":\"" << EscapeJson(desc.name) << "\",";
+    ss << "\"description\":\"" << EscapeJson(desc.description) << "\",";
+    ss << "\"category\":\"" << EscapeJson(desc.category) << "\",";
     ss << "\"value\":" << (current ? "true" : "false") << ",";
     ss << "\"default\":" << (default_value ? "true" : "false") << ",";
     ss << "\"saved\":" << (saved_value ? "true" : "false");
-    if (note_raw)
-      ss << ",\"note\":\"" << EscapeJson(note_raw) << "\"";
+    if (!desc.note.empty())
+      ss << ",\"note\":\"" << EscapeJson(desc.note) << "\"";
     ss << "}";
+    first = false;
   }
   ss << "]";
   ss << "}";
@@ -1836,17 +2132,8 @@ void UI::UpdateSettingsDirtyFlag()
 
 void UI::HandleSettingMutation(const std::string &key, bool value)
 {
-  const SettingDescriptor *descriptor = nullptr;
-  for (const auto &entry : kSettingsCatalog)
-  {
-    if (key == entry.key)
-    {
-      descriptor = &entry;
-      break;
-    }
-  }
-
-  if (!descriptor)
+  const auto *descriptor = FindSettingDescriptor(key);
+  if (!descriptor || !descriptor->member)
     return;
 
   bool &field = settings_.*(descriptor->member);
