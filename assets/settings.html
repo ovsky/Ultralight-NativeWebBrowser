@@ -395,9 +395,180 @@
         <div class="page-body">
             <nav class="toc" aria-label="Settings sections">
                 <h2>Sections</h2>
-                <ul id="section-links"></ul>
+                <ul>
+                    <li><a href="#appearance">Appearance</a></li>
+                    <li><a href="#accessibility">Accessibility &amp; Motion</a></li>
+                    <li><a href="#privacy">Privacy &amp; Content</a></li>
+                    <li><a href="#suggestions">Suggestions</a></li>
+                    <li><a href="#downloads">Downloads</a></li>
+                </ul>
             </nav>
-            <div class="settings-content" id="settings-content" aria-live="polite"></div>
+            <div class="settings-content" id="settings-content">
+                <section class="settings-section" id="appearance" aria-labelledby="appearance-heading">
+                    <h2 id="appearance-heading">Appearance</h2>
+                    <p class="section-hint">Adjust colors, transparency, and visual treatments for the browser chrome.</p>
+                    <div class="settings-list" data-settings-category="appearance">
+                        <label class="setting-row" data-setting-key="launch_dark_theme">
+                            <input type="checkbox" data-key="launch_dark_theme">
+                            <div class="setting-copy">
+                                <div class="setting-title-line">
+                                    <span class="setting-title">Launch in dark theme</span>
+                                    <span class="setting-note" hidden></span>
+                                </div>
+                                <span class="setting-description">Start Ultralight with dark chrome, tabs, and overlays the moment it launches.</span>
+                            </div>
+                        </label>
+                        <label class="setting-row" data-setting-key="experimental_transparent_toolbar">
+                            <input type="checkbox" data-key="experimental_transparent_toolbar">
+                            <div class="setting-copy">
+                                <div class="setting-title-line">
+                                    <span class="setting-title">Transparent toolbar</span>
+                                    <span class="setting-note">Experimental</span>
+                                </div>
+                                <span class="setting-description">Blend the toolbar into page content using a frosted glass effect.</span>
+                            </div>
+                        </label>
+                        <label class="setting-row" data-setting-key="experimental_compact_tabs">
+                            <input type="checkbox" data-key="experimental_compact_tabs">
+                            <div class="setting-copy">
+                                <div class="setting-title-line">
+                                    <span class="setting-title">Compact tabs</span>
+                                    <span class="setting-note">Experimental</span>
+                                </div>
+                                <span class="setting-description">Reduce tab height and spacing so more tabs stay visible without scrolling.</span>
+                            </div>
+                        </label>
+                        <label class="setting-row" data-setting-key="vibrant_window_theme">
+                            <input type="checkbox" data-key="vibrant_window_theme">
+                            <div class="setting-copy">
+                                <div class="setting-title-line">
+                                    <span class="setting-title">Vibrant window theme</span>
+                                    <span class="setting-note" hidden></span>
+                                </div>
+                                <span class="setting-description">Apply a subtle splash of color to the frame for a more vivid finish.</span>
+                            </div>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="settings-section" id="accessibility" aria-labelledby="accessibility-heading">
+                    <h2 id="accessibility-heading">Accessibility &amp; Motion</h2>
+                    <p class="section-hint">Tone down motion and heighten contrast so every element stays readable.</p>
+                    <div class="settings-list" data-settings-category="accessibility">
+                        <label class="setting-row" data-setting-key="reduce_motion">
+                            <input type="checkbox" data-key="reduce_motion">
+                            <div class="setting-copy">
+                                <div class="setting-title-line">
+                                    <span class="setting-title">Reduce motion effects</span>
+                                    <span class="setting-note" hidden></span>
+                                </div>
+                                <span class="setting-description">Limit animated transitions and parallax so UI changes stay subtle.</span>
+                            </div>
+                        </label>
+                        <label class="setting-row" data-setting-key="high_contrast_ui">
+                            <input type="checkbox" data-key="high_contrast_ui">
+                            <div class="setting-copy">
+                                <div class="setting-title-line">
+                                    <span class="setting-title">High contrast UI</span>
+                                    <span class="setting-note" hidden></span>
+                                </div>
+                                <span class="setting-description">Boost contrast for overlays, menus, and dialogs to improve readability.</span>
+                            </div>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="settings-section" id="privacy" aria-labelledby="privacy-heading">
+                    <h2 id="privacy-heading">Privacy &amp; Content</h2>
+                    <p class="section-hint">Choose how Ultralight filters requests and what data sticks around between launches.</p>
+                    <div class="settings-list" data-settings-category="privacy">
+                        <label class="setting-row" data-setting-key="enable_adblock">
+                            <input type="checkbox" data-key="enable_adblock">
+                            <div class="setting-copy">
+                                <div class="setting-title-line">
+                                    <span class="setting-title">Enable ad blocking</span>
+                                    <span class="setting-note" hidden></span>
+                                </div>
+                                <span class="setting-description">Filter requests with the bundled block lists to remove intrusive ads.</span>
+                            </div>
+                        </label>
+                        <label class="setting-row" data-setting-key="log_blocked_requests">
+                            <input type="checkbox" data-key="log_blocked_requests">
+                            <div class="setting-copy">
+                                <div class="setting-title-line">
+                                    <span class="setting-title">Log blocked requests</span>
+                                    <span class="setting-note" hidden></span>
+                                </div>
+                                <span class="setting-description">Write each blocked network request to the console for rule debugging.</span>
+                            </div>
+                        </label>
+                        <label class="setting-row" data-setting-key="clear_history_on_exit">
+                            <input type="checkbox" data-key="clear_history_on_exit">
+                            <div class="setting-copy">
+                                <div class="setting-title-line">
+                                    <span class="setting-title">Clear history on exit</span>
+                                    <span class="setting-note" hidden></span>
+                                </div>
+                                <span class="setting-description">Remove browsing history when Ultralight closes and skip saving new visits.</span>
+                            </div>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="settings-section" id="suggestions" aria-labelledby="suggestions-heading">
+                    <h2 id="suggestions-heading">Suggestions</h2>
+                    <p class="section-hint">Dial in the autocomplete helper that appears while you type in the address bar.</p>
+                    <div class="settings-list" data-settings-category="suggestions">
+                        <label class="setting-row" data-setting-key="enable_suggestions">
+                            <input type="checkbox" data-key="enable_suggestions">
+                            <div class="setting-copy">
+                                <div class="setting-title-line">
+                                    <span class="setting-title">Show address bar suggestions</span>
+                                    <span class="setting-note" hidden></span>
+                                </div>
+                                <span class="setting-description">Surface history matches and popular sites under the address bar.</span>
+                            </div>
+                        </label>
+                        <label class="setting-row" data-setting-key="enable_suggestion_favicons">
+                            <input type="checkbox" data-key="enable_suggestion_favicons">
+                            <div class="setting-copy">
+                                <div class="setting-title-line">
+                                    <span class="setting-title">Show favicons in suggestions</span>
+                                    <span class="setting-note" hidden></span>
+                                </div>
+                                <span class="setting-description">Display site icons next to suggestion rows whenever an icon is available.</span>
+                            </div>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="settings-section" id="downloads" aria-labelledby="downloads-heading">
+                    <h2 id="downloads-heading">Downloads</h2>
+                    <p class="section-hint">Control how the toolbar signals downloads while files are in flight.</p>
+                    <div class="settings-list" data-settings-category="downloads">
+                        <label class="setting-row" data-setting-key="show_download_badge">
+                            <input type="checkbox" data-key="show_download_badge">
+                            <div class="setting-copy">
+                                <div class="setting-title-line">
+                                    <span class="setting-title">Show download badge</span>
+                                    <span class="setting-note" hidden></span>
+                                </div>
+                                <span class="setting-description">Highlight the toolbar downloads button whenever transfers are active.</span>
+                            </div>
+                        </label>
+                        <label class="setting-row" data-setting-key="auto_open_download_panel">
+                            <input type="checkbox" data-key="auto_open_download_panel">
+                            <div class="setting-copy">
+                                <div class="setting-title-line">
+                                    <span class="setting-title">Open downloads panel automatically</span>
+                                    <span class="setting-note" hidden></span>
+                                </div>
+                                <span class="setting-description">Pop open the quick downloads overlay as soon as a new download starts.</span>
+                            </div>
+                        </label>
+                    </div>
+                </section>
+            </div>
         </div>
         <footer class="page-footer">
             <span>Unsaved changes stay in this tab until you press Save.</span>
@@ -408,226 +579,43 @@
         (function () {
             'use strict';
 
-            const KNOWN_CATEGORIES = [
-                {
-                    id: 'appearance',
-                    title: 'Appearance',
-                    description: 'Adjust the chrome, window treatments, and visual polish to match your workspace.'
-                },
-                {
-                    id: 'accessibility',
-                    title: 'Accessibility & Motion',
-                    description: 'Reduce motion and boost contrast so the interface stays comfortable on every display.'
-                },
-                {
-                    id: 'privacy',
-                    title: 'Privacy & Content',
-                    description: 'Choose how Ultralight filters requests, records history, and handles background activity.'
-                },
-                {
-                    id: 'suggestions',
-                    title: 'Suggestions',
-                    description: 'Control the address bar helper so it surfaces only the hints you find useful.'
-                },
-                {
-                    id: 'downloads',
-                    title: 'Downloads',
-                    description: 'Decide how download progress and notifications appear while files transfer.'
-                }
-            ];
-
             const restoreBtn = document.getElementById('restore-defaults');
             const saveBtn = document.getElementById('save-settings');
-            const contentRoot = document.getElementById('settings-content');
-            const tocList = document.getElementById('section-links');
             const savePathEl = document.getElementById('settings-save-path');
 
             const rowsByKey = new Map();
             const inputsByKey = new Map();
+            const titlesByKey = new Map();
+            const descriptionsByKey = new Map();
+            const notesByKey = new Map();
             const defaultsByKey = new Map();
+
+            document.querySelectorAll('.setting-row[data-setting-key]').forEach((row) => {
+                const keyAttr = row.getAttribute('data-setting-key');
+                const key = keyAttr ? String(keyAttr).trim() : '';
+                if (!key) return;
+
+                rowsByKey.set(key, row);
+
+                const input = row.querySelector('input[type="checkbox"]');
+                if (input) {
+                    input.setAttribute('data-key', key);
+                    inputsByKey.set(key, input);
+                }
+
+                const title = row.querySelector('.setting-title');
+                if (title) titlesByKey.set(key, title);
+
+                const description = row.querySelector('.setting-description');
+                if (description) descriptionsByKey.set(key, description);
+
+                const note = row.querySelector('.setting-note');
+                if (note) notesByKey.set(key, note);
+            });
 
             let baselineValues = {};
             let currentValues = {};
             let isDirty = false;
-            let lastCatalogSignature = '';
-
-            function fallbackCategory(id) {
-                if (!id) {
-                    return { id: 'misc', title: 'Other', description: '' };
-                }
-                const normalized = String(id);
-                const title = normalized.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-                return { id: normalized, title: title.trim() || 'Other', description: '' };
-            }
-
-            function stringifyCatalog(entries) {
-                return entries.map((entry) => {
-                    if (!entry) return '';
-                    const key = entry.key ? String(entry.key) : '';
-                    const category = entry.category ? String(entry.category) : '';
-                    const name = entry.name ? String(entry.name) : '';
-                    const note = entry.note ? String(entry.note) : '';
-                    const description = entry.description ? String(entry.description) : '';
-                    return key + '|' + category + '|' + name + '|' + note + '|' + description;
-                }).join(';');
-            }
-
-            function groupCatalog(entries) {
-                const groups = new Map();
-                entries.forEach((entry) => {
-                    if (!entry || !entry.key) return;
-                    const category = entry.category ? String(entry.category) : 'misc';
-                    if (!groups.has(category)) {
-                        groups.set(category, []);
-                    }
-                    groups.get(category).push(entry);
-                });
-                groups.forEach((items) => {
-                    items.sort((a, b) => {
-                        const aName = (a.name || a.key || '').toLowerCase();
-                        const bName = (b.name || b.key || '').toLowerCase();
-                        return aName.localeCompare(bName);
-                    });
-                });
-                return groups;
-            }
-
-            function renderCatalog(entries) {
-                if (!Array.isArray(entries)) return;
-
-                const signature = stringifyCatalog(entries);
-                if (signature === lastCatalogSignature && rowsByKey.size) {
-                    defaultsByKey.clear();
-                    entries.forEach((entry) => {
-                        if (entry && entry.key && typeof entry.default === 'boolean') {
-                            defaultsByKey.set(String(entry.key), !!entry.default);
-                        }
-                    });
-                    return;
-                }
-                lastCatalogSignature = signature;
-
-                const groups = groupCatalog(entries);
-                const ordered = [];
-                KNOWN_CATEGORIES.forEach((info) => {
-                    if (groups.has(info.id)) {
-                        ordered.push({ info, entries: groups.get(info.id) });
-                        groups.delete(info.id);
-                    }
-                });
-
-                Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0])).forEach(([id, items]) => {
-                    ordered.push({ info: fallbackCategory(id), entries: items });
-                });
-
-                contentRoot.textContent = '';
-                tocList.textContent = '';
-                rowsByKey.clear();
-                inputsByKey.clear();
-                defaultsByKey.clear();
-
-                ordered.forEach(({ info, entries: categoryEntries }) => {
-                    if (!categoryEntries.length) return;
-
-                    const section = document.createElement('section');
-                    section.className = 'settings-section';
-                    section.id = info.id;
-                    section.setAttribute('aria-labelledby', info.id + '-heading');
-
-                    const heading = document.createElement('h2');
-                    heading.id = info.id + '-heading';
-                    heading.textContent = info.title || 'Settings';
-                    section.appendChild(heading);
-
-                    if (info.description) {
-                        const hint = document.createElement('p');
-                        hint.className = 'section-hint';
-                        hint.textContent = info.description;
-                        section.appendChild(hint);
-                    }
-
-                    const list = document.createElement('div');
-                    list.className = 'settings-list';
-                    list.dataset.settingsCategory = info.id;
-                    section.appendChild(list);
-
-                    categoryEntries.forEach((entry) => {
-                        if (!entry || !entry.key) return;
-                        const key = String(entry.key);
-
-                        const row = document.createElement('label');
-                        row.className = 'setting-row';
-                        row.dataset.settingKey = key;
-
-                        const input = document.createElement('input');
-                        input.type = 'checkbox';
-                        input.dataset.key = key;
-                        const inputId = 'setting-toggle-' + key;
-                        input.id = inputId;
-                        row.appendChild(input);
-
-                        const copy = document.createElement('div');
-                        copy.className = 'setting-copy';
-
-                        const titleLine = document.createElement('div');
-                        titleLine.className = 'setting-title-line';
-
-                        const title = document.createElement('span');
-                        title.className = 'setting-title';
-                        title.id = key + '-title';
-                        title.textContent = entry.name || key;
-                        titleLine.appendChild(title);
-
-                        const note = document.createElement('span');
-                        note.className = 'setting-note';
-                        if (entry.note) {
-                            note.textContent = entry.note;
-                            note.hidden = false;
-                        } else {
-                            note.hidden = true;
-                        }
-                        titleLine.appendChild(note);
-                        copy.appendChild(titleLine);
-
-                        const description = document.createElement('span');
-                        description.className = 'setting-description';
-                        description.id = key + '-description';
-                        description.textContent = entry.description || '';
-                        copy.appendChild(description);
-
-                        row.appendChild(copy);
-                        list.appendChild(row);
-
-                        rowsByKey.set(key, row);
-                        inputsByKey.set(key, input);
-                        if (typeof entry.default === 'boolean') {
-                            defaultsByKey.set(key, !!entry.default);
-                        }
-
-                        input.setAttribute('aria-labelledby', title.id);
-                        input.setAttribute('aria-describedby', description.id);
-
-                        input.addEventListener('change', () => {
-                            if (input.disabled) return;
-                            const checked = !!input.checked;
-                            currentValues[key] = checked;
-                            markRowDirty(key);
-                            isDirty = true;
-                            updateSaveButtonState();
-                            pushSetting(key, checked);
-                        });
-                    });
-
-                    contentRoot.appendChild(section);
-
-                    const li = document.createElement('li');
-                    const link = document.createElement('a');
-                    link.href = '#' + info.id;
-                    link.textContent = info.title || 'Settings';
-                    li.appendChild(link);
-                    tocList.appendChild(li);
-                });
-            }
 
             function normalizePayload(payload) {
                 if (typeof payload === 'string') {
@@ -704,23 +692,66 @@
                 }
             }
 
+            function hydrateCatalog(entries) {
+                if (!Array.isArray(entries)) return;
+                defaultsByKey.clear();
+                const visibleKeys = new Set();
+
+                entries.forEach((entry) => {
+                    if (!entry || !entry.key) return;
+                    const key = String(entry.key);
+                    visibleKeys.add(key);
+
+                    const title = titlesByKey.get(key);
+                    if (title && entry.name) title.textContent = entry.name;
+
+                    const description = descriptionsByKey.get(key);
+                    if (description && typeof entry.description === 'string') description.textContent = entry.description;
+
+                    const note = notesByKey.get(key);
+                    if (note) {
+                        if (entry.note) {
+                            note.textContent = entry.note;
+                            note.hidden = false;
+                        } else {
+                            note.textContent = '';
+                            note.hidden = true;
+                        }
+                    }
+
+                    if (typeof entry.default === 'boolean') {
+                        defaultsByKey.set(key, !!entry.default);
+                    }
+                });
+
+                rowsByKey.forEach((row, key) => {
+                    const input = inputsByKey.get(key);
+                    if (!visibleKeys.has(key)) {
+                        row.hidden = true;
+                        row.setAttribute('aria-hidden', 'true');
+                        row.classList.remove('setting-row-dirty');
+                        if (input) input.disabled = true;
+                    } else {
+                        row.hidden = false;
+                        row.removeAttribute('aria-hidden');
+                        if (input) input.disabled = false;
+                    }
+                });
+            }
+
             function applySettingsState(payload) {
                 const coerced = coercePayload(payload);
                 if (!coerced) return;
                 const { values, meta } = coerced;
 
                 if (meta && Array.isArray(meta.catalog)) {
-                    renderCatalog(meta.catalog);
-                    meta.catalog.forEach((entry) => {
-                        if (entry && entry.key && typeof entry.default === 'boolean') {
-                            defaultsByKey.set(String(entry.key), !!entry.default);
-                        }
-                    });
+                    hydrateCatalog(meta.catalog);
                 }
 
                 currentValues = {};
 
                 inputsByKey.forEach((input, key) => {
+                    if (input.disabled) return;
                     let nextValue;
                     if (Object.prototype.hasOwnProperty.call(values, key)) {
                         nextValue = !!values[key];
@@ -759,6 +790,18 @@
 
                 updateSaveButtonState();
             }
+
+            inputsByKey.forEach((input, key) => {
+                input.addEventListener('change', () => {
+                    if (input.disabled) return;
+                    const checked = !!input.checked;
+                    currentValues[key] = checked;
+                    markRowDirty(key);
+                    isDirty = true;
+                    updateSaveButtonState();
+                    pushSetting(key, checked);
+                });
+            });
 
             function refreshSnapshot() {
                 if (typeof window.GetSettingsSnapshot !== 'function') return;
