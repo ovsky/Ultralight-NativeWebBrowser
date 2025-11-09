@@ -56,23 +56,6 @@
             <div class="menu-item" data-action="new-tab">New tab [Ctrl+T]</div>
             <div class="menu-item" data-action="new-window">New window [Ctrl+N]</div>
             <div class="menu-separator"></div>
-            <div class="menu-heading" aria-hidden="true">Quick settings</div>
-            <div class="menu-item menu-toggle" id="toggle-dark" data-action="toggle-dark" role="menuitemcheckbox"
-                aria-checked="false">
-                <span class="menu-label">Dark theme</span>
-                <span class="menu-value">Off</span>
-            </div>
-            <div class="menu-item menu-toggle" id="toggle-adblock" data-action="toggle-adblock" role="menuitemcheckbox"
-                aria-checked="false">
-                <span class="menu-label">Ad blocking</span>
-                <span class="menu-value">Off</span>
-            </div>
-            <div class="menu-item menu-toggle" id="toggle-suggestions" data-action="toggle-suggestions"
-                role="menuitemcheckbox" aria-checked="false">
-                <span class="menu-label">Address suggestions</span>
-                <span class="menu-value">Off</span>
-            </div>
-            <div class="menu-separator"></div>
             <div class="menu-item" data-action="history">History [Ctrl+H]</div>
             <div class="menu-item" data-action="downloads">Downloads</div>
             <div class="menu-item" data-action="settings">Settings</div>
@@ -100,57 +83,11 @@
                 if (e.key === 'Escape') closeMenu();
             });
 
-            function getSettingsValues() {
-                if (typeof window.GetSettingsSnapshot !== 'function') return null;
-                try {
-                    const raw = GetSettingsSnapshot();
-                    const payload = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw;
-                    if (payload && typeof payload === 'object') {
-                        if (payload.values && typeof payload.values === 'object') {
-                            return payload.values;
-                        }
-                        return payload;
-                    }
-                } catch { }
-                return null;
-            }
-
-            function setToggleState(id, enabled) {
-                const el = document.getElementById(id);
-                if (!el) return;
-                const on = !!enabled;
-                el.setAttribute('aria-checked', on ? 'true' : 'false');
-                const valueEl = el.querySelector('.menu-value');
-                if (valueEl) valueEl.textContent = on ? 'On' : 'Off';
-            }
-
-            function refreshQuickSettings() {
-                try {
-                    if (typeof window.GetDarkModeEnabled === 'function') {
-                        setToggleState('toggle-dark', !!GetDarkModeEnabled());
-                    }
-                } catch { }
-
-                try {
-                    if (typeof window.GetAdblockEnabled === 'function') {
-                        setToggleState('toggle-adblock', !!GetAdblockEnabled());
-                    }
-                } catch { }
-
-                const values = getSettingsValues();
-                if (values && Object.prototype.hasOwnProperty.call(values, 'enable_suggestions')) {
-                    setToggleState('toggle-suggestions', !!values.enable_suggestions);
-                } else {
-                    setToggleState('toggle-suggestions', true);
-                }
-            }
-
             // Item clicks
             menu.addEventListener('click', (e) => {
                 const item = e.target.closest('.menu-item');
                 if (!item) return;
                 const action = item.getAttribute('data-action');
-                let shouldClose = true;
                 switch (action) {
                     case 'new-tab':
                         if (window.OnRequestNewTab) OnRequestNewTab();
@@ -159,32 +96,6 @@
                         // Placeholder: open a new tab as "new window" is not implemented
                         if (window.OnRequestNewTab) OnRequestNewTab();
                         break;
-                    case 'toggle-dark':
-                        if (window.OnToggleDarkMode) {
-                            OnToggleDarkMode();
-                            shouldClose = false;
-                            setTimeout(refreshQuickSettings, 50);
-                        }
-                        break;
-                    case 'toggle-adblock':
-                        if (window.OnToggleAdblock) {
-                            OnToggleAdblock();
-                            shouldClose = false;
-                            setTimeout(refreshQuickSettings, 50);
-                        }
-                        break;
-                    case 'toggle-suggestions': {
-                        const values = getSettingsValues();
-                        const current = values && Object.prototype.hasOwnProperty.call(values, 'enable_suggestions') ? !!values.enable_suggestions : true;
-                        if (window.OnUpdateSetting) {
-                            try {
-                                OnUpdateSetting('enable_suggestions', !current);
-                            } catch { }
-                            shouldClose = false;
-                            setTimeout(refreshQuickSettings, 80);
-                        }
-                        break;
-                    }
                     case 'history':
                         if (window.OnOpenHistoryNewTab) OnOpenHistoryNewTab();
                         break;
@@ -195,13 +106,8 @@
                         if (window.OnOpenSettingsPanel) OnOpenSettingsPanel();
                         break;
                 }
-                if (shouldClose) {
-                    closeMenu();
-                }
+                closeMenu();
             });
-
-            // Initialize labels
-            refreshQuickSettings();
         })();
     </script>
 </body>

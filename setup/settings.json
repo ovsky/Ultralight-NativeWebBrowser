@@ -1,0 +1,22 @@
+{
+  "values": {
+    "launch_dark_theme": true,
+    "enable_adblock": true,
+    "log_blocked_requests": false,
+    "enable_suggestions": true,
+    "enable_suggestion_favicons": true,
+    "show_download_badge": true,
+    "auto_open_download_panel": true,
+    "clear_history_on_exit": false,
+    "experimental_transparent_toolbar": false,
+    "experimental_compact_tabs": false,
+    "reduce_motion": false,
+    "high_contrast_ui": false,
+    "vibrant_window_theme": false
+  },
+  "meta": {
+    "updated_at": "2025-11-09T12:00:00Z",
+    "dirty": false,
+    "storage_path": "setup/settings.json"
+  }
+}

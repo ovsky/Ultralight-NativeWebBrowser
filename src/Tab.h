@@ -117,6 +117,12 @@ public:
   void OnPickerHover(const JSObject &obj, const JSArgs &args);
   void OnPickerSelect(const JSObject &obj, const JSArgs &args);
 
+  // Settings page callbacks (forward to UI)
+  JSValue JS_GetSettingsSnapshot(const JSObject &obj, const JSArgs &args);
+  void JS_UpdateSetting(const JSObject &obj, const JSArgs &args);
+  void JS_SaveSettings(const JSObject &obj, const JSArgs &args);
+  JSValue JS_RestoreSettingsDefaults(const JSObject &obj, const JSArgs &args);
+
 protected:
   UI *ui_;
   RefPtr<Overlay> overlay_;

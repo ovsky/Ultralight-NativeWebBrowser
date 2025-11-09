@@ -1,6 +1,7 @@
 #include "UI.h"
 #include <cstring>
 #include <cmath>
+#include <iostream>
 #include <Ultralight/Renderer.h>
 #include <chrono>
 #include <fstream>
@@ -20,6 +21,10 @@
 #include "AdBlocker.h"
 #ifdef _WIN32
 #include <direct.h> // _mkdir, _getcwd
+#ifndef NOMINMAX
+#define NOMINMAX 1
+#endif
+#include <windows.h> // GetModuleFileNameW
 #else
 #include <sys/stat.h> // mkdir
 #include <unistd.h>   // getcwd
@@ -418,6 +423,13 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
   overlay_ = Overlay::Create(window_, window_width, ui_height_, 0, 0);
   g_ui = this;
 
+  // Prepare settings and state BEFORE loading the main UI document so the first snapshot reflects persisted values.
+  LoadSuggestionsFaviconsFlag();
+  EnsureDataDirectoryExists();
+  settings_storage_path_ = SettingsFilePath().string();
+  LoadSettingsFromDisk();
+
+  // Hook listeners and then load UI document
   view()->set_load_listener(this);
   view()->set_view_listener(this);
   view()->LoadURL("file:///ui.html");
@@ -426,11 +438,7 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
   download_manager_->SetOnChangeCallback([this]()
                                          { NotifyDownloadsChanged(); });
 
-  // Prepare settings persistence and initial state before loading ancillary data.
-  LoadSuggestionsFaviconsFlag();
-  EnsureDataDirectoryExists();
-  settings_storage_path_ = SettingsFilePath().string();
-  LoadSettingsFromDisk();
+  // Apply runtime toggles (visual sync happens on DOMReady via SyncSettingsStateToUI)
   ApplySettings(true, true);
 
   // Load keyboard shortcuts mapping
@@ -457,6 +465,11 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
   overlay_ = Overlay::Create(window_, window_width, ui_height_, 0, 0);
   g_ui = this;
 
+  LoadSuggestionsFaviconsFlag();
+  EnsureDataDirectoryExists();
+  settings_storage_path_ = SettingsFilePath().string();
+  LoadSettingsFromDisk();
+
   view()->set_load_listener(this);
   view()->set_view_listener(this);
   view()->LoadURL("file:///ui.html");
@@ -465,10 +478,7 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
   download_manager_->SetOnChangeCallback([this]()
                                          { NotifyDownloadsChanged(); });
 
-  LoadSuggestionsFaviconsFlag();
-  EnsureDataDirectoryExists();
-  settings_storage_path_ = SettingsFilePath().string();
-  LoadSettingsFromDisk();
+  // Apply runtime toggles (visual sync happens on DOMReady via SyncSettingsStateToUI)
   ApplySettings(true, true);
 
   // Load keyboard shortcuts mapping
@@ -917,10 +927,14 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["GetAdblockEnabled"] = BindJSCallbackWithRetval(&UI::OnGetAdblockEnabled);
   global["OnOpenSettingsPanel"] = BindJSCallback(&UI::OnOpenSettingsPanel);
   global["OnCloseSettingsPanel"] = BindJSCallback(&UI::OnCloseSettingsPanel);
+
+  // Bind settings bridge functions to ALL views (not just UI overlay)
+  // This ensures settings.html can call GetSettingsSnapshot when loaded in a tab
   global["GetSettingsSnapshot"] = BindJSCallbackWithRetval(&UI::OnGetSettings);
   global["OnUpdateSetting"] = BindJSCallback(&UI::OnUpdateSetting);
   global["OnRestoreSettingsDefaults"] = BindJSCallbackWithRetval(&UI::OnRestoreSettingsDefaults);
   global["OnSaveSettings"] = BindJSCallback(&UI::OnSaveSettings);
+
   if (is_ctx_view)
   {
     // context menu overlay actions
@@ -975,11 +989,17 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
 
   if (is_settings_page_view)
   {
+    // Settings page is loaded - hydrate it with current settings immediately
     applySettingsPanel = global["applySettingsState"];
     if (applySettingsPanel)
     {
       std::string payload = BuildSettingsPayload(true);
+      std::cout << "[OnDOMReady] Settings page loaded, calling applySettingsState with payload" << std::endl;
       applySettingsPanel({String(payload.c_str())});
+    }
+    else
+    {
+      std::cout << "[OnDOMReady] Settings page loaded but applySettingsState not yet defined" << std::endl;
     }
   }
 
@@ -1680,8 +1700,23 @@ void UI::OnCloseSettingsPanel(const JSObject &, const JSArgs &)
 
 ultralight::JSValue UI::OnGetSettings(const JSObject &, const JSArgs &)
 {
+  // Build a fresh snapshot of current settings state
   std::string payload = BuildSettingsPayload(false);
-  return ultralight::JSValue(payload.c_str());
+
+  // Debug: log the payload being returned (first 200 chars)
+  if (payload.length() > 200)
+  {
+    std::string preview = payload.substr(0, 200) + "...";
+    std::cout << "[UI::OnGetSettings] Returning payload: " << preview << std::endl;
+  }
+  else
+  {
+    std::cout << "[UI::OnGetSettings] Returning payload: " << payload << std::endl;
+  }
+
+  // Convert std::string to ultralight::String for proper JSValue conversion
+  ultralight::String ul_payload(payload.c_str());
+  return ultralight::JSValue(ul_payload);
 }
 
 void UI::OnUpdateSetting(const JSObject &, const JSArgs &args)
@@ -1728,7 +1763,8 @@ ultralight::JSValue UI::OnRestoreSettingsDefaults(const JSObject &, const JSArgs
   ApplySettings(false, false);
   UpdateSettingsDirtyFlag();
   std::string payload = BuildSettingsPayload(false);
-  return ultralight::JSValue(payload.c_str());
+  ultralight::String ul_payload(payload.c_str());
+  return ultralight::JSValue(ul_payload);
 }
 
 void UI::OnSaveSettings(const JSObject &, const JSArgs &)
@@ -2095,22 +2131,33 @@ bool UI::SaveSettingsToDisk()
 
 std::string UI::BuildSettingsJSON() const
 {
+  // Debug: log what we're about to serialize
+  std::cout << "[BuildSettingsJSON] settings_ values:" << std::endl;
+  std::cout << "  launch_dark_theme: " << settings_.launch_dark_theme << std::endl;
+  std::cout << "  enable_adblock: " << settings_.enable_adblock << std::endl;
+  std::cout << "  enable_suggestions: " << settings_.enable_suggestions << std::endl;
+
+  // Directly serialize settings_ struct members to ensure actual values are used
   std::ostringstream ss;
   ss << "{";
-  const auto &catalog = GetSettingsCatalog();
-  bool first = true;
-  for (const auto &desc : catalog)
-  {
-    if (!desc.member)
-      continue;
-    bool value = settings_.*(desc.member);
-    if (!first)
-      ss << ",";
-    ss << "\"" << EscapeJson(desc.key) << "\":" << (value ? "true" : "false");
-    first = false;
-  }
+  ss << "\"launch_dark_theme\":" << (settings_.launch_dark_theme ? "true" : "false") << ",";
+  ss << "\"enable_adblock\":" << (settings_.enable_adblock ? "true" : "false") << ",";
+  ss << "\"log_blocked_requests\":" << (settings_.log_blocked_requests ? "true" : "false") << ",";
+  ss << "\"enable_suggestions\":" << (settings_.enable_suggestions ? "true" : "false") << ",";
+  ss << "\"enable_suggestion_favicons\":" << (settings_.enable_suggestion_favicons ? "true" : "false") << ",";
+  ss << "\"show_download_badge\":" << (settings_.show_download_badge ? "true" : "false") << ",";
+  ss << "\"auto_open_download_panel\":" << (settings_.auto_open_download_panel ? "true" : "false") << ",";
+  ss << "\"clear_history_on_exit\":" << (settings_.clear_history_on_exit ? "true" : "false") << ",";
+  ss << "\"experimental_transparent_toolbar\":" << (settings_.experimental_transparent_toolbar ? "true" : "false") << ",";
+  ss << "\"experimental_compact_tabs\":" << (settings_.experimental_compact_tabs ? "true" : "false") << ",";
+  ss << "\"reduce_motion\":" << (settings_.reduce_motion ? "true" : "false") << ",";
+  ss << "\"high_contrast_ui\":" << (settings_.high_contrast_ui ? "true" : "false") << ",";
+  ss << "\"vibrant_window_theme\":" << (settings_.vibrant_window_theme ? "true" : "false");
   ss << "}";
-  return ss.str();
+
+  std::string result = ss.str();
+  std::cout << "[BuildSettingsJSON] Result: " << result << std::endl;
+  return result;
 }
 
 std::string UI::BuildSettingsPayload(bool snapshot_is_baseline) const
@@ -2344,12 +2391,37 @@ void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
       const char *script = R"JS((function(){
         try{
           if (document.execCommand && document.execCommand('cut')) return true;
-          var selText = '';
+          // Prefer storing settings next to the executable under a "setup" folder
+          auto exe_dir = []() -> std::filesystem::path {
+        #if defined(_WIN32)
+            wchar_t buf[MAX_PATH];
+            DWORD n = GetModuleFileNameW(nullptr, buf, MAX_PATH);
+            if (n > 0 && n < MAX_PATH) {
+              std::filesystem::path p(buf);
+              return p.parent_path();
+            }
+            return std::filesystem::current_path();
+        #elif defined(__APPLE__)
+            // Fallback: current_path (resolving actual executable dir on macOS requires _NSGetExecutablePath)
+            return std::filesystem::current_path();
+        #else
+            // Linux/Unix: try /proc/self/exe, else current_path
+            char linkpath[4096];
+            ssize_t len = readlink("/proc/self/exe", linkpath, sizeof(linkpath)-1);
+            if (len > 0) {
+              linkpath[len] = '\0';
+              std::filesystem::path p(linkpath);
+              return p.parent_path();
+            }
+            return std::filesystem::current_path();
+        #endif
+          }();
+          return std::filesystem::absolute(exe_dir / "setup");
           try { selText = String(window.getSelection ? window.getSelection() : ''); } catch(_){ }
           if (!selText) return false;
           try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(selText); } catch(_){ }
           // Delete selection
-          if (document.execCommand) { document.execCommand('delete'); return true; }
+          return SettingsDirectory() / "settings.json";
           var el = document.activeElement;
           if (el && (el.tagName==='INPUT'||el.tagName==='TEXTAREA')){
             var s=el.selectionStart||0, e=el.selectionEnd||0, v=el.value||'';
