@@ -211,7 +211,7 @@ body.compact-tabs #chrome-tabs-add-tab {
 body.compact-tabs .chrome-tabs .chrome-tab {
   height: 26px;
   top: 1px;
-  width: 18em;
+  width: 12em;
 }
 
 body.compact-tabs .chrome-tabs .chrome-tab .chrome-tab-background {

@@ -75,6 +75,13 @@
             </svg>
             <span id="downloads-badge" class="downloads-badge"></span>
         </span>
+        <!-- AdBlock toggle icon -->
+        <span id="toggle-adblock" class="icon" role="button" tabindex="0" aria-label="Toggle ad blocking"
+            data-tooltip="Ad Blocking">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path d="M12 2L4 5v6.09c0 5.06 3.43 9.8 8 10.91c4.57-1.11 8-5.85 8-10.91V5l-8-3z" fill="currentColor" />
+            </svg>
+        </span>
         <!-- Overflow menu (three dots) -->
         <span id="toggle-menu" class="icon" role="button" tabindex="0" aria-label="Open menu" aria-haspopup="true"
             data-tooltip="Menu">
@@ -167,6 +174,38 @@
                         toggleDownloads();
                     }
                 });
+            }
+            const adblockBtn = document.querySelector('#toggle-adblock');
+            if (adblockBtn) {
+                const toggleAdblock = () => {
+                    if (window.OnToggleAdblock) {
+                        OnToggleAdblock();
+                        // Update visual state after toggle
+                        setTimeout(() => {
+                            if (window.GetAdblockEnabled) {
+                                const isEnabled = GetAdblockEnabled();
+                                adblockBtn.classList.toggle('active', isEnabled);
+                            }
+                        }, 50);
+                    }
+                };
+                adblockBtn.addEventListener('click', event => {
+                    event.stopPropagation();
+                    toggleAdblock();
+                });
+                adblockBtn.addEventListener('keydown', event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        toggleAdblock();
+                    }
+                });
+                // Initialize state on load
+                setTimeout(() => {
+                    if (window.GetAdblockEnabled) {
+                        const isEnabled = GetAdblockEnabled();
+                        adblockBtn.classList.toggle('active', isEnabled);
+                    }
+                }, 100);
             }
             var address = document.querySelector('#address');
             address.onkeypress = (function (e) {
