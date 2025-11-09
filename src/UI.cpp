@@ -49,46 +49,95 @@ namespace
     bool default_value;
   };
 
-  constexpr std::array<SettingDescriptor, 13> kFallbackSettingsCatalog = {
+  constexpr std::array<SettingDescriptor, 26> kFallbackSettingsCatalog = {
+      // Appearance
       SettingDescriptor{"launch_dark_theme", "Launch in dark theme",
                         "Start Ultralight with dark chrome, toolbars, and tabs by default.",
                         "appearance", nullptr, &UI::BrowserSettings::launch_dark_theme, false},
-      SettingDescriptor{"enable_adblock", "Enable ad blocking",
-                        "Filter network requests using bundled block lists to hide intrusive ads.",
-                        "privacy", nullptr, &UI::BrowserSettings::enable_adblock, true},
-      SettingDescriptor{"log_blocked_requests", "Log blocked requests",
-                        "Write each blocked network request to the console for debugging rules.",
-                        "privacy", nullptr, &UI::BrowserSettings::log_blocked_requests, false},
-      SettingDescriptor{"enable_suggestions", "Show address bar suggestions",
-                        "Surface history matches and popular sites while typing in the address bar.",
-                        "suggestions", nullptr, &UI::BrowserSettings::enable_suggestions, true},
-      SettingDescriptor{"enable_suggestion_favicons", "Show favicons in suggestions",
-                        "Display site icons next to suggestion rows whenever an icon is available.",
-                        "suggestions", nullptr, &UI::BrowserSettings::enable_suggestion_favicons, true},
-      SettingDescriptor{"show_download_badge", "Show download badge",
-                        "Highlight the toolbar downloads button whenever transfers are active.",
-                        "downloads", nullptr, &UI::BrowserSettings::show_download_badge, true},
-      SettingDescriptor{"auto_open_download_panel", "Open downloads panel automatically",
-                        "Pop open the quick downloads overlay as soon as a new download begins.",
-                        "downloads", nullptr, &UI::BrowserSettings::auto_open_download_panel, true},
-      SettingDescriptor{"clear_history_on_exit", "Clear history on exit",
-                        "Remove browsing history when Ultralight closes and skip saving new visits.",
-                        "privacy", nullptr, &UI::BrowserSettings::clear_history_on_exit, false},
+      SettingDescriptor{"vibrant_window_theme", "Vibrant window theme",
+                        "Apply a subtle color wash to the window frame for a livelier finish.",
+                        "appearance", nullptr, &UI::BrowserSettings::vibrant_window_theme, false},
       SettingDescriptor{"experimental_transparent_toolbar", "Transparent toolbar",
                         "Blend the toolbar into page content with a translucent, glass-like surface.",
                         "appearance", "Experimental", &UI::BrowserSettings::experimental_transparent_toolbar, false},
       SettingDescriptor{"experimental_compact_tabs", "Compact tabs",
                         "Reduce tab height and spacing so more tabs stay visible without scrolling.",
                         "appearance", "Experimental", &UI::BrowserSettings::experimental_compact_tabs, false},
+
+      // Privacy & Security
+      SettingDescriptor{"enable_adblock", "Enable ad blocking",
+                        "Filter network requests using bundled block lists to hide intrusive ads.",
+                        "privacy", nullptr, &UI::BrowserSettings::enable_adblock, true},
+      SettingDescriptor{"log_blocked_requests", "Log blocked requests",
+                        "Write each blocked network request to the console for debugging rules.",
+                        "privacy", nullptr, &UI::BrowserSettings::log_blocked_requests, false},
+      SettingDescriptor{"clear_history_on_exit", "Clear history on exit",
+                        "Remove browsing history when Ultralight closes and skip saving new visits.",
+                        "privacy", nullptr, &UI::BrowserSettings::clear_history_on_exit, true},
+      SettingDescriptor{"enable_javascript", "Enable JavaScript",
+                        "Allow websites to run JavaScript code for interactive features and dynamic content.",
+                        "privacy", nullptr, &UI::BrowserSettings::enable_javascript, true},
+      SettingDescriptor{"enable_web_security", "Enable web security",
+                        "Enforce same-origin policy and other web security restrictions.",
+                        "privacy", nullptr, &UI::BrowserSettings::enable_web_security, true},
+      SettingDescriptor{"block_third_party_cookies", "Block third-party cookies",
+                        "Prevent websites from setting cookies that track you across different sites.",
+                        "privacy", nullptr, &UI::BrowserSettings::block_third_party_cookies, false},
+      SettingDescriptor{"do_not_track", "Send Do Not Track header",
+                        "Request that websites not track your browsing activity.",
+                        "privacy", nullptr, &UI::BrowserSettings::do_not_track, true},
+
+      // Address Bar & Suggestions
+      SettingDescriptor{"enable_suggestions", "Show address bar suggestions",
+                        "Surface history matches and popular sites while typing in the address bar.",
+                        "suggestions", nullptr, &UI::BrowserSettings::enable_suggestions, true},
+      SettingDescriptor{"enable_suggestion_favicons", "Show favicons in suggestions",
+                        "Display site icons next to suggestion rows whenever an icon is available.",
+                        "suggestions", nullptr, &UI::BrowserSettings::enable_suggestion_favicons, true},
+
+      // Downloads
+      SettingDescriptor{"show_download_badge", "Show download badge",
+                        "Highlight the toolbar downloads button whenever transfers are active.",
+                        "downloads", nullptr, &UI::BrowserSettings::show_download_badge, true},
+      SettingDescriptor{"auto_open_download_panel", "Open downloads panel automatically",
+                        "Pop open the quick downloads overlay as soon as a new download begins.",
+                        "downloads", nullptr, &UI::BrowserSettings::auto_open_download_panel, true},
+      SettingDescriptor{"ask_download_location", "Ask where to save downloads",
+                        "Show a file picker dialog for each download instead of using default location.",
+                        "downloads", nullptr, &UI::BrowserSettings::ask_download_location, false},
+
+      // Performance
+      SettingDescriptor{"smooth_scrolling", "Smooth scrolling",
+                        "Enable smooth animated scrolling for a more fluid browsing experience.",
+                        "performance", nullptr, &UI::BrowserSettings::smooth_scrolling, true},
+      SettingDescriptor{"hardware_acceleration", "Hardware acceleration",
+                        "Use GPU to accelerate graphics rendering for better performance.",
+                        "performance", nullptr, &UI::BrowserSettings::hardware_acceleration, true},
+      SettingDescriptor{"enable_local_storage", "Enable local storage",
+                        "Allow websites to store data locally for offline functionality.",
+                        "performance", nullptr, &UI::BrowserSettings::enable_local_storage, true},
+      SettingDescriptor{"enable_database", "Enable database storage",
+                        "Allow websites to use IndexedDB and Web SQL for data storage.",
+                        "performance", nullptr, &UI::BrowserSettings::enable_database, true},
+
+      // Accessibility
       SettingDescriptor{"reduce_motion", "Reduce motion effects",
                         "Limit animated transitions and parallax flourishes for a calmer experience.",
                         "accessibility", nullptr, &UI::BrowserSettings::reduce_motion, false},
       SettingDescriptor{"high_contrast_ui", "High contrast UI",
                         "Boost contrast for overlays, menus, and dialogs to improve readability.",
                         "accessibility", nullptr, &UI::BrowserSettings::high_contrast_ui, false},
-      SettingDescriptor{"vibrant_window_theme", "Vibrant window theme",
-                        "Apply a subtle color wash to the window frame for a livelier finish.",
-                        "appearance", nullptr, &UI::BrowserSettings::vibrant_window_theme, false}};
+      SettingDescriptor{"enable_caret_browsing", "Enable caret browsing",
+                        "Navigate web pages using keyboard cursor like in a text editor.",
+                        "accessibility", nullptr, &UI::BrowserSettings::enable_caret_browsing, false},
+
+      // Developer
+      SettingDescriptor{"enable_remote_inspector", "Enable remote inspector",
+                        "Allow remote debugging via Chrome DevTools Protocol.",
+                        "developer", nullptr, &UI::BrowserSettings::enable_remote_inspector, false},
+      SettingDescriptor{"show_performance_overlay", "Show performance overlay",
+                        "Display FPS counter and rendering statistics on screen.",
+                        "developer", nullptr, &UI::BrowserSettings::show_performance_overlay, false}};
 
   struct ParsedCatalogEntry
   {
@@ -1846,8 +1895,13 @@ void UI::SyncSettingsStateToUI(bool snapshot_is_baseline)
 
 void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
 {
+  // Appearance
   SetDarkModeEnabled(settings_.launch_dark_theme);
+  vibrant_window_theme_enabled_ = settings_.vibrant_window_theme;
+  experimental_transparent_toolbar_enabled_ = settings_.experimental_transparent_toolbar;
+  experimental_compact_tabs_enabled_ = settings_.experimental_compact_tabs;
 
+  // Privacy & Security
   if (adblock_)
   {
     adblock_->set_enabled(settings_.enable_adblock);
@@ -1858,21 +1912,35 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
     trackerblock_->set_enabled(settings_.enable_adblock);
     trackerblock_->set_log_blocked(settings_.log_blocked_requests);
   }
-
   adblock_enabled_cached_ = settings_.enable_adblock;
+  clear_history_on_exit_ = settings_.clear_history_on_exit;
+
+  // Note: JavaScript, web security, cookies, DNT would require View config changes
+  // These settings are stored and can be applied on next tab creation
+
+  // Address Bar & Suggestions
   suggestions_enabled_ = settings_.enable_suggestions;
   suggestion_favicons_enabled_ = settings_.enable_suggestion_favicons;
-  show_download_badge_ = settings_.show_download_badge;
-  auto_open_download_panel_ = settings_.auto_open_download_panel;
-  clear_history_on_exit_ = settings_.clear_history_on_exit;
-  experimental_transparent_toolbar_enabled_ = settings_.experimental_transparent_toolbar;
-  experimental_compact_tabs_enabled_ = settings_.experimental_compact_tabs;
-  reduce_motion_enabled_ = settings_.reduce_motion;
-  high_contrast_ui_enabled_ = settings_.high_contrast_ui;
-  vibrant_window_theme_enabled_ = settings_.vibrant_window_theme;
-
   if (!suggestions_enabled_)
     HideSuggestionsOverlay();
+
+  // Downloads
+  show_download_badge_ = settings_.show_download_badge;
+  auto_open_download_panel_ = settings_.auto_open_download_panel;
+  // ask_download_location would be checked when download starts
+
+  // Performance
+  // smooth_scrolling, hardware_acceleration, local_storage, database
+  // These would typically be applied during View/Config creation
+
+  // Accessibility
+  reduce_motion_enabled_ = settings_.reduce_motion;
+  high_contrast_ui_enabled_ = settings_.high_contrast_ui;
+  // enable_caret_browsing would require page-level script injection
+
+  // Developer
+  // enable_remote_inspector, show_performance_overlay
+  // These would require additional implementation
 
   SyncAdblockStateToUI();
   UpdateSettingsDirtyFlag();
@@ -2137,22 +2205,41 @@ std::string UI::BuildSettingsJSON() const
   std::cout << "  enable_adblock: " << settings_.enable_adblock << std::endl;
   std::cout << "  enable_suggestions: " << settings_.enable_suggestions << std::endl;
 
-  // Directly serialize settings_ struct members to ensure actual values are used
+  // Directly serialize all settings_ struct members
   std::ostringstream ss;
   ss << "{";
+  // Appearance
   ss << "\"launch_dark_theme\":" << (settings_.launch_dark_theme ? "true" : "false") << ",";
-  ss << "\"enable_adblock\":" << (settings_.enable_adblock ? "true" : "false") << ",";
-  ss << "\"log_blocked_requests\":" << (settings_.log_blocked_requests ? "true" : "false") << ",";
-  ss << "\"enable_suggestions\":" << (settings_.enable_suggestions ? "true" : "false") << ",";
-  ss << "\"enable_suggestion_favicons\":" << (settings_.enable_suggestion_favicons ? "true" : "false") << ",";
-  ss << "\"show_download_badge\":" << (settings_.show_download_badge ? "true" : "false") << ",";
-  ss << "\"auto_open_download_panel\":" << (settings_.auto_open_download_panel ? "true" : "false") << ",";
-  ss << "\"clear_history_on_exit\":" << (settings_.clear_history_on_exit ? "true" : "false") << ",";
+  ss << "\"vibrant_window_theme\":" << (settings_.vibrant_window_theme ? "true" : "false") << ",";
   ss << "\"experimental_transparent_toolbar\":" << (settings_.experimental_transparent_toolbar ? "true" : "false") << ",";
   ss << "\"experimental_compact_tabs\":" << (settings_.experimental_compact_tabs ? "true" : "false") << ",";
+  // Privacy & Security
+  ss << "\"enable_adblock\":" << (settings_.enable_adblock ? "true" : "false") << ",";
+  ss << "\"log_blocked_requests\":" << (settings_.log_blocked_requests ? "true" : "false") << ",";
+  ss << "\"clear_history_on_exit\":" << (settings_.clear_history_on_exit ? "true" : "false") << ",";
+  ss << "\"enable_javascript\":" << (settings_.enable_javascript ? "true" : "false") << ",";
+  ss << "\"enable_web_security\":" << (settings_.enable_web_security ? "true" : "false") << ",";
+  ss << "\"block_third_party_cookies\":" << (settings_.block_third_party_cookies ? "true" : "false") << ",";
+  ss << "\"do_not_track\":" << (settings_.do_not_track ? "true" : "false") << ",";
+  // Address Bar & Suggestions
+  ss << "\"enable_suggestions\":" << (settings_.enable_suggestions ? "true" : "false") << ",";
+  ss << "\"enable_suggestion_favicons\":" << (settings_.enable_suggestion_favicons ? "true" : "false") << ",";
+  // Downloads
+  ss << "\"show_download_badge\":" << (settings_.show_download_badge ? "true" : "false") << ",";
+  ss << "\"auto_open_download_panel\":" << (settings_.auto_open_download_panel ? "true" : "false") << ",";
+  ss << "\"ask_download_location\":" << (settings_.ask_download_location ? "true" : "false") << ",";
+  // Performance
+  ss << "\"smooth_scrolling\":" << (settings_.smooth_scrolling ? "true" : "false") << ",";
+  ss << "\"hardware_acceleration\":" << (settings_.hardware_acceleration ? "true" : "false") << ",";
+  ss << "\"enable_local_storage\":" << (settings_.enable_local_storage ? "true" : "false") << ",";
+  ss << "\"enable_database\":" << (settings_.enable_database ? "true" : "false") << ",";
+  // Accessibility
   ss << "\"reduce_motion\":" << (settings_.reduce_motion ? "true" : "false") << ",";
   ss << "\"high_contrast_ui\":" << (settings_.high_contrast_ui ? "true" : "false") << ",";
-  ss << "\"vibrant_window_theme\":" << (settings_.vibrant_window_theme ? "true" : "false");
+  ss << "\"enable_caret_browsing\":" << (settings_.enable_caret_browsing ? "true" : "false") << ",";
+  // Developer
+  ss << "\"enable_remote_inspector\":" << (settings_.enable_remote_inspector ? "true" : "false") << ",";
+  ss << "\"show_performance_overlay\":" << (settings_.show_performance_overlay ? "true" : "false");
   ss << "}";
 
   std::string result = ss.str();
@@ -3499,18 +3586,30 @@ void UI::OnNewDownloadStarted()
 bool UI::BrowserSettings::operator==(const BrowserSettings &other) const
 {
   return launch_dark_theme == other.launch_dark_theme &&
+         vibrant_window_theme == other.vibrant_window_theme &&
+         experimental_transparent_toolbar == other.experimental_transparent_toolbar &&
+         experimental_compact_tabs == other.experimental_compact_tabs &&
          enable_adblock == other.enable_adblock &&
          log_blocked_requests == other.log_blocked_requests &&
+         clear_history_on_exit == other.clear_history_on_exit &&
+         enable_javascript == other.enable_javascript &&
+         enable_web_security == other.enable_web_security &&
+         block_third_party_cookies == other.block_third_party_cookies &&
+         do_not_track == other.do_not_track &&
          enable_suggestions == other.enable_suggestions &&
          enable_suggestion_favicons == other.enable_suggestion_favicons &&
          show_download_badge == other.show_download_badge &&
          auto_open_download_panel == other.auto_open_download_panel &&
-         clear_history_on_exit == other.clear_history_on_exit &&
-         experimental_transparent_toolbar == other.experimental_transparent_toolbar &&
-         experimental_compact_tabs == other.experimental_compact_tabs &&
+         ask_download_location == other.ask_download_location &&
+         smooth_scrolling == other.smooth_scrolling &&
+         hardware_acceleration == other.hardware_acceleration &&
+         enable_local_storage == other.enable_local_storage &&
+         enable_database == other.enable_database &&
          reduce_motion == other.reduce_motion &&
          high_contrast_ui == other.high_contrast_ui &&
-         vibrant_window_theme == other.vibrant_window_theme;
+         enable_caret_browsing == other.enable_caret_browsing &&
+         enable_remote_inspector == other.enable_remote_inspector &&
+         show_performance_overlay == other.show_performance_overlay;
 }
 
 std::filesystem::path UI::SettingsDirectory()

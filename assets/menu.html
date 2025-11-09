@@ -4,10 +4,6 @@
     <meta charset="utf-8" />
     <link rel="stylesheet" type="text/css" href="ui.css">
     <style>
-        * {
-            transition: all 0.2s ease-in-out;
-        }
-
         body {
             margin: 0;
             background: transparent;
@@ -56,6 +52,16 @@
             <div class="menu-item" data-action="new-tab">New tab [Ctrl+T]</div>
             <div class="menu-item" data-action="new-window">New window [Ctrl+N]</div>
             <div class="menu-separator"></div>
+            <div class="menu-heading">Quick Settings</div>
+            <div class="menu-item menu-toggle" data-action="toggle-dark-mode">
+                <span class="menu-label">Dark theme</span>
+                <span class="menu-value" id="dark-mode-value">OFF</span>
+            </div>
+            <div class="menu-item menu-toggle" data-action="toggle-adblock">
+                <span class="menu-label">Ad blocking</span>
+                <span class="menu-value" id="adblock-value">OFF</span>
+            </div>
+            <div class="menu-separator"></div>
             <div class="menu-item" data-action="history">History [Ctrl+H]</div>
             <div class="menu-item" data-action="downloads">Downloads</div>
             <div class="menu-item" data-action="settings">Settings</div>
@@ -70,6 +76,27 @@
             function closeMenu() {
                 if (window.OnMenuClose) OnMenuClose();
             }
+
+            // Refresh toggle values from native bridge
+            function refreshToggles() {
+                if (window.GetDarkModeEnabled) {
+                    const darkModeEnabled = GetDarkModeEnabled();
+                    const darkModeValue = document.getElementById('dark-mode-value');
+                    if (darkModeValue) {
+                        darkModeValue.textContent = darkModeEnabled ? 'ON' : 'OFF';
+                    }
+                }
+                if (window.GetAdblockEnabled) {
+                    const adblockEnabled = GetAdblockEnabled();
+                    const adblockValue = document.getElementById('adblock-value');
+                    if (adblockValue) {
+                        adblockValue.textContent = adblockEnabled ? 'ON' : 'OFF';
+                    }
+                }
+            }
+
+            // Refresh on load
+            setTimeout(refreshToggles, 0);
 
             // Click outside closes
             document.addEventListener('click', (e) => {
@@ -96,6 +123,18 @@
                         // Placeholder: open a new tab as "new window" is not implemented
                         if (window.OnRequestNewTab) OnRequestNewTab();
                         break;
+                    case 'toggle-dark-mode':
+                        if (window.OnToggleDarkMode) {
+                            OnToggleDarkMode();
+                            setTimeout(refreshToggles, 50);
+                        }
+                        return; // Don't close menu on toggle
+                    case 'toggle-adblock':
+                        if (window.OnToggleAdblock) {
+                            OnToggleAdblock();
+                            setTimeout(refreshToggles, 50);
+                        }
+                        return; // Don't close menu on toggle
                     case 'history':
                         if (window.OnOpenHistoryNewTab) OnOpenHistoryNewTab();
                         break;

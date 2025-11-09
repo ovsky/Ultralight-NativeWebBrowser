@@ -31,19 +31,45 @@ public:
 
   struct BrowserSettings
   {
+    // Appearance
     bool launch_dark_theme = false;
-    bool enable_adblock = true;
-    bool log_blocked_requests = false;
-    bool enable_suggestions = true;
-    bool enable_suggestion_favicons = true;
-    bool show_download_badge = true;
-    bool auto_open_download_panel = true;
-    bool clear_history_on_exit = false;
+    bool vibrant_window_theme = false;
     bool experimental_transparent_toolbar = false;
     bool experimental_compact_tabs = false;
+
+    // Privacy & Security
+    bool enable_adblock = true;
+    bool log_blocked_requests = false;
+    bool clear_history_on_exit = true;
+    bool enable_javascript = true;
+    bool enable_web_security = true;
+    bool block_third_party_cookies = false;
+    bool do_not_track = true;
+
+    // Address Bar & Suggestions
+    bool enable_suggestions = true;
+    bool enable_suggestion_favicons = true;
+
+    // Downloads
+    bool show_download_badge = true;
+    bool auto_open_download_panel = true;
+    bool ask_download_location = false;
+
+    // Performance
+    bool smooth_scrolling = true;
+    bool hardware_acceleration = true;
+    bool enable_local_storage = true;
+    bool enable_database = true;
+
+    // Accessibility
     bool reduce_motion = false;
     bool high_contrast_ui = false;
-    bool vibrant_window_theme = false;
+    bool enable_caret_browsing = false;
+
+    // Developer
+    bool enable_remote_inspector = false;
+    bool show_performance_overlay = false;
+
     bool operator==(const BrowserSettings &other) const;
     bool operator!=(const BrowserSettings &other) const { return !(*this == other); }
   };
