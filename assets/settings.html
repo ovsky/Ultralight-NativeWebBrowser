@@ -122,20 +122,30 @@
 
         .toggle-switch {
             position: relative;
-            width: 50px;
-            height: 26px;
-            background: rgba(65, 72, 104, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 13px;
+            width: 40px;
+            height: 20px;
+            background: rgba(65, 72, 104, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             flex-shrink: 0;
         }
 
+        .toggle-switch:hover {
+            background: rgba(65, 72, 104, 0.8);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
         .toggle-switch.active {
-            background: rgba(124, 104, 238, 0.5);
-            border-color: rgba(169, 158, 255, 0.4);
-            box-shadow: 0 0 12px rgba(124, 104, 238, 0.3);
+            background: linear-gradient(135deg, rgba(124, 104, 238, 0.6), rgba(169, 158, 255, 0.5));
+            border-color: rgba(169, 158, 255, 0.5);
+            box-shadow: 0 0 16px rgba(124, 104, 238, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.1);
+        }
+
+        .toggle-switch.active:hover {
+            background: linear-gradient(135deg, rgba(124, 104, 238, 0.7), rgba(169, 158, 255, 0.6));
+            box-shadow: 0 0 20px rgba(124, 104, 238, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.15);
         }
 
         .toggle-switch::after {
@@ -143,16 +153,17 @@
             position: absolute;
             top: 2px;
             left: 2px;
-            width: 20px;
-            height: 20px;
-            background: white;
+            width: 14px;
+            height: 14px;
+            background: linear-gradient(180deg, #ffffff, #f0f0f0);
             border-radius: 50%;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-            transition: transform 0.3s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 1px rgba(0, 0, 0, 0.2);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .toggle-switch.active::after {
-            transform: translateX(24px);
+            transform: translateX(20px);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 0 2px rgba(0, 0, 0, 0.25);
         }
 
         .actions {
