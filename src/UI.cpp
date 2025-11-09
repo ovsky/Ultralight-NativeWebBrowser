@@ -429,6 +429,7 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
   // Prepare settings persistence and initial state before loading ancillary data.
   LoadSuggestionsFaviconsFlag();
   EnsureDataDirectoryExists();
+  settings_storage_path_ = SettingsFilePath().string();
   LoadSettingsFromDisk();
   ApplySettings(true, true);
 
@@ -466,6 +467,7 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
 
   LoadSuggestionsFaviconsFlag();
   EnsureDataDirectoryExists();
+  settings_storage_path_ = SettingsFilePath().string();
   LoadSettingsFromDisk();
   ApplySettings(true, true);
 
@@ -1882,7 +1884,7 @@ void UI::EnsureDataDirectoryExists()
 {
   namespace fs = std::filesystem;
   std::error_code ec;
-  fs::create_directories("data", ec);
+  fs::create_directories(LegacySettingsFilePath().parent_path(), ec);
   fs::create_directories(SettingsDirectory(), ec);
 }
 
@@ -1955,18 +1957,25 @@ void UI::LoadSettingsFromDisk()
       apply_from_stream(in);
       in.close();
       loaded_primary = true;
+      settings_storage_path_ = SettingsFilePath().string();
     }
   }
 
   if (!loaded_primary)
   {
-    std::ifstream legacy("data/settings.json", std::ios::in | std::ios::binary);
+    std::ifstream legacy(LegacySettingsFilePath(), std::ios::in | std::ios::binary);
     if (legacy.is_open())
     {
       apply_from_stream(legacy);
       legacy.close();
       migrated_from_legacy = true;
+      settings_storage_path_ = LegacySettingsFilePath().string();
     }
+  }
+
+  if (!loaded_primary && !migrated_from_legacy)
+  {
+    settings_storage_path_ = SettingsFilePath().string();
   }
 
   saved_settings_ = settings_;
@@ -1982,60 +1991,103 @@ void UI::LoadSettingsFromDisk()
 bool UI::SaveSettingsToDisk()
 {
   EnsureDataDirectoryExists();
-  std::ofstream out(SettingsFilePath(), std::ios::out | std::ios::binary | std::ios::trunc);
-  if (!out.is_open())
-    return false;
-
   const auto &catalog = GetSettingsCatalog();
-  std::string timestamp = ToIso8601UTC(std::chrono::system_clock::now());
-  std::string storage_path = SettingsFilePath().string();
+  const std::string timestamp = ToIso8601UTC(std::chrono::system_clock::now());
 
-  out << "{\n";
-  out << "  \"values\": " << BuildSettingsJSON() << ",\n";
-  out << "  \"meta\": {\n";
-  out << "    \"updated_at\": \"" << timestamp << "\",\n";
-  out << "    \"dirty\": false,\n";
-  out << "    \"storage_path\": \"" << EscapeJson(storage_path) << "\",\n";
-  out << "    \"settings\": [\n";
+  const std::string values_json = BuildSettingsJSON();
 
-  bool first_entry = true;
-  for (size_t i = 0; i < catalog.size(); ++i)
+  auto build_document_for_path = [&](const std::string &path_str) -> std::string
   {
-    const auto &desc = catalog[i];
-    if (!desc.member)
-      continue;
-    bool current = settings_.*(desc.member);
-    bool default_value = desc.default_value;
+    std::ostringstream doc;
+    doc << "{\n";
+    doc << "  \"values\": " << values_json << ",\n";
+    doc << "  \"meta\": {\n";
+    doc << "    \"updated_at\": \"" << timestamp << "\",\n";
+    doc << "    \"dirty\": false,\n";
+    doc << "    \"storage_path\": \"" << EscapeJson(path_str) << "\",\n";
+    doc << "    \"settings\": [\n";
+
+    bool first_entry = true;
+    for (const auto &desc : catalog)
+    {
+      if (!desc.member)
+        continue;
+      bool current = settings_.*(desc.member);
+      bool default_value = desc.default_value;
+
+      if (!first_entry)
+        doc << ",\n";
+
+      doc << "      {\"key\":\"" << EscapeJson(desc.key) << "\",";
+      doc << "\"name\":\"" << EscapeJson(desc.name) << "\",";
+      doc << "\"description\":\"" << EscapeJson(desc.description) << "\",";
+      doc << "\"category\":\"" << EscapeJson(desc.category) << "\",";
+      doc << "\"value\":" << (current ? "true" : "false") << ",";
+      doc << "\"default\":" << (default_value ? "true" : "false");
+      if (!desc.note.empty())
+        doc << ",\"note\":\"" << EscapeJson(desc.note) << "\"";
+      doc << "}";
+      first_entry = false;
+    }
 
     if (!first_entry)
-      out << ",\n";
+      doc << "\n";
 
-    out << "      {\"key\":\"" << EscapeJson(desc.key) << "\",";
-    out << "\"name\":\"" << EscapeJson(desc.name) << "\",";
-    out << "\"description\":\"" << EscapeJson(desc.description) << "\",";
-    out << "\"category\":\"" << EscapeJson(desc.category) << "\",";
-    out << "\"value\":" << (current ? "true" : "false") << ",";
-    out << "\"default\":" << (default_value ? "true" : "false");
-    if (!desc.note.empty())
-      out << ",\"note\":\"" << EscapeJson(desc.note) << "\"";
-    out << "}";
-    first_entry = false;
+    doc << "    ]\n";
+    doc << "  }\n";
+    doc << "}\n";
+    return doc.str();
+  };
+
+  auto write_payload = [](const std::filesystem::path &path, const std::string &payload) -> bool
+  {
+    if (path.empty())
+      return false;
+    std::ofstream out(path, std::ios::out | std::ios::binary | std::ios::trunc);
+    if (!out.is_open())
+      return false;
+    out << payload;
+    out.flush();
+    bool ok = out.good();
+    out.close();
+    return ok;
+  };
+
+  const std::filesystem::path primary_path = SettingsFilePath();
+  const std::filesystem::path fallback_path = LegacySettingsFilePath();
+  const std::string primary_path_str = primary_path.string();
+  const std::string fallback_path_str = fallback_path.string();
+
+  std::string primary_payload = build_document_for_path(primary_path_str);
+  bool ok = write_payload(primary_path, primary_payload);
+
+  if (ok)
+  {
+    settings_storage_path_ = primary_path_str;
   }
-
-  if (!first_entry)
-    out << "\n";
-
-  out << "    ]\n";
-  out << "  }\n";
-  out << "}\n";
-  out.flush();
-  bool ok = out.good();
-  out.close();
+  else
+  {
+    std::error_code ec;
+    if (!fallback_path.empty())
+      std::filesystem::create_directories(fallback_path.parent_path(), ec);
+    std::string fallback_payload = build_document_for_path(fallback_path_str);
+    ok = write_payload(fallback_path, fallback_payload);
+    if (ok)
+      settings_storage_path_ = fallback_path_str;
+  }
 
   if (ok)
   {
     saved_settings_ = settings_;
     settings_dirty_ = false;
+
+    if (settings_storage_path_ == primary_path_str && !fallback_path.empty() && fallback_path != primary_path)
+    {
+      std::error_code ec;
+      std::filesystem::create_directories(fallback_path.parent_path(), ec);
+      std::string mirror_payload = build_document_for_path(fallback_path_str);
+      write_payload(fallback_path, mirror_payload);
+    }
   }
 
   return ok;
@@ -2068,7 +2120,7 @@ std::string UI::BuildSettingsPayload(bool snapshot_is_baseline) const
   std::vector<const char *> dirty_keys;
   dirty_keys.reserve(catalog.size());
 
-  std::string storage_path = SettingsFilePath().string();
+  std::string storage_path = settings_storage_path_.empty() ? SettingsFilePath().string() : settings_storage_path_;
 
   for (const auto &desc : catalog)
   {
@@ -3410,4 +3462,10 @@ std::filesystem::path UI::SettingsDirectory()
 std::filesystem::path UI::SettingsFilePath()
 {
   return SettingsDirectory() / "settings.json";
+}
+
+std::filesystem::path UI::LegacySettingsFilePath()
+{
+  namespace fs = std::filesystem;
+  return fs::path("data") / "settings.json";
 }

@@ -111,6 +111,7 @@ public:
 protected:
   static std::filesystem::path SettingsDirectory();
   static std::filesystem::path SettingsFilePath();
+  static std::filesystem::path LegacySettingsFilePath();
   void CreateNewTab();
   RefPtr<View> CreateNewTabForChildView(const String &url);
   void UpdateTabTitle(uint64_t id, const String &title);
@@ -294,6 +295,7 @@ protected:
 
   BrowserSettings saved_settings_;
   bool settings_dirty_ = false;
+  std::string settings_storage_path_;
 
   friend class Tab;
 };
