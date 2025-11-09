@@ -1,0 +1,34 @@
+{
+  "values": {
+    "launch_dark_theme": true,
+    "vibrant_window_theme": false,
+    "experimental_transparent_toolbar": false,
+    "experimental_compact_tabs": false,
+    "enable_adblock": true,
+    "log_blocked_requests": false,
+    "clear_history_on_exit": true,
+    "enable_javascript": true,
+    "enable_web_security": true,
+    "block_third_party_cookies": false,
+    "do_not_track": true,
+    "enable_suggestions": true,
+    "enable_suggestion_favicons": true,
+    "show_download_badge": true,
+    "auto_open_download_panel": true,
+    "ask_download_location": false,
+    "smooth_scrolling": true,
+    "hardware_acceleration": true,
+    "enable_local_storage": true,
+    "enable_database": true,
+    "reduce_motion": false,
+    "high_contrast_ui": false,
+    "enable_caret_browsing": false,
+    "enable_remote_inspector": false,
+    "show_performance_overlay": false
+  },
+  "meta": {
+    "updated_at": "2025-11-09T12:00:00Z",
+    "dirty": false,
+    "storage_path": "setup/settings.json"
+  }
+}

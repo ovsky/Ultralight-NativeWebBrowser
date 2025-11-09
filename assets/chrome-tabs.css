@@ -1,7 +1,3 @@
-* {
-  transition: all 0.2s ease-in-out;
-}
-
 .chrome-tabs {
   box-sizing: border-box;
   position: relative;
@@ -197,6 +193,53 @@
   right: 0;
   bottom: 0;
   left: 0;
+}
+
+body.compact-tabs .chrome-tabs {
+  height: 28px;
+  padding: 0.2em 0.8em 0 0.8em;
+}
+
+body.compact-tabs #chrome-tabs-add-tab {
+  height: 26px;
+  top: 1px;
+  padding: 0 10px;
+  font-size: 11px;
+  min-width: 32px;
+}
+
+body.compact-tabs .chrome-tabs .chrome-tab {
+  height: 26px;
+  top: 1px;
+  width: 18em;
+}
+
+body.compact-tabs .chrome-tabs .chrome-tab .chrome-tab-background {
+  margin: 1px 3px 2px 3px;
+  height: calc(100% - 2px);
+}
+
+body.compact-tabs .chrome-tabs .chrome-tab-favicon,
+body.compact-tabs .chrome-tabs .chrome-tab-spinner {
+  margin-left: 1.2em;
+  height: 12px;
+  width: 12px;
+  background-size: 12px;
+  margin-top: 7px;
+}
+
+body.compact-tabs .chrome-tabs .chrome-tab-title {
+  margin-top: 6px;
+  font-size: 10px;
+  padding: 0 0.3em;
+  max-width: calc(100% - 4.5em);
+}
+
+body.compact-tabs .chrome-tabs .chrome-tab-close {
+  top: 6px;
+  right: 1em;
+  width: 1.2em;
+  height: 1.2em;
 }
 
 .chrome-tabs .chrome-tab-close:hover::before,

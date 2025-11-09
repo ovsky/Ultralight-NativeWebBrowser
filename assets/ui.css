@@ -250,3 +250,37 @@ svg#icon_defs path {
      border-width: 0 5px 5px 5px;
      border-color: transparent transparent rgba(43, 43, 56, 0.95) transparent;
 }
+
+body.transparent-toolbar #bar {
+     background: rgba(35, 35, 48, 0.55);
+     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+     backdrop-filter: blur(16px);
+}
+
+body.transparent-toolbar {
+     background: radial-gradient(circle at top, rgba(26, 26, 38, 0.85), #16151d 68%);
+}
+
+body.transparent-toolbar .chrome-tabs {
+     background: rgba(24, 24, 32, 0.38);
+     backdrop-filter: blur(16px);
+}
+
+body.compact-tabs #bar {
+     height: 28px;
+     padding: 2px 8px;
+}
+
+body.compact-tabs #address {
+     height: 28px;
+     font-size: 13px;
+     padding: 1px 14px 1px 14px;
+}
+
+body.compact-tabs .icon {
+     padding: 4px;
+}
+
+body.compact-tabs #toggle-downloads .downloads-badge {
+     top: 0;
+}

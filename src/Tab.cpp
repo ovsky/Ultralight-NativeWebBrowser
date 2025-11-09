@@ -276,6 +276,20 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
     JSObject global = JSGlobalObject();
     global["NativeOpenContextMenu"] = BindJSCallback(&Tab::OnOpenContextMenu);
 
+    // Check if this is the settings page
+    auto url_utf8 = url.utf8();
+    bool is_settings_page = url_utf8.data() && std::strstr(url_utf8.data(), "settings.html") != nullptr;
+
+    if (is_settings_page)
+    {
+      // Bind settings bridge functions when settings page loads in a tab
+      global["GetSettingsSnapshot"] = BindJSCallbackWithRetval(&Tab::JS_GetSettingsSnapshot);
+      global["OnUpdateSetting"] = BindJSCallback(&Tab::JS_UpdateSetting);
+      global["OnSaveSettings"] = BindJSCallback(&Tab::JS_SaveSettings);
+      global["OnRestoreSettingsDefaults"] = BindJSCallbackWithRetval(&Tab::JS_RestoreSettingsDefaults);
+      std::cout << "[Tab::OnDOMReady] Settings page detected, bridge functions bound" << std::endl;
+    }
+
     // Expose a unified native bridge on window.__ul using global function proxies
     global["__ul_back"] = BindJSCallback(&Tab::JS_Back);
     global["__ul_forward"] = BindJSCallback(&Tab::JS_Forward);
@@ -952,6 +966,33 @@ void Tab::OnHistoryClear(const JSObject &obj, const JSArgs &args)
 {
   if (ui_)
     ui_->ClearHistory();
+}
+
+// --- Settings page JS bridge (forward to UI) ---
+JSValue Tab::JS_GetSettingsSnapshot(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_)
+    return JSValue();
+  return ui_->OnGetSettings(obj, args);
+}
+
+void Tab::JS_UpdateSetting(const JSObject &obj, const JSArgs &args)
+{
+  if (ui_)
+    ui_->OnUpdateSetting(obj, args);
+}
+
+void Tab::JS_SaveSettings(const JSObject &obj, const JSArgs &args)
+{
+  if (ui_)
+    ui_->OnSaveSettings(obj, args);
+}
+
+JSValue Tab::JS_RestoreSettingsDefaults(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_)
+    return JSValue();
+  return ui_->OnRestoreSettingsDefaults(obj, args);
 }
 
 // (Disable-history removed)

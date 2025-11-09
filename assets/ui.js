@@ -1,3 +1,5 @@
+window.__ul_settings = window.__ul_settings || {};
+
 function updateBack(enable) {
 	if (enable)
 		document.getElementById("back").classList.remove("disabled");
@@ -54,4 +56,32 @@ function updateAdblockEnabled(enabled) {
 	el.classList.toggle('active', isEnabled);
 	el.setAttribute('aria-pressed', isEnabled ? 'true' : 'false');
 	el.dataset.state = isEnabled ? 'on' : 'off';
+}
+
+function applySettings(payload) {
+	let parsed = null;
+	try {
+		parsed = (typeof payload === 'string') ? JSON.parse(payload || '{}') : payload;
+	} catch (e) {
+		return;
+	}
+	if (!parsed || typeof parsed !== 'object') return;
+	window.__ul_settings = parsed;
+	const applyToBody = () => {
+		const body = document.body;
+		if (!body) return;
+		body.classList.toggle('transparent-toolbar', !!parsed.experimental_transparent_toolbar);
+		body.classList.toggle('compact-tabs', !!parsed.experimental_compact_tabs);
+	};
+	if (document.readyState === 'loading' && !document.body) {
+		document.addEventListener('DOMContentLoaded', applyToBody, { once: true });
+	} else {
+		applyToBody();
+	}
+	if (typeof window.__ul_update_downloads_badge === 'function') {
+		window.__ul_update_downloads_badge();
+	}
+	if (parsed.enable_suggestions === false && typeof CloseSuggestionsOverlay === 'function') {
+		CloseSuggestionsOverlay();
+	}
 }
