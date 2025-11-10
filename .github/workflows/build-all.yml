@@ -1,6 +1,3 @@
-# .github/workflows/build-all.yml
-# Orchestrates all builds (Windows x64, macOS x64/arm64, Linux x64/arm64)
-
 name: Build - All (x64 + ARM64)
 
 on:
@@ -22,6 +19,11 @@ on:
         description: "Package format(s) for macOS/Linux (eg. TGZ;DMG or TGZ;DEB;RPM)"
         required: false
         type: string
+      create_installer:
+        description: "Create Windows installer via CPack (NSIS) when true"
+        required: false
+        type: boolean
+        default: false
       development_build:
         description: "Development build (keeps intermediate packages, verbose logs)"
         required: false
@@ -38,44 +40,49 @@ jobs:
     uses: ./.github/workflows/build-windows.yml
     secrets: inherit
     with:
-      sdk_url: ${{ inputs.sdk_url }}
-      version: ${{ inputs.version }}
-      webbrowser_version: ${{ inputs.webbrowser_version }}
-      development_build: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
+      sdk_url: ${{ inputs.sdk_url || github.event.inputs.sdk_url }}
+      version: ${{ inputs.version || github.event.inputs.version }}
+      webbrowser_version: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version }}
+      development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
+      # create installer by default on PRs, otherwise obey input
+      create_installer: ${{ inputs.create_installer || github.event_name == 'pull_request' }}
 
   macos-x64:
     uses: ./.github/workflows/build-macos.yml
     secrets: inherit
     with:
-      sdk_url: ${{ inputs.sdk_url }}
-      version: ${{ inputs.version }}
-      webbrowser_version: ${{ inputs.webbrowser_version }}
-      package_format: ${{ inputs.package_format }}
-      development_build: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
+      sdk_url: ${{ inputs.sdk_url || github.event.inputs.sdk_url }}
+      version: ${{ inputs.version || github.event.inputs.version }}
+      webbrowser_version: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version }}
+      package_format: ${{ inputs.package_format || github.event.inputs.package_format }}
+      development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
 
   macos-arm64:
     uses: ./.github/workflows/build-macos-arm64.yml
     secrets: inherit
     with:
-      sdk_url: ${{ inputs.sdk_url }}
-      version: ${{ inputs.version }}
-      webbrowser_version: ${{ inputs.webbrowser_version }}
-      package_format: ${{ inputs.package_format }}
-      development_build: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
+      sdk_url: ${{ inputs.sdk_url || github.event.inputs.sdk_url }}
+      version: ${{ inputs.version || github.event.inputs.version }}
+      webbrowser_version: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version }}
+      package_format: ${{ inputs.package_format || github.event.inputs.package_format }}
+      development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
 
   linux-x64:
     uses: ./.github/workflows/build-linux.yml
     secrets: inherit
     with:
-      sdk_url: ${{ inputs.sdk_url }}
-      version: ${{ inputs.version }}
-      webbrowser_version: ${{ inputs.webbrowser_version }}
-      package_format: ${{ inputs.package_format }}
-      development_build: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
+      sdk_url: ${{ inputs.sdk_url || github.event.inputs.sdk_url }}
+      version: ${{ inputs.version || github.event.inputs.version }}
+      webbrowser_version: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version }}
+      package_format: ${{ inputs.package_format || github.event.inputs.package_format }}
+      development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
 
   linux-arm64:
     uses: ./.github/workflows/build-linux-arm64.yml
     secrets: inherit
     with:
-      webbrowser_version: ${{ inputs.webbrowser_version }}
-      development_build: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
+      sdk_url: ${{ inputs.sdk_url || github.event.inputs.sdk_url }}
+      version: ${{ inputs.version || github.event.inputs.version }}
+      webbrowser_version: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version }}
+      package_format: ${{ inputs.package_format || github.event.inputs.package_format }}
+      development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
