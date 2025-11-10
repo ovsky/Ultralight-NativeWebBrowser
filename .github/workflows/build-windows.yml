@@ -186,15 +186,46 @@ jobs:
         if: ${{ inputs.create_installer == true || github.event_name == 'pull_request' }}
         shell: pwsh
         run: |
-          Write-Host "Installing NSIS for Windows installer creation..."
-          choco install nsis -y --no-progress
-          $nsisPath = "C:\Program Files (x86)\NSIS\makensis.exe"
-          if (Test-Path $nsisPath) {
-            Write-Host "NSIS installed successfully at: $nsisPath"
-            # Add to PATH for CPack
-            "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          } else {
-            Write-Warning "NSIS installation completed but executable not found at expected location"
+          $ErrorActionPreference = 'Continue'
+          function Install-NSIS {
+            $maxTries = 3
+            for ($i = 1; $i -le $maxTries; $i++) {
+              Write-Host "Attempt $i: Installing NSIS via Chocolatey..."
+              try {
+                choco install nsis -y --no-progress
+                $nsisPath = "C:\\Program Files (x86)\\NSIS\\makensis.exe"
+                if (Test-Path $nsisPath) {
+                  Write-Host "NSIS installed successfully at: $nsisPath"
+                  "C:\\Program Files (x86)\\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+                  return $true
+                }
+              } catch {
+                Write-Warning "Chocolatey NSIS install failed: $_"
+              }
+              Start-Sleep -Seconds 10
+            }
+            return $false
+          }
+          $success = Install-NSIS
+          if (-not $success) {
+            Write-Warning "Chocolatey NSIS install failed after retries. Attempting direct download..."
+            $nsisUrl = "https://prdownloads.sourceforge.net/nsis/nsis-3.10-setup.exe"
+            $nsisExe = Join-Path $env:RUNNER_TEMP "nsis-setup.exe"
+            try {
+              Invoke-WebRequest -Uri $nsisUrl -OutFile $nsisExe -UseBasicParsing
+              Start-Process -FilePath $nsisExe -ArgumentList "/S" -Wait
+              $nsisPath = "C:\\Program Files (x86)\\NSIS\\makensis.exe"
+              if (Test-Path $nsisPath) {
+                Write-Host "NSIS installed via direct download at: $nsisPath"
+                "C:\\Program Files (x86)\\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+              } else {
+                Write-Error "NSIS install failed after all attempts."
+                exit 1
+              }
+            } catch {
+              Write-Error "Direct NSIS download and install failed: $_"
+              exit 1
+            }
           }
 
       - name: "4. Prepare Ultralight SDK (Windows)"
