@@ -754,6 +754,23 @@ bool UI::RunShortcutAction(const std::string &action)
     }
     return false;
   }
+  if (action == "open-downloads")
+  {
+    // Toggle downloads overlay
+    ShowDownloadsOverlay();
+    return true;
+  }
+  if (action == "open-settings")
+  {
+    // Open Settings in a NEW tab (like Ctrl+H opens history)
+    RefPtr<View> child = CreateNewTabForChildView(String("file:///settings.html"));
+    if (child)
+    {
+      child->LoadURL("file:///settings.html");
+      return true;
+    }
+    return false;
+  }
   return false;
 }
 
