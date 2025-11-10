@@ -33,6 +33,7 @@
 static UI *g_ui = 0;
 
 #define UI_HEIGHT 80
+#define UI_HEIGHT_COMPACT 60 // Reduced height when compact tabs mode is enabled
 
 namespace
 {
@@ -749,6 +750,23 @@ bool UI::RunShortcutAction(const std::string &action)
       RefPtr<JSContext> lock(view()->LockJSContext());
       focusAddressBar({});
       address_bar_is_focused_ = true;
+      return true;
+    }
+    return false;
+  }
+  if (action == "open-downloads")
+  {
+    // Toggle downloads overlay
+    ShowDownloadsOverlay();
+    return true;
+  }
+  if (action == "open-settings")
+  {
+    // Open Settings in a NEW tab (like Ctrl+H opens history)
+    RefPtr<View> child = CreateNewTabForChildView(String("file:///settings.html"));
+    if (child)
+    {
+      child->LoadURL("file:///settings.html");
       return true;
     }
     return false;
@@ -1899,7 +1917,25 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
   SetDarkModeEnabled(settings_.launch_dark_theme);
   vibrant_window_theme_enabled_ = settings_.vibrant_window_theme;
   experimental_transparent_toolbar_enabled_ = settings_.experimental_transparent_toolbar;
+
+  // Handle compact tabs mode - adjust UI height and trigger resize
+  bool was_compact = experimental_compact_tabs_enabled_;
   experimental_compact_tabs_enabled_ = settings_.experimental_compact_tabs;
+
+  if (was_compact != experimental_compact_tabs_enabled_)
+  {
+    // Calculate new UI height based on compact mode
+    double scale = window_ ? window_->scale() : 1.0;
+    uint32_t target_height = experimental_compact_tabs_enabled_ ? (uint32_t)std::round(UI_HEIGHT_COMPACT * scale) : (uint32_t)std::round(UI_HEIGHT * scale);
+
+    if (ui_height_ != target_height)
+    {
+      ui_height_ = target_height;
+      // Trigger resize to reposition all tabs
+      if (window_)
+        OnResize(window_.get(), window_->width(), window_->height());
+    }
+  }
 
   // Privacy & Security
   if (adblock_)

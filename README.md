@@ -82,7 +82,7 @@ ARM64 archives are probed automatically when available in the `base-sdk` branch 
 ---
 
 ## 📥 Get the App
-Official tagged releases:  
+Official tagged releases:
 [🎉 Releases Page → Ultralight Web Browser](https://github.com/ovsky/Ultralight-WebBrowser/releases)
 
 Development (continuous) artifacts (latest successful `dev` workflow runs):
@@ -137,27 +137,53 @@ Packages install a desktop entry and icon + CLI launcher `ultralight-webbrowser`
 ---
 
 ## ✨ Features
-- GPU‑Accelerated Rendering (Ultralight core)
-- Low Memory Footprint (single process shell)
-- HTML5 / CSS3 / Modern JS Support
-- Native C++17 Application Layer
-- Multi‑Tab Interface
-- Navigation Controls (Back / Forward / Reload / Stop / Address bar)
-- Dynamic Page Title + Loading Indicators
-- Responsive Resize
-- Lightweight Ad & Tracker Filtering  
-  - Domain + substring + simple glob patterns  
-  - Rule sources: `assets/blocklist.txt` + all additional `.txt` in `assets/filters/`  
-  - Formats: `example.com`, `0.0.0.0 example.com`, `||example.com^`, `/ads.js`, `*://*/*analytics*.js`  
-  - Always allowed: `file://`, `data:`  
-  - Requires SDK network interception capabilities  
-- Dark Mode (Global Toggle)
-- Local In‑Memory History (non‑persistent)
-- Favicon Support
-- Autosuggestion / Autocompletion
-- Download Manager + UI
-- Context Menu / 🔤 Shortcut Map Systems
-- JavaScript ↔ Native Bridge (`window.__ul`)
+
+### Core Browser Functionality
+- **GPU‑Accelerated Rendering** – Powered by Ultralight core engine
+- **Low Memory Footprint** – Single process shell architecture (~1/10 RAM vs. Electron)
+- **HTML5 / CSS3 / Modern JS Support** – Full web standards compliance
+- **Multi‑Tab Interface** – Chrome-style draggable tabs with smooth animations
+- **Navigation Controls** – Back / Forward / Reload / Stop / Address bar
+- **Dynamic Page Indicators** – Real-time title updates and loading states
+- **Responsive Resize** – Fluid layout adaptation
+
+### Privacy & Security
+- **Lightweight Ad & Tracker Filtering**
+  - Domain + substring + glob pattern matching
+  - Rule sources: `assets/blocklist.txt` + all `.txt` in `assets/filters/`
+  - Formats: `example.com`, `0.0.0.0 example.com`, `||example.com^`, `/ads.js`, `*://*/*analytics*.js`
+  - Always allowed: `file://`, `data:`
+  - Toggle via toolbar icon or Settings
+  - Requires SDK network interception capabilities
+- **Do Not Track (DNT)** – Configurable header setting
+- **Clear History on Exit** – Optional automatic cleanup
+- **Web Security Controls** – JavaScript, cookies, storage permissions
+
+### User Interface & Experience
+- **Modern Glassmorphic Design** – Semi-transparent overlays with backdrop blur
+- **Dark Mode** – Global theme toggle with persistent preferences
+- **Compact Tabs Mode** – Space-saving layout (60px UI height, 12em tab width)
+- **Toolbar Icons** – Quick access to Inspector, Downloads, AdBlock, Menu
+- **Download Manager** – Full-featured UI with progress tracking and notifications
+- **Settings Panel** – Comprehensive configuration across 7 categories:
+  - Appearance (Dark Mode, Vibrant Window, Transparent Toolbar, Compact Tabs)
+  - Privacy & Security (AdBlock, Trackers, JavaScript, Web Security, Cookies, DNT, History)
+  - Address Bar & Suggestions (Autocompletion, Favicons)
+  - Downloads (Badge, Auto-open Panel, Ask Location)
+  - Performance (Smooth Scrolling, Hardware Acceleration, Local Storage, Database)
+  - Accessibility (Reduce Motion, High Contrast, Caret Browsing)
+  - Developer (Remote Inspector, Performance Overlay)
+- **Persistent Settings** – JSON-based storage with runtime updates
+- **Context Menu** – Right-click actions and shortcuts
+- **Keyboard Shortcuts** – Customizable shortcut mapping system
+- **Favicon Support** – Site icons in tabs and suggestions
+- **Autosuggestion** – Intelligent URL/search completions with popular sites
+
+### Developer Features
+- **JavaScript ↔ Native Bridge** – `window.__ul` API for deep integration
+- **Local History API** – In-memory browsing history (non-persistent by default)
+- **Shortcut Mapping** – JSON-based keyboard shortcut configuration
+- **Debug Panel** – Runtime settings inspection and diagnostics
 
 ---
 
@@ -176,8 +202,8 @@ Packages install a desktop entry and icon + CLI launcher `ultralight-webbrowser`
 ## 🧪 Build From Source
 
 ### Prerequisites
-1. CMake ≥ 3.10  
-2. C++17 compiler (MSVC 2019+, GCC 9+, Clang 9+)  
+1. CMake ≥ 3.10
+2. C++17 compiler (MSVC 2019+, GCC 9+, Clang 9+)
 3. Ultralight SDK (bundled fallback under `data/`; override via `ULTRALIGHT_SDK_ROOT`)
 
 ### Steps
@@ -239,35 +265,76 @@ ctest --test-dir build --output-on-failure
 ## 🧩 JavaScript Bridge API (`window.__ul`)
 Injected into the main frame once DOM is ready.
 
-Navigation:
+### Navigation
 ```js
-__ul.back(); __ul.forward(); __ul.reload(); __ul.stop();
-__ul.navigate("https://example.com");
-__ul.newTab("https://example.org");
-__ul.closeTab(); // or __ul.closeTab(id)
-__ul.openHistory();
+__ul.back();                              // Navigate back
+__ul.forward();                           // Navigate forward
+__ul.reload();                            // Reload current page
+__ul.stop();                              // Stop loading
+__ul.navigate("https://example.com");     // Navigate to URL
+__ul.newTab("https://example.org");       // Open new tab with URL
+__ul.closeTab();                          // Close current tab
+__ul.closeTab(id);                        // Close specific tab by ID
+__ul.openHistory();                       // Open history overlay
 ```
 
-History:
+### Settings Management
 ```js
-const h = __ul.getHistory(); // { items: [{ url, title, time }, ...] }
+// Get complete settings snapshot
+const settings = __ul.getSettingsSnapshot();
+// Returns: { values: { dark_mode: true, ... }, meta: { ... } }
+
+// Update individual setting
+__ul.updateSetting("enable_adblock", true);
+__ul.updateSetting("experimental_compact_tabs", false);
+
+// Save current settings to disk
+__ul.saveSettings();
+
+// Restore factory defaults
+__ul.restoreSettingsDefaults();
+```
+
+### AdBlock Control
+```js
+// Check AdBlock status
+const isEnabled = __ul.getAdblockEnabled();
+
+// Toggle AdBlock
+__ul.toggleAdblock();
+```
+
+### History
+```js
+// Get browsing history
+const h = __ul.getHistory();
+// Returns: { items: [{ url, title, time }, ...] }
+
+// Clear all history
 __ul.clearHistory();
 ```
 
-Theme:
+### Theme
 ```js
-if (!__ul.isDarkModeEnabled()) __ul.toggleDarkMode();
+// Check dark mode status
+if (!__ul.isDarkModeEnabled()) {
+    __ul.toggleDarkMode();
+}
 ```
 
-App Info:
+### App Info
 ```js
-const info = __ul.getAppInfo(); // { name, version }
+// Get application metadata
+const info = __ul.getAppInfo();
+// Returns: { name: "Ultralight WebBrowser", version: "1.4.0" }
 ```
 
-Notes:
-- Bridge not injected into subframes.
-- History is in‑memory; cleared on exit.
-- Calls become no‑ops if underlying state unavailable.
+### Notes
+- Bridge not injected into subframes (security consideration)
+- History is in-memory; cleared on exit unless persistence enabled
+- Settings are persisted to `setup/settings.json` on save
+- Calls become no-ops if underlying state unavailable
+- All settings changes trigger runtime updates (no restart required)
 
 ---
 
@@ -316,26 +383,45 @@ Set `TARGET_ARCH` and select appropriate SDK archive per matrix entry.
 ---
 
 ## 🗺️ Roadmap / Ideas
-✅ Completed:
-- Context Menu
-- Local History
-- Optimized Filtering System
-- Universal Menu
-- Shortcut Mapping
-- Dark Theme (WIP polish)
-- JS Bridge Enhancements
-- Favicon Support
-- Autosuggestion / Autocompletion
-- Download Manager & UI
-- Tab UX Improvements
 
-🧩 Planned / Open:
-- Bookmark System
-- Plugin / Script Injection API
-- Settings Panel (flags & experimental toggles)
-- Persistent History / Sessions
-- Multi‑process isolation options (research)
-- Enhanced privacy filters (cosmetic blocking)
+### ✅ Completed
+- ✓ Context Menu System
+- ✓ Local History Management
+- ✓ Optimized Content Filtering
+- ✓ Universal Menu Interface
+- ✓ Keyboard Shortcut Mapping
+- ✓ Dark Theme Support
+- ✓ JavaScript Bridge API
+- ✓ Favicon Support
+- ✓ Autosuggestion / Autocompletion
+- ✓ Download Manager with UI
+- ✓ Tab UX Improvements (Chrome-style draggable tabs)
+- ✓ **Settings System** – Comprehensive preferences panel with 26+ options
+- ✓ **Glassmorphic UI** – Modern semi-transparent design with backdrop blur
+- ✓ **Compact Tabs Mode** – Space-saving layout option
+- ✓ **AdBlock Toolbar Icon** – Quick toggle access
+- ✓ **Runtime Settings Updates** – No restart required for changes
+- ✓ **Persistent Configuration** – JSON-based settings storage
+
+### 🚧 In Progress
+- Performance Optimization (smooth scrolling, hardware acceleration toggles)
+- Accessibility Features (high contrast, reduced motion, caret browsing)
+
+### 🧩 Planned / Open
+- **Bookmark System** – Save and organize favorite sites
+- **Session Management** – Restore tabs on startup
+- **Plugin / Extension API** – Script injection framework
+- **Persistent History** – Optional long-term storage
+- **Advanced Privacy Filters** – Cosmetic blocking (CSS selectors)
+- **Multi-profile Support** – Separate settings/history per profile
+- **Sync Service Integration** – Cross-device settings sync
+- **Enhanced Developer Tools** – Integrated console and network inspector
+- **Custom Themes** – User-defined color schemes
+- **Password Manager** – Secure credential storage
+- **Tab Groups** – Organize tabs into collapsible groups
+- **Reader Mode** – Distraction-free article reading
+- **Screenshot Tool** – Capture full page or visible area
+- **Multi-process Isolation** – Optional sandboxing (research phase)
 
 ---
 
@@ -346,8 +432,21 @@ Set `TARGET_ARCH` and select appropriate SDK archive per matrix entry.
 | Cannot load external pages | Network interception not available | Use full Ultralight SDK version; confirm `ULTRALIGHT_SDK_ROOT` contents |
 | High CPU on resize | Continuous repaint loop | Known in rapid resize scenarios; consider throttle patch |
 | Rules not applied | SDK lacks interception | Build with proper network layer; confirm rule file paths |
-| macOS gatekeeper warning | Unsigned binaries | Right‑click “Open” once or sign with local cert |
+| Settings not loading | Bridge initialization failed | Check browser console for "Bridge not ready" errors; verify `settings.json` exists in `setup/` directory |
+| Settings won't save | File permission issues | Ensure write permissions for `setup/settings.json`; check disk space |
+| AdBlock not working | Network interception disabled | Verify SDK supports request filtering; check AdBlock toggle in toolbar/settings |
+| Compact tabs gap | Dynamic resize failed | Try toggling compact mode off/on; restart browser if issue persists |
+| macOS gatekeeper warning | Unsigned binaries | Right‑click "Open" once or sign with local cert |
 | Arm64 archive not detected | CI runner architecture mismatch | Provide `sdk_url` manually or run on arm64 runner |
+| Downloads not appearing | Download manager initialization | Check permissions for downloads directory; verify UI overlay loaded |
+| Shortcuts not working | JSON parse error | Validate `assets/shortcuts.json` syntax; check console for errors |
+
+### Debug Tips
+1. **Enable Debug Panel** – Settings → Developer → Show Performance Overlay
+2. **Check Console Output** – Launch from terminal to see initialization logs
+3. **Verify Settings File** – `setup/settings.json` should contain valid JSON structure
+4. **Reset Settings** – Delete `setup/settings.json` to restore defaults
+5. **Clear Cache** – Remove temporary files if rendering issues occur
 
 ---
 
