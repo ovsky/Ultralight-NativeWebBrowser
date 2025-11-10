@@ -2615,61 +2615,77 @@ void UI::ApplyDarkModeToView(RefPtr<View> v)
       // Remove any previous style to avoid duplicates/conflicts
       var prev=document.getElementById(sid); if(prev) prev.remove();
       var css = [
-        'html,body{background:#0e0e0f !important;color:#e0e0e0 !important;color-scheme:dark !important}',
-        // Make common large containers nearly black by default
-        'body > header, body > main, body > footer, body > nav, body > section, body > article{background:#0e0e0f !important}',
-        'div,section,main,article,aside,header,footer,nav{border-color:#333 !important}',
-        // Form controls
-        'input,textarea,select,button{background:#1a1b1c !important;color:#e6e6e6 !important;border-color:#333 !important}',
-        'input::placeholder,textarea::placeholder{color:#9aa0a6 !important}',
-        // Links
-        'a{color:#8ab4f8 !important}',
+        '* { color-scheme: dark !important; }',
+        'html { background: #1e1e1e !important; }',
+        'body { background: #1e1e1e !important; color: #e4e4e7 !important; }',
+        // Only target major structural elements with more specific selectors
+        'body > div, body > main, body > section { background-color: #1e1e1e !important; }',
+        // Form controls - less aggressive
+        'input[type="text"], input[type="search"], input[type="email"], input[type="password"], textarea, select { background: #252525 !important; color: #e4e4e7 !important; border: 1px solid rgba(255,255,255,0.12) !important; }',
+        'input::placeholder, textarea::placeholder { color: #a1a1aa !important; opacity: 0.7 !important; }',
+        // Respect existing link colors but make them readable
+        'a { filter: brightness(1.2) !important; }',
         // Tables
-        'table{background:#0f0f10 !important}',
-        'thead,tbody,tr,th,td{background:transparent !important;border-color:#333 !important}',
+        'table { border-color: rgba(255,255,255,0.08) !important; }',
+        'th, td { border-color: rgba(255,255,255,0.08) !important; }',
         // Code blocks
-        'pre,code,kbd,samp{background:#111215 !important;color:#e0e0e0 !important}',
-        // Shadows
-        '.card, .panel, .box{background:#111213 !important; border:1px solid #2a2b2d !important}'
+        'pre, code { background: #2a2a2a !important; color: #e4e4e7 !important; border-color: rgba(255,255,255,0.08) !important; }'
       ].join('\n');
       var s=document.createElement('style'); s.id=sid; s.type='text/css'; s.appendChild(document.createTextNode(css));
       (document.head||document.documentElement).appendChild(s);
 
-      // Heuristic: darken wide/large containers and backgrounds to near-black.
+      // Simplified approach: only darken very large backgrounds, be less aggressive
       function parseRGB(c){
         var m=(c||'').match(/rgba?\(([^)]+)\)/i); if(!m) return null; var p=m[1].split(',').map(function(x){return parseFloat(x)});
         return {r:~~p[0], g:~~p[1], b:~~p[2], a:(p.length>3? p[3]:1)};
       }
-      function luminance(r,g,b){ // sRGB relative luminance
+      function luminance(r,g,b){ 
         function srgb(u){u/=255; return (u<=0.03928)? u/12.92: Math.pow((u+0.055)/1.055,2.4);}
         var R=srgb(r), G=srgb(g), B=srgb(b); return 0.2126*R+0.7152*G+0.0722*B;
       }
-      function isLight(bg){ var c=parseRGB(bg); if(!c) return true; return luminance(c.r,c.g,c.b) > 0.35; }
+      function isVeryLight(bg){ 
+        var c=parseRGB(bg); 
+        if(!c) return false; 
+        return luminance(c.r,c.g,c.b) > 0.65;  // Only convert very light backgrounds
+      }
 
-      function darkenLarge(el){
+      function darkenIfNeeded(el){
         if(!el || !el.getBoundingClientRect) return;
         var r=el.getBoundingClientRect();
         var area=r.width*r.height;
-        if (r.width>=600 || r.height>=300 || area>=120000) {
+        // Only process very large elements
+        if (r.width>=800 || r.height>=500 || area>=300000) {
           var cs=getComputedStyle(el);
           var bg=cs.backgroundImage && cs.backgroundImage!=='none' ? null : cs.backgroundColor;
-          if (!bg || bg==='transparent' || bg==='rgba(0, 0, 0, 0)' || isLight(bg)){
-            try { el.style.setProperty('background-color', '#0e0e0f', 'important'); el.setAttribute('data-ul-dark','1'); } catch(e){}
+          // Only change very light backgrounds (like white)
+          if (bg && isVeryLight(bg)){
+            try { 
+              el.style.setProperty('background-color', '#1e1e1e', 'important'); 
+              el.setAttribute('data-ul-dark','1'); 
+            } catch(e){}
           }
-          // ensure text is readable
-          try { el.style.setProperty('color', '#e0e0e0', 'important'); } catch(e){}
         }
       }
 
-      function walk(root){
-        var nodes=root.querySelectorAll('div,section,main,article,aside,header,footer,nav,body,html');
-        for(var i=0;i<nodes.length;i++) darkenLarge(nodes[i]);
+      function processPage(){
+        // Target only body and major containers
+        var nodes=document.querySelectorAll('body, body > div, body > main, body > section, body > article');
+        for(var i=0;i<nodes.length;i++) darkenIfNeeded(nodes[i]);
       }
 
-      walk(document);
+      processPage();
+      // Less aggressive observer - only on major changes
       var pending=null;
-      var obs=new MutationObserver(function(){ if(pending) return; pending=requestAnimationFrame(function(){ pending=null; walk(document); }); });
-      obs.observe(document.documentElement||document.body,{childList:true,subtree:true});
+      var obs=new MutationObserver(function(mutations){ 
+        var significant=false;
+        for(var i=0;i<mutations.length;i++){
+          if(mutations[i].addedNodes.length>10) { significant=true; break; }
+        }
+        if(!significant) return;
+        if(pending) return; 
+        pending=setTimeout(function(){ pending=null; processPage(); }, 500);
+      });
+      obs.observe(document.documentElement||document.body,{childList:true,subtree:false});
       window.__ul_dark_observer = obs;
       return true;
     }catch(e){return false;}
