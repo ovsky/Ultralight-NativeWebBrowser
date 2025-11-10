@@ -278,7 +278,6 @@ jobs:
           }
 
       - name: "6.2 Package (CPack)"
-        if: ${{ inputs.create_installer == true }}
         shell: pwsh
         run: |
           Write-Host "Packaging with CPack (Release config)"
@@ -297,29 +296,34 @@ jobs:
             Move-Item -Force $cpackZip.FullName $finalZipName
           }
 
-          # Check if NSIS is available before attempting to create installer
-          $nsisPath = "C:\Program Files (x86)\NSIS\makensis.exe"
-          if (Test-Path $nsisPath) {
-            Write-Host "NSIS found at: $nsisPath"
-            Write-Host "Creating NSIS installer..."
-            try {
-              cpack -C Release -G NSIS
-              Write-Host "NSIS installer created successfully"
+          # Check if NSIS is available and create_installer is true
+          $createInstaller = "$env:CREATE_INSTALLER"
+          if ($createInstaller -match '^(true|1|on)$') {
+            $nsisPath = "C:\Program Files (x86)\NSIS\makensis.exe"
+            if (Test-Path $nsisPath) {
+              Write-Host "NSIS found at: $nsisPath"
+              Write-Host "Creating NSIS installer..."
+              try {
+                cpack -C Release -G NSIS
+                Write-Host "NSIS installer created successfully"
 
-              # Rename NSIS installer to final name
-              $exe = Get-ChildItem -Path . -Filter *.exe -File | Where-Object { $_.Name -notlike '*CompilerIdCXX*' } | Select-Object -First 1
-              if ($exe) {
-                $finalInstallerName = "Ultralight-WebBrowser-$version-Windows-x64-Installer.exe"
-                Write-Host "Renaming installer: $($exe.Name) -> $finalInstallerName"
-                Move-Item -Force $exe.FullName $finalInstallerName
+                # Rename NSIS installer to final name
+                $exe = Get-ChildItem -Path . -Filter *.exe -File | Where-Object { $_.Name -notlike '*CompilerIdCXX*' } | Select-Object -First 1
+                if ($exe) {
+                  $finalInstallerName = "Ultralight-WebBrowser-$version-Windows-x64.exe"
+                  Write-Host "Renaming installer: $($exe.Name) -> $finalInstallerName"
+                  Move-Item -Force $exe.FullName $finalInstallerName
+                }
+              } catch {
+                Write-Warning "NSIS installer creation failed: $_"
+                Write-Warning "Continuing without installer..."
               }
-            } catch {
-              Write-Warning "NSIS installer creation failed: $_"
-              Write-Warning "Continuing without installer..."
+            } else {
+              Write-Warning "NSIS not found at: $nsisPath"
+              Write-Warning "Skipping NSIS installer generation."
             }
           } else {
-            Write-Warning "NSIS not found at: $nsisPath"
-            Write-Warning "Skipping NSIS installer generation."
+            Write-Host "CREATE_INSTALLER not set to true, skipping NSIS installer."
           }
 
           popd
@@ -350,13 +354,12 @@ jobs:
           Write-Host "Listing resources:"; if (Test-Path (Join-Path $src 'assets/resources')) { Get-ChildItem -Force (Join-Path $src 'assets/resources') | Format-List -Property Mode,Length,Name } else { Write-Host 'assets/resources not found' }
 
       - name: "7. Upload Final Packages"
-        if: ${{ inputs.create_installer == true }}
         uses: actions/upload-artifact@v4
         with:
           name: Ultralight-WebBrowser-${{ env.WEBBROWSER_VERSION }}-Windows-x64
           path: |
             build/Ultralight-WebBrowser-*-Windows-x64.zip
-            build/Ultralight-WebBrowser-*-Windows-x64-Installer.exe
+            build/Ultralight-WebBrowser-*-Windows-x64.exe
           if-no-files-found: warn
 
       - name: "7.1 Upload Intermediate Packages (Development Only)"

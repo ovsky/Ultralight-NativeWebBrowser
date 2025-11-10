@@ -1,0 +1,35 @@
+{
+  "values": {"launch_dark_theme":false,"vibrant_window_theme":true,"experimental_transparent_toolbar":false,"experimental_compact_tabs":false,"enable_adblock":true,"log_blocked_requests":true,"clear_history_on_exit":true,"enable_javascript":true,"enable_web_security":true,"block_third_party_cookies":false,"do_not_track":true,"enable_suggestions":true,"enable_suggestion_favicons":true,"show_download_badge":true,"auto_open_download_panel":true,"ask_download_location":false,"smooth_scrolling":true,"hardware_acceleration":true,"enable_local_storage":true,"enable_database":true,"reduce_motion":false,"high_contrast_ui":false,"enable_caret_browsing":false,"enable_remote_inspector":false,"show_performance_overlay":false},
+  "meta": {
+    "updated_at": "2025-11-09T20:21:22Z",
+    "dirty": false,
+    "storage_path": "data\\settings.json",
+    "settings": [
+      {"key":"launch_dark_theme","name":"Launch in dark theme","description":"Start Ultralight with dark chrome, toolbars, and tabs by default.","category":"appearance","value":false,"default":false},
+      {"key":"vibrant_window_theme","name":"Vibrant window theme","description":"Apply a subtle color wash to the window frame for a livelier finish.","category":"appearance","value":true,"default":false},
+      {"key":"experimental_transparent_toolbar","name":"Transparent toolbar","description":"Blend the toolbar into page content with a translucent, glass-like surface.","category":"appearance","value":false,"default":false,"note":"Experimental"},
+      {"key":"experimental_compact_tabs","name":"Compact tabs","description":"Reduce tab height and spacing so more tabs stay visible without scrolling.","category":"appearance","value":false,"default":false,"note":"Experimental"},
+      {"key":"enable_adblock","name":"Enable ad blocking","description":"Filter network requests using bundled block lists to hide intrusive ads.","category":"privacy","value":true,"default":true},
+      {"key":"log_blocked_requests","name":"Log blocked requests","description":"Write each blocked network request to the console for debugging rules.","category":"privacy","value":true,"default":false},
+      {"key":"clear_history_on_exit","name":"Clear history on exit","description":"Remove browsing history when Ultralight closes and skip saving new visits.","category":"privacy","value":true,"default":false},
+      {"key":"enable_javascript","name":"Enable JavaScript","description":"Allow websites to run JavaScript code for interactive features and dynamic content.","category":"privacy","value":true,"default":true},
+      {"key":"enable_web_security","name":"Enable web security","description":"Enforce same-origin policy and other web security restrictions.","category":"privacy","value":true,"default":true},
+      {"key":"block_third_party_cookies","name":"Block third-party cookies","description":"Prevent websites from setting cookies that track you across different sites.","category":"privacy","value":false,"default":false},
+      {"key":"do_not_track","name":"Send Do Not Track header","description":"Request that websites not track your browsing activity.","category":"privacy","value":true,"default":true},
+      {"key":"enable_suggestions","name":"Show address bar suggestions","description":"Surface history matches and popular sites while typing in the address bar.","category":"suggestions","value":true,"default":true},
+      {"key":"enable_suggestion_favicons","name":"Show favicons in suggestions","description":"Display site icons next to suggestion rows whenever an icon is available.","category":"suggestions","value":true,"default":true},
+      {"key":"show_download_badge","name":"Show download badge","description":"Highlight the toolbar downloads button whenever transfers are active.","category":"downloads","value":true,"default":true},
+      {"key":"auto_open_download_panel","name":"Open downloads panel automatically","description":"Pop open the quick downloads overlay as soon as a new download begins.","category":"downloads","value":true,"default":true},
+      {"key":"ask_download_location","name":"Ask where to save downloads","description":"Show a file picker dialog for each download instead of using default location.","category":"downloads","value":false,"default":false},
+      {"key":"smooth_scrolling","name":"Smooth scrolling","description":"Enable smooth animated scrolling for a more fluid browsing experience.","category":"performance","value":true,"default":true},
+      {"key":"hardware_acceleration","name":"Hardware acceleration","description":"Use GPU to accelerate graphics rendering for better performance.","category":"performance","value":true,"default":true},
+      {"key":"enable_local_storage","name":"Enable local storage","description":"Allow websites to store data locally for offline functionality.","category":"performance","value":true,"default":true},
+      {"key":"enable_database","name":"Enable database storage","description":"Allow websites to use IndexedDB and Web SQL for data storage.","category":"performance","value":true,"default":true},
+      {"key":"reduce_motion","name":"Reduce motion effects","description":"Limit animated transitions and parallax flourishes for a calmer experience.","category":"accessibility","value":false,"default":false},
+      {"key":"high_contrast_ui","name":"High contrast UI","description":"Boost contrast for overlays, menus, and dialogs to improve readability.","category":"accessibility","value":false,"default":false},
+      {"key":"enable_caret_browsing","name":"Enable caret browsing","description":"Navigate web pages using keyboard cursor like in a text editor.","category":"accessibility","value":false,"default":false},
+      {"key":"enable_remote_inspector","name":"Enable remote inspector","description":"Allow remote debugging via Chrome DevTools Protocol.","category":"developer","value":false,"default":false},
+      {"key":"show_performance_overlay","name":"Show performance overlay","description":"Display FPS counter and rendering statistics on screen.","category":"developer","value":false,"default":false}
+    ]
+  }
+}
