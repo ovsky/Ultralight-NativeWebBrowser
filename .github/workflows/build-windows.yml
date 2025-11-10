@@ -298,8 +298,9 @@ jobs:
 
           # Check if NSIS is available and create_installer is true
           $createInstaller = "$env:CREATE_INSTALLER"
-          if ($createInstaller -match '^(true|1|on)$') {
-            $nsisPath = "C:\Program Files (x86)\NSIS\makensis.exe"
+          if ($createInstaller -eq 'true') {
+            $nsisDir = Join-Path ${env:ProgramFiles(x86)} 'NSIS'
+            $nsisPath = Join-Path $nsisDir 'makensis.exe'
             if (Test-Path $nsisPath) {
               Write-Host "NSIS found at: $nsisPath"
               Write-Host "Creating NSIS installer..."
