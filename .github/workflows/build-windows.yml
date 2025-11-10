@@ -183,7 +183,7 @@ jobs:
           }
 
       - name: "3.1 Install NSIS (for installer creation)"
-        if: ${{ inputs.create_installer == true }}
+        if: ${{ inputs.create_installer == true || github.event_name == 'pull_request' }}
         shell: pwsh
         run: |
           Write-Host "Installing NSIS for Windows installer creation..."
@@ -264,7 +264,7 @@ jobs:
         run: cmake --build build --config Release --parallel
 
       - name: "6.15 Install NSIS (for installer)"
-        if: ${{ inputs.create_installer == true }}
+        if: ${{ inputs.create_installer == true || github.event_name == 'pull_request' }}
         shell: pwsh
         run: |
           choco install nsis -y --no-progress
@@ -296,9 +296,9 @@ jobs:
             Move-Item -Force $cpackZip.FullName $finalZipName
           }
 
-          # Check if NSIS is available and create_installer is true
+          # Check if NSIS is available and create_installer is true or on pull request
           $createInstaller = "$env:CREATE_INSTALLER"
-          if ($createInstaller -eq 'true') {
+          if ($env:GITHUB_EVENT_NAME -eq 'pull_request' -or $createInstaller -eq 'true') {
             $nsisDir = Join-Path ${env:ProgramFiles(x86)} 'NSIS'
             $nsisPath = Join-Path $nsisDir 'makensis.exe'
             if (Test-Path $nsisPath) {
