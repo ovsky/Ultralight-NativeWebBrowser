@@ -28,6 +28,11 @@ on:
         description: "Package format(s) to produce via CPack (eg. TGZ, DEB, RPM or multi 'TGZ;DEB;RPM')"
         required: false
         type: string
+      development_build:
+        description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       sdk_url:
@@ -47,6 +52,11 @@ on:
         required: false
         default: "TGZ;DEB;RPM"
         type: string
+      development_build:
+        description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -56,6 +66,7 @@ jobs:
       ULTRALIGHT_VERSION: ${{ inputs.version || github.event.inputs.version }}
       WEBBROWSER_VERSION: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}
       PACKAGE_GENERATORS: ${{ inputs.package_format || github.event.inputs.package_format || 'TGZ;DEB;RPM' }}
+      DEVELOPMENT_BUILD: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
     steps:
       - name: 0. Configure Git (longpaths, autocrlf=false)
         run: |
@@ -272,44 +283,6 @@ jobs:
             sudo apt-get install -y fakeroot
           fi
 
-      - name: 8. Package with CPack (Linux)
-        if: steps.prep_sdk.outputs.present == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          set -x
-          gens_raw="${PACKAGE_GENERATORS:-TGZ}"
-          gens_uc=$(echo "$gens_raw" | tr '[:lower:]' '[:upper:]')
-          # Expand shorthand like 'multi' or 'all' to a supported set
-          case "$gens_uc" in
-            MULTI|ALL)
-              gens_uc="TGZ;DEB;RPM" ;;
-          esac
-          # Split by semicolon, comma, or whitespace
-          IFS=$' ;,\t\n' read -r -a GEN_LIST <<< "$gens_uc"
-          echo "Using CPack generators: ${GEN_LIST[*]}"
-          # Ensure output goes to the build directory in all cases
-          outdir="${{ github.workspace }}/build"
-          mkdir -p "$outdir"
-          for g in "${GEN_LIST[@]}"; do
-            if [ -n "$g" ]; then
-              echo "Running CPack for generator: $g"
-              cpack --config build/CPackConfig.cmake -C Release -G "$g" -V \
-                -D CPACK_OUTPUT_FILE_PREFIX="$outdir" \
-                -D CPACK_PACKAGING_INSTALL_PREFIX="/usr"
-              echo "CPack completed for $g"
-            fi
-          done
-
-      - name: 8.2 List package outputs
-        if: steps.prep_sdk.outputs.present == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Listing build directory after CPack:"
-          ls -la "${{ github.workspace }}/build" || true
-          echo "Searching recursively for produced packages:"
-          find "${{ github.workspace }}" -maxdepth 4 -type f \( -name "*.rpm" -o -name "*.deb" -o -name "*.tar.gz" -o -name "*.tgz" \) -print || true
 
       - name: "7.5 Diagnostics: verify runtime contents"
         if: steps.prep_sdk.outputs.present == 'true'
@@ -337,48 +310,70 @@ jobs:
           echo "Listing resources:"
           ls -la "$src"/assets/resources 2>/dev/null || true
 
-      - name: 8.5 Archive Runtime Artifacts (zip)
+
+      - name: 8. Package with CPack (Linux)
         if: steps.prep_sdk.outputs.present == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          candidates=(
-            "build"
-            "build/bin"
-            "build/Ultralight-WebBrowser"
-            "build/samples/Ultralight-WebBrowser"
-          )
-          src=""
-          for p in "${candidates[@]}"; do
-            if [ -d "$p" ]; then src="$p"; break; fi
+          outdir="${{ github.workspace }}/build"
+          mkdir -p "$outdir"
+          version="${WEBBROWSER_VERSION}"
+          gens_raw="${PACKAGE_GENERATORS:-TGZ;DEB;RPM}"
+          IFS=$' ;,\t\n' read -r -a GEN_LIST <<< "$gens_raw"
+          echo "Requested package formats: ${GEN_LIST[*]}"
+          for g in "${GEN_LIST[@]}"; do
+            [ -z "$g" ] && continue
+            g_uc=$(echo "$g" | tr '[:lower:]' '[:upper:]')
+            gen="$g_uc"
+            echo "Running CPack for generator: $gen"
+            cpack --config build/CPackConfig.cmake -C Release -G "$gen" -V -D CPACK_OUTPUT_FILE_PREFIX="$outdir"
           done
-          if [ -z "$src" ]; then
-            echo "No expected output folder found. Checked: ${candidates[*]}" >&2
-            exit 1
-          fi
-          echo "Archiving from: $src"
-          dest="$GITHUB_WORKSPACE/ultralight-linux.zip"
-          rm -f "$dest" 2>/dev/null || true
-          (cd "$src" && zip -r "$dest" .)
+          # Rename packages to final names with proper architecture
+          echo "Renaming packages to final names..."
+          for file in "$outdir"/*.tar.gz; do
+            [ -f "$file" ] || continue
+            finalname="Ultralight-WebBrowser-${version}-Linux-x64.tar.gz"
+            echo "Renaming: $(basename "$file") -> $finalname"
+            mv "$file" "$outdir/$finalname"
+          done
+          for file in "$outdir"/*.deb; do
+            [ -f "$file" ] || continue
+            finalname="Ultralight-WebBrowser-${version}-Linux-x64.deb"
+            echo "Renaming: $(basename "$file") -> $finalname"
+            mv "$file" "$outdir/$finalname"
+          done
+          for file in "$outdir"/*.rpm; do
+            [ -f "$file" ] || continue
+            finalname="Ultralight-WebBrowser-${version}-Linux-x64.rpm"
+            echo "Renaming: $(basename "$file") -> $finalname"
+            mv "$file" "$outdir/$finalname"
+          done
 
-      - name: 9. Upload Runtime Zip
+      - name: 8.2 List package outputs
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Final packages in build directory:"
+          ls -lh "${{ github.workspace }}/build"/Ultralight-WebBrowser-* || true
+
+      - name: 8.3 Upload Final Packages
         if: steps.prep_sdk.outputs.present == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: ultralight-linux-build
-          path: ultralight-linux.zip
-
-      - name: 9.5 Upload Packages (TGZ/DEB/RPM)
-        if: steps.prep_sdk.outputs.present == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ultralight-linux-packages
+          name: Ultralight-WebBrowser-${{ env.WEBBROWSER_VERSION }}-Linux-x64
           path: |
-            ${{ github.workspace }}/build/*.tar.gz
-            ${{ github.workspace }}/build/*.tgz
-            ${{ github.workspace }}/build/*.deb
-            ${{ github.workspace }}/build/*.rpm
-            ${{ github.workspace }}/**/*.tar.gz
-            ${{ github.workspace }}/**/*.tgz
-            ${{ github.workspace }}/**/*.deb
-            ${{ github.workspace }}/**/*.rpm
+            ${{ github.workspace }}/build/Ultralight-WebBrowser-*-Linux-x64.tar.gz
+            ${{ github.workspace }}/build/Ultralight-WebBrowser-*-Linux-x64.deb
+            ${{ github.workspace }}/build/Ultralight-WebBrowser-*-Linux-x64.rpm
+          if-no-files-found: warn
+
+      - name: 8.4 Upload Intermediate Packages (Development Only)
+        if: steps.prep_sdk.outputs.present == 'true' && env.DEVELOPMENT_BUILD == 'true'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ultralight-WebBrowser-${{ env.WEBBROWSER_VERSION }}-Linux-x64-Intermediate
+          path: ${{ github.workspace }}/build/_CPack_Packages/
+          if-no-files-found: warn

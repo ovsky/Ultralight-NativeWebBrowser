@@ -31,6 +31,11 @@ on:
         description: "Create Windows installer via CPack (NSIS)"
         required: false
         type: boolean
+      development_build:
+        description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       sdk_url:
@@ -50,6 +55,11 @@ on:
         required: false
         type: boolean
         default: false
+      development_build:
+        description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -59,6 +69,7 @@ jobs:
       ULTRALIGHT_VERSION: ${{ inputs.version || github.event.inputs.version }}
       WEBBROWSER_VERSION: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}
       CREATE_INSTALLER: ${{ inputs.create_installer || github.event.inputs.create_installer }}
+      DEVELOPMENT_BUILD: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
 
     steps:
       - name: "0. Configure Git (longpaths, autocrlf=false)"
@@ -272,16 +283,25 @@ jobs:
             Write-Warning "NSIS makensis.exe not found after install; CPack NSIS may not be available."
           }
 
-      - name: "6.2 Package (CPack installer)"
+      - name: "6.2 Package (CPack)"
         if: ${{ inputs.create_installer == true }}
         shell: pwsh
         run: |
           Write-Host "Packaging with CPack (Release config)"
           pushd build
 
-          # Always produce a ZIP package for portability
-          Write-Host "Creating ZIP package..."
+          # Create CPack ZIP package with proper naming
+          Write-Host "Creating CPack ZIP package..."
           cpack -C Release -G ZIP
+
+          # Rename CPack ZIP to final name
+          $version = "$env:WEBBROWSER_VERSION"
+          $cpackZip = Get-ChildItem -Path . -Filter "*.zip" -File | Select-Object -First 1
+          if ($cpackZip) {
+            $finalZipName = "Ultralight-WebBrowser-$version-Windows-x64.zip"
+            Write-Host "Renaming CPack ZIP: $($cpackZip.Name) -> $finalZipName"
+            Move-Item -Force $cpackZip.FullName $finalZipName
+          }
 
           # Check if NSIS is available before attempting to create installer
           $nsisPath = "C:\Program Files (x86)\NSIS\makensis.exe"
@@ -291,6 +311,14 @@ jobs:
             try {
               cpack -C Release -G NSIS
               Write-Host "NSIS installer created successfully"
+              
+              # Rename NSIS installer to final name
+              $exe = Get-ChildItem -Path . -Filter *.exe -File | Where-Object { $_.Name -notlike '*CompilerIdCXX*' } | Select-Object -First 1
+              if ($exe) {
+                $finalInstallerName = "Ultralight-WebBrowser-$version-Windows-x64-Installer.exe"
+                Write-Host "Renaming installer: $($exe.Name) -> $finalInstallerName"
+                Move-Item -Force $exe.FullName $finalInstallerName
+              }
             } catch {
               Write-Warning "NSIS installer creation failed: $_"
               Write-Warning "Continuing without installer..."
@@ -301,27 +329,14 @@ jobs:
           }
 
           popd
-          Write-Host "CPack outputs:"
-          Get-ChildItem -Path build -Recurse -Include *.exe,*.msi,*.zip | Select-Object -Property FullName,Length | Format-Table -AutoSize
-
-      - name: "6.3 Rename Windows installer"
-        if: ${{ inputs.create_installer == true }}
-        shell: pwsh
-        run: |
-          $version = "$env:WEBBROWSER_VERSION"
-          $desired = "Ultralight-WebBrowser-$version-Windows-Installer.exe"
-          $exe = Get-ChildItem -Path build -Filter *.exe -File -Recurse | Where-Object { $_.Name -notlike '*CompilerIdCXX*' } | Select-Object -First 1
-          if ($exe) {
-            Write-Host "Renaming installer: $($exe.FullName) -> $desired"
-            Move-Item -Force $exe.FullName (Join-Path $exe.DirectoryName $desired)
-          } else {
-            Write-Warning "No NSIS installer .exe found to rename. This is expected if NSIS was not available."
-          }
+          Write-Host "Final CPack outputs:"
+          Get-ChildItem -Path build -Include "Ultralight-WebBrowser-*" -File | Select-Object -Property Name,Length | Format-Table -AutoSize
 
       - name: "6.8 Run tests (ctest)"
         run: ctest --test-dir build -C Release --output-on-failure
 
       - name: "6.5 Diagnostics: verify runtime contents"
+        if: ${{ env.DEVELOPMENT_BUILD == 'true' }}
         shell: pwsh
         run: |
           $candidates = @(
@@ -340,53 +355,21 @@ jobs:
           Write-Host "Listing DLLs:"; Get-ChildItem -Path (Join-Path $src '*.dll') -ErrorAction SilentlyContinue | Format-List -Property Mode,Length,Name
           Write-Host "Listing resources:"; if (Test-Path (Join-Path $src 'assets/resources')) { Get-ChildItem -Force (Join-Path $src 'assets/resources') | Format-List -Property Mode,Length,Name } else { Write-Host 'assets/resources not found' }
 
-      - name: "7. Archive Artifacts"
-        # For multi-config, Visual Studio places outputs in 'build/Release'
-        # We use PowerShell's Compress-Archive
-        shell: pwsh
-        run: |
-          # Detect the actual output folder and zip it (handles different generators/layouts)
-          $candidates = @(
-            'build\Release',
-            'build\bin\Release',
-            'build\Ultralight-WebBrowser\Release',
-            'build\samples\Ultralight-WebBrowser\Release'
-          )
-          $src = $null
-          foreach ($p in $candidates) {
-            if (Test-Path $p) { $src = $p; break }
-          }
-          if (-not $src) {
-            throw "No expected output folder found. Checked: $($candidates -join ', ')"
-          }
-          Write-Host "Archiving from: $src"
-          $version = "$env:WEBBROWSER_VERSION"
-          $outName = "Ultralight-WebBrowser-$version-Windows-Portable.zip"
-          Compress-Archive -Path (Join-Path $src '*') -DestinationPath $outName -Force
-
-      - name: "8. Upload Artifact"
-        uses: actions/upload-artifact@v4
-        with:
-          name: ultralight-windows-build
-          path: Ultralight-WebBrowser-*-Windows-Portable.zip
-
-      - name: "8.1 Upload Installer"
+      - name: "7. Upload Final Packages"
         if: ${{ inputs.create_installer == true }}
-        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: ultralight-windows-installer
+          name: Ultralight-WebBrowser-${{ env.WEBBROWSER_VERSION }}-Windows-x64
           path: |
-            build/Ultralight-WebBrowser-*-Windows-Installer.exe
-            build/*.msi
+            build/Ultralight-WebBrowser-*-Windows-x64.zip
+            build/Ultralight-WebBrowser-*-Windows-x64-Installer.exe
           if-no-files-found: warn
 
-      - name: "8.2 Upload CPack ZIP"
-        if: ${{ inputs.create_installer == true }}
+      - name: "7.1 Upload Intermediate Packages (Development Only)"
+        if: ${{ env.DEVELOPMENT_BUILD == 'true' }}
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: ultralight-windows-cpack-zip
-          path: |
-            build/*.zip
+          name: Ultralight-WebBrowser-${{ env.WEBBROWSER_VERSION }}-Windows-x64-Intermediate
+          path: build/_CPack_Packages/
           if-no-files-found: warn

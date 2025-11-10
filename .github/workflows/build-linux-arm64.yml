@@ -28,6 +28,11 @@ on:
         description: "Package format(s) to produce via CPack (eg. TGZ only for ARM64 here)"
         required: false
         type: string
+      development_build:
+        description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       webbrowser_version:
@@ -39,6 +44,11 @@ on:
         required: false
         default: "TGZ;DEB;RPM"
         type: string
+      development_build:
+        description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -52,7 +62,8 @@ jobs:
         with:
           submodules: recursive
 
-      - name: 2. Build (ARM64 emulated)
+
+      - name: 2. Build and Package (ARM64 emulated)
         id: arm64_build
         uses: uraimo/run-on-arch-action@v2
         with:
@@ -72,6 +83,7 @@ jobs:
             git config --global core.longpaths true
             git config --global core.autocrlf false
             export WEBBROWSER_VERSION="${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}"
+            export DEVELOPMENT_BUILD="${{ inputs.development_build || github.event.inputs.development_build || 'false' }}"
             echo "== ARM64: Detect ULTRALIGHT_SDK_URL from base-sdk =="
             API="https://api.github.com/repos/${{ github.repository }}/contents/sdks?ref=base-sdk"
             RESP=$(curl -fLs -H "Accept: application/vnd.github+json" "$API" || true)
@@ -121,19 +133,34 @@ jobs:
             cmake --build build --parallel
             echo "== ARM64: Package (TGZ) =="
             cpack --config build/CPackConfig.cmake -C Release -G TGZ -D CPACK_OUTPUT_FILE_PREFIX="$GITHUB_WORKSPACE/build"
-            echo "== ARM64: Zip runtime =="
-            (cd build && zip -r "$GITHUB_WORKSPACE/ultralight-linux-arm64.zip" .)
+            # Rename package to final name
+            outdir="$GITHUB_WORKSPACE/build"
+            version="$WEBBROWSER_VERSION"
+            for file in "$outdir"/*.tar.gz; do
+              [ -f "$file" ] || continue
+              finalname="Ultralight-WebBrowser-${version}-Linux-arm64.tar.gz"
+              echo "Renaming: $(basename "$file") -> $finalname"
+              mv "$file" "$outdir/$finalname"
+            done
+            # Upload final package
+            if [ "$DEVELOPMENT_BUILD" = "true" ]; then
+              echo "Uploading intermediate packages (development build)"
+              mkdir -p "$GITHUB_WORKSPACE/intermediate"
+              cp -r "$outdir/_CPack_Packages" "$GITHUB_WORKSPACE/intermediate/" || true
+            fi
 
-      - name: 3. Upload ARM64 Runtime Zip
+      - name: 3. Upload ARM64 Final Package
         uses: actions/upload-artifact@v4
         with:
-          name: ultralight-linux-arm64-build
-          path: ultralight-linux-arm64.zip
+          name: Ultralight-WebBrowser-${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}-Linux-arm64
+          path: build/Ultralight-WebBrowser-*-Linux-arm64.tar.gz
+          if-no-files-found: warn
 
-      - name: 4. Upload ARM64 Packages
+      - name: 4. Upload ARM64 Intermediate Packages (Development Only)
+        if: inputs.development_build == true || github.event.inputs.development_build == 'true'
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: ultralight-linux-arm64-packages
-          path: |
-            ${{ github.workspace }}/build/*.tar.gz
-            ${{ github.workspace }}/**/*.tar.gz
+          name: Ultralight-WebBrowser-${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}-Linux-arm64-Intermediate
+          path: intermediate/_CPack_Packages/
+          if-no-files-found: warn
