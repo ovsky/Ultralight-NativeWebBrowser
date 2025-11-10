@@ -4,6 +4,12 @@
 name: Build - macOS (x64)
 
 on:
+  pull_request:
+    branches: [main, dev]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".gitignore"
   workflow_dispatch:
     inputs:
       sdk_url:
@@ -39,7 +45,7 @@ on:
       package_format:
         description: "Package format(s) to produce via CPack (eg. TGZ or DMG or multi 'TGZ;DMG')"
         required: false
-        default: DMG
+        default: "TGZ;DMG"
         type: string
 
 jobs:
@@ -52,7 +58,7 @@ jobs:
       ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url || github.event.inputs.sdk_url }}
       ULTRALIGHT_VERSION: ${{ inputs.version || github.event.inputs.version }}
       WEBBROWSER_VERSION: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}
-      PACKAGE_GENERATORS: ${{ inputs.package_format || github.event.inputs.package_format || 'TGZ' }}
+      PACKAGE_GENERATORS: ${{ inputs.package_format || github.event.inputs.package_format || 'TGZ;DMG' }}
       TARGET_ARCH: x64
     steps:
       - name: 0. Configure Git (longpaths, autocrlf=false)

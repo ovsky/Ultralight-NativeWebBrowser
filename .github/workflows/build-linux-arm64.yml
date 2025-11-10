@@ -4,6 +4,12 @@
 name: Build - Linux (ARM64)
 
 on:
+  pull_request:
+    branches: [main, dev]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".gitignore"
   workflow_dispatch:
     inputs:
       sdk_url:
@@ -29,9 +35,9 @@ on:
         required: false
         type: string
       package_format:
-        description: "Package format(s) to produce via CPack (eg. TGZ only for ARM64 here)"
+        description: "Package format(s) to produce via CPack (eg. TGZ, DEB, RPM or multi 'TGZ;DEB;RPM')"
         required: false
-        default: TGZ
+        default: "TGZ;DEB;RPM"
         type: string
 
 jobs:

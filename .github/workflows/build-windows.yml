@@ -7,6 +7,12 @@
 name: Build - Windows
 
 on:
+  pull_request:
+    branches: [main, dev]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".gitignore"
   workflow_dispatch:
     inputs:
       sdk_url:
@@ -171,6 +177,21 @@ jobs:
             }
           }
 
+      - name: "3.1 Install NSIS (for installer creation)"
+        if: ${{ inputs.create_installer == true }}
+        shell: pwsh
+        run: |
+          Write-Host "Installing NSIS for Windows installer creation..."
+          choco install nsis -y --no-progress
+          $nsisPath = "C:\Program Files (x86)\NSIS\makensis.exe"
+          if (Test-Path $nsisPath) {
+            Write-Host "NSIS installed successfully at: $nsisPath"
+            # Add to PATH for CPack
+            "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          } else {
+            Write-Warning "NSIS installation completed but executable not found at expected location"
+          }
+
       - name: "4. Prepare Ultralight SDK (Windows)"
         id: prep_sdk
         shell: pwsh
@@ -257,14 +278,28 @@ jobs:
         run: |
           Write-Host "Packaging with CPack (Release config)"
           pushd build
+
           # Always produce a ZIP package for portability
+          Write-Host "Creating ZIP package..."
           cpack -C Release -G ZIP
-          # Produce NSIS installer only if makensis is available
-          if (Get-Command makensis -ErrorAction SilentlyContinue) {
-            cpack -C Release -G NSIS
+
+          # Check if NSIS is available before attempting to create installer
+          $nsisPath = "C:\Program Files (x86)\NSIS\makensis.exe"
+          if (Test-Path $nsisPath) {
+            Write-Host "NSIS found at: $nsisPath"
+            Write-Host "Creating NSIS installer..."
+            try {
+              cpack -C Release -G NSIS
+              Write-Host "NSIS installer created successfully"
+            } catch {
+              Write-Warning "NSIS installer creation failed: $_"
+              Write-Warning "Continuing without installer..."
+            }
           } else {
-            Write-Warning "makensis not found in PATH; skipping NSIS installer generation."
+            Write-Warning "NSIS not found at: $nsisPath"
+            Write-Warning "Skipping NSIS installer generation."
           }
+
           popd
           Write-Host "CPack outputs:"
           Get-ChildItem -Path build -Recurse -Include *.exe,*.msi,*.zip | Select-Object -Property FullName,Length | Format-Table -AutoSize
@@ -275,12 +310,12 @@ jobs:
         run: |
           $version = "$env:WEBBROWSER_VERSION"
           $desired = "Ultralight-WebBrowser-$version-Windows-Installer.exe"
-          $exe = Get-ChildItem -Path build -Filter *.exe -File -Recurse | Select-Object -First 1
+          $exe = Get-ChildItem -Path build -Filter *.exe -File -Recurse | Where-Object { $_.Name -notlike '*CompilerIdCXX*' } | Select-Object -First 1
           if ($exe) {
             Write-Host "Renaming installer: $($exe.FullName) -> $desired"
             Move-Item -Force $exe.FullName (Join-Path $exe.DirectoryName $desired)
           } else {
-            Write-Warning "No NSIS installer .exe found to rename."
+            Write-Warning "No NSIS installer .exe found to rename. This is expected if NSIS was not available."
           }
 
       - name: "6.8 Run tests (ctest)"
@@ -337,17 +372,21 @@ jobs:
 
       - name: "8.1 Upload Installer"
         if: ${{ inputs.create_installer == true }}
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ultralight-windows-installer
           path: |
-            build\Ultralight-WebBrowser-*-Windows-Installer.exe
-            build\*.msi
+            build/Ultralight-WebBrowser-*-Windows-Installer.exe
+            build/*.msi
+          if-no-files-found: warn
 
       - name: "8.2 Upload CPack ZIP"
         if: ${{ inputs.create_installer == true }}
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ultralight-windows-cpack-zip
           path: |
-            build\*.zip
+            build/*.zip
+          if-no-files-found: warn
