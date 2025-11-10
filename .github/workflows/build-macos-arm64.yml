@@ -4,12 +4,6 @@
 name: Build - macOS (ARM64)
 
 on:
-  pull_request:
-    branches: [main, dev]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - ".gitignore"
   workflow_dispatch:
     inputs:
       sdk_url:
@@ -239,7 +233,6 @@ jobs:
         if: steps.prep_sdk.outputs.present == 'true'
         run: cmake --build build --config Release --parallel
 
-
       - name: 6.9 Package with CPack (macOS)
         if: steps.prep_sdk.outputs.present == 'true'
         shell: bash
@@ -264,14 +257,24 @@ jobs:
           for file in "$outdir"/*.tar.gz; do
             [ -f "$file" ] || continue
             finalname="Ultralight-WebBrowser-${version}-macOS-arm64.tar.gz"
-            echo "Renaming: $(basename "$file") -> $finalname"
-            mv "$file" "$outdir/$finalname"
+            bname=$(basename "$file")
+            if [ "$bname" = "$finalname" ]; then
+              echo "Skipping rename for $bname (already final name)"
+            else
+              echo "Renaming: $bname -> $finalname"
+              mv "$file" "$outdir/$finalname"
+            fi
           done
           for file in "$outdir"/*.dmg; do
             [ -f "$file" ] || continue
             finalname="Ultralight-WebBrowser-${version}-macOS-arm64.dmg"
-            echo "Renaming: $(basename "$file") -> $finalname"
-            mv "$file" "$outdir/$finalname"
+            bname=$(basename "$file")
+            if [ "$bname" = "$finalname" ]; then
+              echo "Skipping rename for $bname (already final name)"
+            else
+              echo "Renaming: $bname -> $finalname"
+              mv "$file" "$outdir/$finalname"
+            fi
           done
 
       - name: 7.1 List package outputs

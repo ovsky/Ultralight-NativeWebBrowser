@@ -4,12 +4,6 @@
 name: Build - Linux (ARM64)
 
 on:
-  pull_request:
-    branches: [main, dev]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - ".gitignore"
   workflow_dispatch:
     inputs:
       sdk_url:
@@ -61,7 +55,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-
 
       - name: 2. Build and Package (ARM64 emulated)
         id: arm64_build
@@ -139,8 +132,13 @@ jobs:
             for file in "$outdir"/*.tar.gz; do
               [ -f "$file" ] || continue
               finalname="Ultralight-WebBrowser-${version}-Linux-arm64.tar.gz"
-              echo "Renaming: $(basename "$file") -> $finalname"
-              mv "$file" "$outdir/$finalname"
+              bname=$(basename "$file")
+              if [ "$bname" = "$finalname" ]; then
+                echo "Skipping rename for $bname (already final name)"
+              else
+                echo "Renaming: $bname -> $finalname"
+                mv "$file" "$outdir/$finalname"
+              fi
             done
             # Upload final package
             if [ "$DEVELOPMENT_BUILD" = "true" ]; then

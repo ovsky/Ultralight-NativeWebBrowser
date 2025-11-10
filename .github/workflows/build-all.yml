@@ -22,6 +22,11 @@ on:
         description: "Package format(s) for macOS/Linux (eg. TGZ;DMG or TGZ;DEB;RPM)"
         required: false
         type: string
+      development_build:
+        description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
   pull_request:
 
 permissions:
@@ -36,6 +41,7 @@ jobs:
       sdk_url: ${{ inputs.sdk_url }}
       version: ${{ inputs.version }}
       webbrowser_version: ${{ inputs.webbrowser_version }}
+      development_build: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
 
   macos-x64:
     uses: ./.github/workflows/build-macos.yml
@@ -45,6 +51,7 @@ jobs:
       version: ${{ inputs.version }}
       webbrowser_version: ${{ inputs.webbrowser_version }}
       package_format: ${{ inputs.package_format }}
+      development_build: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
 
   macos-arm64:
     uses: ./.github/workflows/build-macos-arm64.yml
@@ -54,6 +61,7 @@ jobs:
       version: ${{ inputs.version }}
       webbrowser_version: ${{ inputs.webbrowser_version }}
       package_format: ${{ inputs.package_format }}
+      development_build: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
 
   linux-x64:
     uses: ./.github/workflows/build-linux.yml
@@ -63,9 +71,11 @@ jobs:
       version: ${{ inputs.version }}
       webbrowser_version: ${{ inputs.webbrowser_version }}
       package_format: ${{ inputs.package_format }}
+      development_build: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
 
   linux-arm64:
     uses: ./.github/workflows/build-linux-arm64.yml
     secrets: inherit
     with:
       webbrowser_version: ${{ inputs.webbrowser_version }}
+      development_build: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}

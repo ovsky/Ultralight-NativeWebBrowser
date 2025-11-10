@@ -4,12 +4,6 @@
 name: Build - Linux (x64)
 
 on:
-  pull_request:
-    branches: [main, dev]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - ".gitignore"
   workflow_dispatch:
     inputs:
       sdk_url:
@@ -283,7 +277,6 @@ jobs:
             sudo apt-get install -y fakeroot
           fi
 
-
       - name: "7.5 Diagnostics: verify runtime contents"
         if: steps.prep_sdk.outputs.present == 'true'
         shell: bash
@@ -310,7 +303,6 @@ jobs:
           echo "Listing resources:"
           ls -la "$src"/assets/resources 2>/dev/null || true
 
-
       - name: 8. Package with CPack (Linux)
         if: steps.prep_sdk.outputs.present == 'true'
         shell: bash
@@ -334,20 +326,35 @@ jobs:
           for file in "$outdir"/*.tar.gz; do
             [ -f "$file" ] || continue
             finalname="Ultralight-WebBrowser-${version}-Linux-x64.tar.gz"
-            echo "Renaming: $(basename "$file") -> $finalname"
-            mv "$file" "$outdir/$finalname"
+            bname=$(basename "$file")
+            if [ "$bname" = "$finalname" ]; then
+              echo "Skipping rename for $bname (already final name)"
+            else
+              echo "Renaming: $bname -> $finalname"
+              mv "$file" "$outdir/$finalname"
+            fi
           done
           for file in "$outdir"/*.deb; do
             [ -f "$file" ] || continue
             finalname="Ultralight-WebBrowser-${version}-Linux-x64.deb"
-            echo "Renaming: $(basename "$file") -> $finalname"
-            mv "$file" "$outdir/$finalname"
+            bname=$(basename "$file")
+            if [ "$bname" = "$finalname" ]; then
+              echo "Skipping rename for $bname (already final name)"
+            else
+              echo "Renaming: $bname -> $finalname"
+              mv "$file" "$outdir/$finalname"
+            fi
           done
           for file in "$outdir"/*.rpm; do
             [ -f "$file" ] || continue
             finalname="Ultralight-WebBrowser-${version}-Linux-x64.rpm"
-            echo "Renaming: $(basename "$file") -> $finalname"
-            mv "$file" "$outdir/$finalname"
+            bname=$(basename "$file")
+            if [ "$bname" = "$finalname" ]; then
+              echo "Skipping rename for $bname (already final name)"
+            else
+              echo "Renaming: $bname -> $finalname"
+              mv "$file" "$outdir/$finalname"
+            fi
           done
 
       - name: 8.2 List package outputs

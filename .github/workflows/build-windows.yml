@@ -7,12 +7,6 @@
 name: Build - Windows
 
 on:
-  pull_request:
-    branches: [main, dev]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - ".gitignore"
   workflow_dispatch:
     inputs:
       sdk_url:
@@ -311,7 +305,7 @@ jobs:
             try {
               cpack -C Release -G NSIS
               Write-Host "NSIS installer created successfully"
-              
+
               # Rename NSIS installer to final name
               $exe = Get-ChildItem -Path . -Filter *.exe -File | Where-Object { $_.Name -notlike '*CompilerIdCXX*' } | Select-Object -First 1
               if ($exe) {

@@ -4,12 +4,6 @@
 name: Build - macOS (x64)
 
 on:
-  pull_request:
-    branches: [main, dev]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - ".gitignore"
   workflow_dispatch:
     inputs:
       sdk_url:
@@ -344,21 +338,31 @@ jobs:
             echo "Running CPack for generator: $gen"
             cpack --config build/CPackConfig.cmake -C Release -G "$gen" -V -D CPACK_OUTPUT_FILE_PREFIX="$outdir"
           done
-          
+
           # Rename packages to final names with proper architecture
           echo "Renaming packages to final names..."
           for file in "$outdir"/*.tar.gz; do
             [ -f "$file" ] || continue
             finalname="Ultralight-WebBrowser-${version}-macOS-x64.tar.gz"
-            echo "Renaming: $(basename "$file") -> $finalname"
-            mv "$file" "$outdir/$finalname"
+            bname=$(basename "$file")
+            if [ "$bname" = "$finalname" ]; then
+              echo "Skipping rename for $bname (already final name)"
+            else
+              echo "Renaming: $bname -> $finalname"
+              mv "$file" "$outdir/$finalname"
+            fi
           done
-          
+
           for file in "$outdir"/*.dmg; do
             [ -f "$file" ] || continue
             finalname="Ultralight-WebBrowser-${version}-macOS-x64.dmg"
-            echo "Renaming: $(basename "$file") -> $finalname"
-            mv "$file" "$outdir/$finalname"
+            bname=$(basename "$file")
+            if [ "$bname" = "$finalname" ]; then
+              echo "Skipping rename for $bname (already final name)"
+            else
+              echo "Renaming: $bname -> $finalname"
+              mv "$file" "$outdir/$finalname"
+            fi
           done
 
       - name: 7.1 List package outputs
