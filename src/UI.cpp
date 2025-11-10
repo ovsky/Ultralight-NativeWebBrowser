@@ -2612,81 +2612,19 @@ void UI::ApplyDarkModeToView(RefPtr<View> v)
   const char *js = R"JS((function(){
     try{
       var sid='__ul_auto_dark';
-      // Remove any previous style to avoid duplicates/conflicts
-      var prev=document.getElementById(sid); if(prev) prev.remove();
-      var css = [
-        '* { color-scheme: dark !important; }',
-        'html { background: #1e1e1e !important; }',
-        'body { background: #1e1e1e !important; color: #e4e4e7 !important; }',
-        // Only target major structural elements with more specific selectors
-        'body > div, body > main, body > section { background-color: #1e1e1e !important; }',
-        // Form controls - less aggressive
-        'input[type="text"], input[type="search"], input[type="email"], input[type="password"], textarea, select { background: #252525 !important; color: #e4e4e7 !important; border: 1px solid rgba(255,255,255,0.12) !important; }',
-        'input::placeholder, textarea::placeholder { color: #a1a1aa !important; opacity: 0.7 !important; }',
-        // Respect existing link colors but make them readable
-        'a { filter: brightness(1.2) !important; }',
-        // Tables
-        'table { border-color: rgba(255,255,255,0.08) !important; }',
-        'th, td { border-color: rgba(255,255,255,0.08) !important; }',
-        // Code blocks
-        'pre, code { background: #2a2a2a !important; color: #e4e4e7 !important; border-color: rgba(255,255,255,0.08) !important; }'
-      ].join('\n');
-      var s=document.createElement('style'); s.id=sid; s.type='text/css'; s.appendChild(document.createTextNode(css));
+      var prev=document.getElementById(sid); 
+      if(prev) prev.remove();
+      
+      // Simple, elegant CSS filter-based dark mode
+      var css = 'html { filter: invert(0.9) hue-rotate(180deg) !important; background: #1e1e1e !important; }\n';
+      css += 'img, video, [style*="background-image"], picture, svg, iframe { filter: invert(1.11) hue-rotate(-180deg) !important; }';
+      
+      var s=document.createElement('style'); 
+      s.id=sid; 
+      s.type='text/css'; 
+      s.appendChild(document.createTextNode(css));
       (document.head||document.documentElement).appendChild(s);
-
-      // Simplified approach: only darken very large backgrounds, be less aggressive
-      function parseRGB(c){
-        var m=(c||'').match(/rgba?\(([^)]+)\)/i); if(!m) return null; var p=m[1].split(',').map(function(x){return parseFloat(x)});
-        return {r:~~p[0], g:~~p[1], b:~~p[2], a:(p.length>3? p[3]:1)};
-      }
-      function luminance(r,g,b){ 
-        function srgb(u){u/=255; return (u<=0.03928)? u/12.92: Math.pow((u+0.055)/1.055,2.4);}
-        var R=srgb(r), G=srgb(g), B=srgb(b); return 0.2126*R+0.7152*G+0.0722*B;
-      }
-      function isVeryLight(bg){ 
-        var c=parseRGB(bg); 
-        if(!c) return false; 
-        return luminance(c.r,c.g,c.b) > 0.65;  // Only convert very light backgrounds
-      }
-
-      function darkenIfNeeded(el){
-        if(!el || !el.getBoundingClientRect) return;
-        var r=el.getBoundingClientRect();
-        var area=r.width*r.height;
-        // Only process very large elements
-        if (r.width>=800 || r.height>=500 || area>=300000) {
-          var cs=getComputedStyle(el);
-          var bg=cs.backgroundImage && cs.backgroundImage!=='none' ? null : cs.backgroundColor;
-          // Only change very light backgrounds (like white)
-          if (bg && isVeryLight(bg)){
-            try { 
-              el.style.setProperty('background-color', '#1e1e1e', 'important'); 
-              el.setAttribute('data-ul-dark','1'); 
-            } catch(e){}
-          }
-        }
-      }
-
-      function processPage(){
-        // Target only body and major containers
-        var nodes=document.querySelectorAll('body, body > div, body > main, body > section, body > article');
-        for(var i=0;i<nodes.length;i++) darkenIfNeeded(nodes[i]);
-      }
-
-      processPage();
-      // Less aggressive observer - only on major changes
-      var pending=null;
-      var obs=new MutationObserver(function(mutations){ 
-        var significant=false;
-        for(var i=0;i<mutations.length;i++){
-          if(mutations[i].addedNodes.length>10) { significant=true; break; }
-        }
-        if(!significant) return;
-        if(pending) return; 
-        pending=setTimeout(function(){ pending=null; processPage(); }, 500);
-      });
-      obs.observe(document.documentElement||document.body,{childList:true,subtree:false});
-      window.__ul_dark_observer = obs;
+      
       return true;
     }catch(e){return false;}
   })())JS";
