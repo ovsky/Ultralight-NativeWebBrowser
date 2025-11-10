@@ -342,10 +342,18 @@ set(CPACK_STRIP_FILES ON)
 
 # Icon detection (used by Windows installers when available)
 set(APP_ICON_ICO "")
+
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/browser.ico")
   set(APP_ICON_ICO "${CMAKE_CURRENT_SOURCE_DIR}/browser.ico")
 elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon.ico")
   set(APP_ICON_ICO "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon.ico")
+else()
+  set(APP_ICON_ICO "")
+endif()
+
+# Pass icon path to resource compiler for browser.rc
+if (APP_ICON_ICO)
+  set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/browser.rc PROPERTIES COMPILE_DEFINITIONS "APP_ICON_ICO=\"${APP_ICON_ICO}\"")
 endif()
 
 # Choose default generators per platform; users can always override CPACK_GENERATOR
