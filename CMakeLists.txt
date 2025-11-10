@@ -396,8 +396,35 @@ else()
   endif()
 endif()
 
-# Helpful names
-set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
+# Helpful names with better OS naming (macOS, Linux, Windows) and architecture
+# Detect architecture
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set(ARCH_SUFFIX "x64")
+elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+  set(ARCH_SUFFIX "x86")
+else()
+  # Fallback to processor name for ARM etc.
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|ARM64")
+    set(ARCH_SUFFIX "arm64")
+  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "armv7")
+    set(ARCH_SUFFIX "armv7")
+  else()
+    set(ARCH_SUFFIX ${CMAKE_SYSTEM_PROCESSOR})
+  endif()
+endif()
+
+# Better OS naming
+if(APPLE)
+  set(OS_NAME "macOS")
+elseif(WIN32)
+  set(OS_NAME "Windows")
+elseif(UNIX)
+  set(OS_NAME "Linux")
+else()
+  set(OS_NAME ${CMAKE_SYSTEM_NAME})
+endif()
+
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${OS_NAME}-${ARCH_SUFFIX}")
 
 include(CPack)
 
