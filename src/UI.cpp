@@ -2612,19 +2612,45 @@ void UI::ApplyDarkModeToView(RefPtr<View> v)
   const char *js = R"JS((function(){
     try{
       var sid='__ul_auto_dark';
-      var prev=document.getElementById(sid); 
+      var prev=document.getElementById(sid);
       if(prev) prev.remove();
-      
-      // Simple, elegant CSS filter-based dark mode
+
+      // Check if page is already dark or very bright
+      function getPageBrightness(){
+        var bgColor = window.getComputedStyle(document.body).backgroundColor;
+        if(!bgColor || bgColor === 'transparent' || bgColor === 'rgba(0, 0, 0, 0)'){
+          bgColor = window.getComputedStyle(document.documentElement).backgroundColor;
+        }
+        if(!bgColor || bgColor === 'transparent' || bgColor === 'rgba(0, 0, 0, 0)'){
+          return 1.0; // Assume bright if we can't detect
+        }
+        var m = bgColor.match(/rgba?\(([^)]+)\)/);
+        if(!m) return 1.0;
+        var parts = m[1].split(',').map(function(x){ return parseFloat(x); });
+        var r = parts[0]/255, g = parts[1]/255, b = parts[2]/255;
+        // Calculate relative luminance
+        function srgb(c){ return (c<=0.03928)? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); }
+        return 0.2126*srgb(r) + 0.7152*srgb(g) + 0.0722*srgb(b);
+      }
+
+      var brightness = getPageBrightness();
+
+      // Only apply dark mode to bright pages (luminance > 0.5)
+      if(brightness < 0.5){
+        // Page is already dark, don't apply filter
+        return false;
+      }
+
+      // Apply filter-based dark mode for bright pages
       var css = 'html { filter: invert(0.9) hue-rotate(180deg) !important; background: #1e1e1e !important; }\n';
       css += 'img, video, [style*="background-image"], picture, svg, iframe { filter: invert(1.11) hue-rotate(-180deg) !important; }';
-      
-      var s=document.createElement('style'); 
-      s.id=sid; 
-      s.type='text/css'; 
+
+      var s=document.createElement('style');
+      s.id=sid;
+      s.type='text/css';
       s.appendChild(document.createTextNode(css));
       (document.head||document.documentElement).appendChild(s);
-      
+
       return true;
     }catch(e){return false;}
   })())JS";
