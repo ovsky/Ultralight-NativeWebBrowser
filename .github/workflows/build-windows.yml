@@ -308,12 +308,22 @@ jobs:
                 cpack -C Release -G NSIS
                 Write-Host "NSIS installer created successfully"
 
-                # Rename NSIS installer to final name
-                $exe = Get-ChildItem -Path . -Filter *.exe -File | Where-Object { $_.Name -notlike '*CompilerIdCXX*' } | Select-Object -First 1
+                # Find NSIS installer (.exe) anywhere under build (CPack may place it under _CPack_Packages)
+                $exe = Get-ChildItem -Path . -Recurse -Filter *.exe -File -ErrorAction SilentlyContinue |
+                       Where-Object { $_.Name -notlike '*CompilerIdCXX*' -and $_.Name -like 'Ultralight-WebBrowser*' } |
+                       Select-Object -First 1
+                if (-not $exe) {
+                  # Fallback: pick first exe that isn't compiler helper
+                  $exe = Get-ChildItem -Path . -Recurse -Filter *.exe -File -ErrorAction SilentlyContinue |
+                         Where-Object { $_.Name -notlike '*CompilerIdCXX*' } | Select-Object -First 1
+                }
                 if ($exe) {
                   $finalInstallerName = "Ultralight-WebBrowser-$version-Windows-x64.exe"
-                  Write-Host "Renaming installer: $($exe.Name) -> $finalInstallerName"
-                  Move-Item -Force $exe.FullName $finalInstallerName
+                  $target = Join-Path (Get-Location) $finalInstallerName
+                  Write-Host "Found NSIS installer at: $($exe.FullName); moving to: $target"
+                  Move-Item -Force $exe.FullName $target
+                } else {
+                  Write-Warning "No installer .exe found under build after running CPack NSIS"
                 }
               } catch {
                 Write-Warning "NSIS installer creation failed: $_"
@@ -361,6 +371,7 @@ jobs:
           path: |
             build/Ultralight-WebBrowser-*-Windows-x64.zip
             build/Ultralight-WebBrowser-*-Windows-x64.exe
+            build/**/Ultralight-WebBrowser-*-Windows-x64.exe
           if-no-files-found: warn
 
       - name: "7.1 Upload Intermediate Packages (Development Only)"
