@@ -460,6 +460,13 @@ jobs:
           rm -f "$dest" 2>/dev/null || true
           (cd "$src" && zip -r "$dest" .)
 
+      - name: 8. Upload Artifact
+        if: steps.prep_sdk.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-macos-build
+          path: ultralight-macos.zip
+
       - name: 9. Delete large packages artifact (cleanup)
         if: always()
         uses: actions/github-script@v7
