@@ -268,27 +268,64 @@ jobs:
         run: |
           Write-Host "Packaging with CPack (Release config)"
           pushd build
-          # Always produce a ZIP package for portability
-          cpack -C Release -G ZIP
+          # Produce ZIP first; treat ZIP as required output
+          & cpack -C Release -G ZIP
+          $zipCode = $LASTEXITCODE
+          if ($zipCode -ne 0) {
+            Write-Error "ZIP packaging failed with exit code $zipCode"
+            popd
+            exit $zipCode
+          }
 
-          # Produce NSIS installer only if makensis is available
+          # Try NSIS installer generation if makensis exists, but do not fail the step if it errors
           if (Get-Command makensis -ErrorAction SilentlyContinue) {
-            cpack -C Release -G NSIS
+            & cpack -C Release -G NSIS
+            $nsisCode = $LASTEXITCODE
+            if ($nsisCode -ne 0) {
+              Write-Warning "NSIS packaging failed with exit code $nsisCode"
+              # Print NSIS output log if present to help diagnostics
+              $nsisLog = Get-ChildItem -Path _CPack_Packages -Recurse -Filter NSISOutput.log -ErrorAction SilentlyContinue | Select-Object -First 1
+              if ($nsisLog) {
+                Write-Host "=== NSISOutput.log (begin) ==="
+                Get-Content $nsisLog.FullName -Raw | Write-Host
+                Write-Host "=== NSISOutput.log (end) ==="
+              } else {
+                Write-Warning "NSISOutput.log not found under build/_CPack_Packages"
+              }
+            }
           } else {
             Write-Warning "makensis not found in PATH; skipping NSIS installer generation."
           }
           popd
           Write-Host "CPack outputs:"
           Get-ChildItem -Path build -Recurse -Include *.exe,*.msi,*.zip | Select-Object -Property FullName,Length | Format-Table -AutoSize
+          # Prevent this step from failing the job due to NSIS issues (ZIP success is authoritative)
+          exit 0
 
       - name: "6.3 Rename Windows installer"
+        if: ${{ inputs.create_installer == true }}
+        shell: pwsh
         run: |
           $version = "$env:WEBBROWSER_VERSION"
-          $cpackZip = Get-ChildItem -Path . -Filter "*.zip" -File | Select-Object -First 1
+          # Find the CPack ZIP and installer under build and move them to workspace root with stable names
+          $cpackZip = Get-ChildItem -Path build -Filter "*.zip" -File -Recurse | Select-Object -First 1
           if ($cpackZip) {
             $finalZipName = "Ultralight-WebBrowser-$version-Windows-x64.zip"
             Write-Host "Renaming CPack ZIP: $($cpackZip.Name) -> $finalZipName"
-            Move-Item -Force $cpackZip.FullName $finalZipName
+            Move-Item -Force $cpackZip.FullName (Join-Path $PWD $finalZipName)
+          } else {
+            Write-Warning "No CPack ZIP found to rename."
+          }
+
+          # Optionally rename NSIS installer if present
+          $installer = Get-ChildItem -Path build -Filter "*-Installer.exe" -File -Recurse | Select-Object -First 1
+          if ($installer) {
+            $finalInstallerName = "Ultralight-WebBrowser-$version-Windows-Installer.exe"
+            Write-Host "Renaming installer: $($installer.Name) -> $finalInstallerName"
+            Move-Item -Force $installer.FullName (Join-Path $PWD $finalInstallerName)
+          } else {
+            Write-Host "No installer .exe found to rename (OK if NSIS skipped or failed)."
+          }
 
       - name: "6.8 Run tests (ctest)"
         run: ctest --test-dir build -C Release --output-on-failure
@@ -337,11 +374,33 @@ jobs:
           $outName = "Ultralight-WebBrowser-$version-Windows-Portable.zip"
           Compress-Archive -Path (Join-Path $src '*') -DestinationPath $outName -Force
 
+      - name: "7.9 Pre-upload diagnostics: list artifacts to upload"
+        shell: pwsh
+        run: |
+          Write-Host "Listing candidate artifacts before upload (workspace root and build/)"
+          $patterns = @(
+            'Ultralight-WebBrowser-*-Windows-Portable.zip',
+            'Ultralight-WebBrowser-*-Windows-x64.zip',
+            'Ultralight-WebBrowser-*-Windows-Installer.exe',
+            'build\*.zip',
+            'build\*.msi'
+          )
+          foreach ($p in $patterns) {
+            Write-Host "Pattern: $p"
+            $found = Get-ChildItem -Path $p -File -ErrorAction SilentlyContinue -Recurse | Select-Object -First 100
+            if ($found) {
+              $found | ForEach-Object { Write-Host " - $($_.FullName) ($([math]::Round(($_.Length/1KB),2)) KB)" }
+            } else {
+              Write-Host "  (none)"
+            }
+          }
+
       - name: "8. Upload Artifact"
         uses: actions/upload-artifact@v4
         with:
           name: ultralight-windows-build
           path: Ultralight-WebBrowser-*-Windows-Portable.zip
+          if-no-files-found: warn
 
       - name: "8.1 Upload Installer"
         if: ${{ inputs.create_installer == true }}
@@ -349,8 +408,9 @@ jobs:
         with:
           name: ultralight-windows-installer
           path: |
-            build\Ultralight-WebBrowser-*-Windows-Installer.exe
+            Ultralight-WebBrowser-*-Windows-Installer.exe
             build\*.msi
+          if-no-files-found: warn
 
       - name: "8.2 Upload CPack ZIP"
         if: ${{ inputs.create_installer == true }}
@@ -358,4 +418,6 @@ jobs:
         with:
           name: ultralight-windows-cpack-zip
           path: |
+            Ultralight-WebBrowser-*-Windows-x64.zip
             build\*.zip
+          if-no-files-found: warn
