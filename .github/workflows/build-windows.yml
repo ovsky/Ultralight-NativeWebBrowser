@@ -6,6 +6,16 @@
 
 name: Build - Windows
 
+# Require minimum permissions for artifact upload on PRs/forks and allow workflow cancellation
+permissions:
+  contents: read
+  actions: write
+
+# Prevent duplicate runs for the same ref
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
     inputs:
@@ -56,6 +66,31 @@ on:
         default: false
 
 jobs:
+  validate_yaml:
+    name: Validate workflow YAML
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install yamllint and PyYAML
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyyaml yamllint
+
+      - name: Run yamllint on build-windows.yml
+        run: |
+          yamllint .github/workflows/build-windows.yml || true
+
+      - name: Sanity-parse with PyYAML
+        run: |
+          python -c "import yaml,sys; yaml.safe_load(open('.github/workflows/build-windows.yml','r',encoding='utf-8')); print('PyYAML: parse OK')"
+
   build:
     runs-on: windows-latest
     env:
@@ -269,6 +304,7 @@ jobs:
           Write-Host "Packaging with CPack (Release config)"
           pushd build
           # Produce ZIP first; treat ZIP as required output
+          Write-Host "Running: cpack -C Release -G ZIP"
           & cpack -C Release -G ZIP
           $zipCode = $LASTEXITCODE
           if ($zipCode -ne 0) {
@@ -277,17 +313,25 @@ jobs:
             exit $zipCode
           }
 
-          # Try NSIS installer generation if makensis exists, but do not fail the step if it errors
+          # Try NSIS installer generation if makensis exists. Capture cpack output to a log so we can print it on failure.
           if (Get-Command makensis -ErrorAction SilentlyContinue) {
-            & cpack -C Release -G NSIS
+            $nsisLog = "nsis-cpack.log"
+            Write-Host "Running: cpack -C Release -G NSIS  (logging to $nsisLog)"
+            & cmd /c "cpack -C Release -G NSIS > $nsisLog 2>&1"
             $nsisCode = $LASTEXITCODE
             if ($nsisCode -ne 0) {
               Write-Warning "NSIS packaging failed with exit code $nsisCode"
-              # Print NSIS output log if present to help diagnostics
-              $nsisLog = Get-ChildItem -Path _CPack_Packages -Recurse -Filter NSISOutput.log -ErrorAction SilentlyContinue | Select-Object -First 1
-              if ($nsisLog) {
+              if (Test-Path $nsisLog) {
+                Write-Host "=== cpack NSIS log (begin) ==="
+                Get-Content $nsisLog -Raw | Write-Host
+                Write-Host "=== cpack NSIS log (end) ==="
+              }
+
+              # Also print the NSISOutput.log produced by the NSIS tool (if present)
+              $nsisOutput = Get-ChildItem -Path _CPack_Packages -Recurse -Filter NSISOutput.log -ErrorAction SilentlyContinue | Select-Object -First 1
+              if ($nsisOutput) {
                 Write-Host "=== NSISOutput.log (begin) ==="
-                Get-Content $nsisLog.FullName -Raw | Write-Host
+                Get-Content $nsisOutput.FullName -Raw | Write-Host
                 Write-Host "=== NSISOutput.log (end) ==="
               } else {
                 Write-Warning "NSISOutput.log not found under build/_CPack_Packages"
@@ -296,10 +340,12 @@ jobs:
           } else {
             Write-Warning "makensis not found in PATH; skipping NSIS installer generation."
           }
+
           popd
           Write-Host "CPack outputs:"
           Get-ChildItem -Path build -Recurse -Include *.exe,*.msi,*.zip | Select-Object -Property FullName,Length | Format-Table -AutoSize
-          # Prevent this step from failing the job due to NSIS issues (ZIP success is authoritative)
+
+          # If NSIS failed, we still treat ZIP as the authoritative package and do not fail the workflow.
           exit 0
 
       - name: "6.3 Rename Windows installer"
@@ -326,6 +372,16 @@ jobs:
           } else {
             Write-Host "No installer .exe found to rename (OK if NSIS skipped or failed)."
           }
+
+      - name: "6.2.5 Upload NSIS logs (if any)"
+        if: ${{ inputs.create_installer == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-windows-nsis-logs
+          path: |
+            build\nsis-cpack.log
+            build\_CPack_Packages\**\NSISOutput.log
+          if-no-files-found: warn
 
       - name: "6.8 Run tests (ctest)"
         run: ctest --test-dir build -C Release --output-on-failure
