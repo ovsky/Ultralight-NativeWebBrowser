@@ -301,51 +301,64 @@ jobs:
         if: ${{ inputs.create_installer == true }}
         shell: pwsh
         run: |
+          # Ensure transient errors don't stop the script so we can always collect logs and exit cleanly
+          $ErrorActionPreference = 'Continue'
           Write-Host "Packaging with CPack (Release config)"
-          pushd build
-          # Produce ZIP first; treat ZIP as required output
-          Write-Host "Running: cpack -C Release -G ZIP"
-          & cpack -C Release -G ZIP
-          $zipCode = $LASTEXITCODE
-          if ($zipCode -ne 0) {
-            Write-Error "ZIP packaging failed with exit code $zipCode"
-            popd
-            exit $zipCode
-          }
+          try {
+            pushd build
 
-          # Try NSIS installer generation if makensis exists. Capture cpack output to a log so we can print it on failure.
-          if (Get-Command makensis -ErrorAction SilentlyContinue) {
-            $nsisLog = "nsis-cpack.log"
-            Write-Host "Running: cpack -C Release -G NSIS  (logging to $nsisLog)"
-            & cmd /c "cpack -C Release -G NSIS > $nsisLog 2>&1"
-            $nsisCode = $LASTEXITCODE
-            if ($nsisCode -ne 0) {
-              Write-Warning "NSIS packaging failed with exit code $nsisCode"
-              if (Test-Path $nsisLog) {
-                Write-Host "=== cpack NSIS log (begin) ==="
-                Get-Content $nsisLog -Raw | Write-Host
-                Write-Host "=== cpack NSIS log (end) ==="
+            # Produce ZIP first; treat ZIP as required output. Capture output to a log.
+            $zipLog = "zip-cpack.log"
+            Write-Host "Running: cpack -C Release -G ZIP  (logging to $zipLog)"
+            cmd /c "cpack -C Release -G ZIP > $zipLog 2>&1"
+            $zipCode = $LASTEXITCODE
+            if ($zipCode -ne 0) {
+              Write-Error "ZIP packaging failed with exit code $zipCode"
+              if (Test-Path $zipLog) {
+                Write-Host "=== cpack ZIP log (begin) ==="
+                Get-Content $zipLog -Raw | Write-Host
+                Write-Host "=== cpack ZIP log (end) ==="
               }
-
-              # Also print the NSISOutput.log produced by the NSIS tool (if present)
-              $nsisOutput = Get-ChildItem -Path _CPack_Packages -Recurse -Filter NSISOutput.log -ErrorAction SilentlyContinue | Select-Object -First 1
-              if ($nsisOutput) {
-                Write-Host "=== NSISOutput.log (begin) ==="
-                Get-Content $nsisOutput.FullName -Raw | Write-Host
-                Write-Host "=== NSISOutput.log (end) ==="
-              } else {
-                Write-Warning "NSISOutput.log not found under build/_CPack_Packages"
-              }
+              throw "ZIP packaging failed"
             }
-          } else {
-            Write-Warning "makensis not found in PATH; skipping NSIS installer generation."
+
+            # Try NSIS installer generation if makensis exists. Capture cpack NSIS output to a log so we can print it on failure.
+            if (Get-Command makensis -ErrorAction SilentlyContinue) {
+              $nsisLog = "nsis-cpack.log"
+              Write-Host "Running: cpack -C Release -G NSIS  (logging to $nsisLog)"
+              cmd /c "cpack -C Release -G NSIS > $nsisLog 2>&1"
+              $nsisCode = $LASTEXITCODE
+              if ($nsisCode -ne 0) {
+                Write-Warning "NSIS packaging failed with exit code $nsisCode"
+                if (Test-Path $nsisLog) {
+                  Write-Host "=== cpack NSIS log (begin) ==="
+                  Get-Content $nsisLog -Raw | Write-Host
+                  Write-Host "=== cpack NSIS log (end) ==="
+                }
+
+                # Also print the NSISOutput.log produced by makensis (if present)
+                $nsisOutput = Get-ChildItem -Path _CPack_Packages -Recurse -Filter NSISOutput.log -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($nsisOutput) {
+                  Write-Host "=== NSISOutput.log (begin) ==="
+                  Get-Content $nsisOutput.FullName -Raw | Write-Host
+                  Write-Host "=== NSISOutput.log (end) ==="
+                } else {
+                  Write-Warning "NSISOutput.log not found under build/_CPack_Packages"
+                }
+                # Do not throw here: NSIS failures are non-fatal for our pipeline (we keep ZIP)
+              }
+            } else {
+              Write-Warning "makensis not found in PATH; skipping NSIS installer generation."
+            }
+          } finally {
+            # Ensure we always popd even if earlier commands failed
+            try { popd } catch {}
           }
 
-          popd
           Write-Host "CPack outputs:"
           Get-ChildItem -Path build -Recurse -Include *.exe,*.msi,*.zip | Select-Object -Property FullName,Length | Format-Table -AutoSize
 
-          # If NSIS failed, we still treat ZIP as the authoritative package and do not fail the workflow.
+          # If ZIP succeeded above, return success regardless of NSIS result.
           exit 0
 
       - name: "6.3 Rename Windows installer"
@@ -381,6 +394,15 @@ jobs:
           path: |
             build\nsis-cpack.log
             build\_CPack_Packages\**\NSISOutput.log
+          if-no-files-found: warn
+
+      - name: "6.2.6 Upload full CPack package directory for debug (optional, may be large)"
+        if: ${{ inputs.create_installer == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-windows-cpack-debug
+          path: |
+            build\_CPack_Packages\**
           if-no-files-found: warn
 
       - name: "6.8 Run tests (ctest)"
