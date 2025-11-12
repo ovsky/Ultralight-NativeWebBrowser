@@ -14,7 +14,7 @@ LANGUAGE 9, 1
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDI_MYICON              ICON                    "browser.ico"
+IDI_MYICON              ICON                    "@APP_ICON_ICO@"
 
 #endif    // English (United States) resources
 

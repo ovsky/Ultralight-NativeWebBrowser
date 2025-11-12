@@ -3,6 +3,9 @@ project(UltralightWebBrowser LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+  # (Browser resource file will be configured after the icon-detection block
+  # later in this file using configure_file(... @ONLY).)
+
 # Option: create an installer on Windows via CPack (NSIS)
 option(CREATE_INSTALLER "Create a Windows installer via CPack (NSIS)" OFF)
 
@@ -85,7 +88,7 @@ set(SOURCES "src/Browser.h"
             "src/UI.h"
             "src/UI.cpp"
             "src/main.cpp"
-            "browser.rc"
+            "${CMAKE_CURRENT_BINARY_DIR}/browser.rc"
 )
 
 add_app(Ultralight-WebBrowser ${SOURCES})
@@ -342,11 +345,28 @@ set(CPACK_STRIP_FILES ON)
 
 # Icon detection (used by Windows installers when available)
 set(APP_ICON_ICO "")
+
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/browser.ico")
   set(APP_ICON_ICO "${CMAKE_CURRENT_SOURCE_DIR}/browser.ico")
 elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon.ico")
   set(APP_ICON_ICO "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon.ico")
+else()
+  set(APP_ICON_ICO "")
 endif()
+
+# Pass icon path to resource compiler for browser.rc
+if (APP_ICON_ICO)
+  # We no longer pass APP_ICON_ICO via compile definitions for browser.rc;
+  # instead we generate a configured copy of the resource file with
+  # @APP_ICON_ICO@ replaced by the absolute icon path below.
+  # (Keeping compile-time definitions for other sources is still possible.)
+endif()
+
+# Configure browser.rc into the build directory using @VAR@ style substitution
+# so configure_file(... @ONLY) will replace @APP_ICON_ICO@ with the chosen path.
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/browser.rc"
+               "${CMAKE_CURRENT_BINARY_DIR}/browser.rc"
+               @ONLY)
 
 # Choose default generators per platform; users can always override CPACK_GENERATOR
 if(WIN32)
@@ -396,8 +416,35 @@ else()
   endif()
 endif()
 
-# Helpful names
-set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
+# Helpful names with better OS naming (macOS, Linux, Windows) and architecture
+# Detect architecture
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set(ARCH_SUFFIX "x64")
+elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+  set(ARCH_SUFFIX "x86")
+else()
+  # Fallback to processor name for ARM etc.
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|ARM64")
+    set(ARCH_SUFFIX "arm64")
+  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "armv7")
+    set(ARCH_SUFFIX "armv7")
+  else()
+    set(ARCH_SUFFIX ${CMAKE_SYSTEM_PROCESSOR})
+  endif()
+endif()
+
+# Better OS naming
+if(APPLE)
+  set(OS_NAME "macOS")
+elseif(WIN32)
+  set(OS_NAME "Windows")
+elseif(UNIX)
+  set(OS_NAME "Linux")
+else()
+  set(OS_NAME ${CMAKE_SYSTEM_NAME})
+endif()
+
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${OS_NAME}-${ARCH_SUFFIX}")
 
 include(CPack)
 

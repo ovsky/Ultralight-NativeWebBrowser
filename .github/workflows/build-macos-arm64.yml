@@ -22,6 +22,11 @@ on:
         description: "Package format(s) to produce via CPack (eg. TGZ or DMG or multi 'TGZ;DMG')"
         required: false
         type: string
+      development_build:
+        description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       sdk_url:
@@ -39,8 +44,13 @@ on:
       package_format:
         description: "Package format(s) to produce via CPack (eg. TGZ or DMG or multi 'TGZ;DMG')"
         required: false
-        default: TGZ
+        default: "TGZ;DMG"
         type: string
+      development_build:
+        description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -52,8 +62,9 @@ jobs:
       ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url || github.event.inputs.sdk_url }}
       ULTRALIGHT_VERSION: ${{ inputs.version || github.event.inputs.version }}
       WEBBROWSER_VERSION: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}
-      PACKAGE_GENERATORS: ${{ inputs.package_format || github.event.inputs.package_format || 'TGZ' }}
+      PACKAGE_GENERATORS: ${{ inputs.package_format || github.event.inputs.package_format || 'TGZ;DMG' }}
       TARGET_ARCH: arm64
+      DEVELOPMENT_BUILD: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
     steps:
       - name: 0. Configure Git (longpaths, autocrlf=false)
         run: |
@@ -229,40 +240,66 @@ jobs:
           set -euo pipefail
           outdir="${{ github.workspace }}/build"
           mkdir -p "$outdir"
-          gens_raw="${PACKAGE_GENERATORS:-TGZ}"
+          version="${WEBBROWSER_VERSION}"
+          gens_raw="${PACKAGE_GENERATORS:-TGZ;DMG}"
           IFS=$' ;,\t\n' read -r -a GEN_LIST <<< "$gens_raw"
           echo "Requested package formats: ${GEN_LIST[*]}"
-          for g in "${GEN_LIST[@]}"; do [ -z "$g" ] && continue; g_uc=$(echo "$g" | tr '[:lower:]' '[:upper:]'); gen="$g_uc"; [ "$g_uc" = "DMG" ] && gen="DragNDrop"; echo "Running CPack for generator: $gen"; cpack --config build/CPackConfig.cmake -C Release -G "$gen" -V -D CPACK_OUTPUT_FILE_PREFIX="$outdir"; done
+          for g in "${GEN_LIST[@]}"; do
+            [ -z "$g" ] && continue
+            g_uc=$(echo "$g" | tr '[:lower:]' '[:upper:]')
+            gen="$g_uc"
+            [ "$g_uc" = "DMG" ] && gen="DragNDrop"
+            echo "Running CPack for generator: $gen"
+            cpack --config build/CPackConfig.cmake -C Release -G "$gen" -V -D CPACK_OUTPUT_FILE_PREFIX="$outdir"
+          done
+          # Rename packages to final names with proper architecture
+          echo "Renaming packages to final names..."
+          for file in "$outdir"/*.tar.gz; do
+            [ -f "$file" ] || continue
+            finalname="Ultralight-WebBrowser-${version}-macOS-arm64.tar.gz"
+            bname=$(basename "$file")
+            if [ "$bname" = "$finalname" ]; then
+              echo "Skipping rename for $bname (already final name)"
+            else
+              echo "Renaming: $bname -> $finalname"
+              mv "$file" "$outdir/$finalname"
+            fi
+          done
+          for file in "$outdir"/*.dmg; do
+            [ -f "$file" ] || continue
+            finalname="Ultralight-WebBrowser-${version}-macOS-arm64.dmg"
+            bname=$(basename "$file")
+            if [ "$bname" = "$finalname" ]; then
+              echo "Skipping rename for $bname (already final name)"
+            else
+              echo "Renaming: $bname -> $finalname"
+              mv "$file" "$outdir/$finalname"
+            fi
+          done
 
-      - name: 7.2 Upload Packages (TGZ/DMG)
-        if: steps.prep_sdk.outputs.present == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ultralight-macos-arm64-packages
-          path: |
-            ${{ github.workspace }}/build/*.tar.gz
-            ${{ github.workspace }}/build/*.tgz
-            ${{ github.workspace }}/build/*.dmg
-            ${{ github.workspace }}/**/*.tar.gz
-            ${{ github.workspace }}/**/*.tgz
-            ${{ github.workspace }}/**/*.dmg
-
-      - name: 8. Archive Artifacts
+      - name: 7.1 List package outputs
         if: steps.prep_sdk.outputs.present == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          candidates=(
-            "build/Release" "build/bin/Release" "build/Ultralight-WebBrowser/Release" "build/samples/Ultralight-WebBrowser/Release"
-            "build" "build/bin" "build/Ultralight-WebBrowser" "build/samples/Ultralight-WebBrowser"
-          )
-          src=""; for p in "${candidates[@]}"; do [ -d "$p" ] && { src="$p"; break; }; done
-          [ -z "$src" ] && { echo "Warning: No expected output folder found. Skipping." >&2; exit 0; }
-          echo "Archiving from: $src"; dest="$GITHUB_WORKSPACE/ultralight-macos-arm64.zip"; rm -f "$dest" 2>/dev/null || true; (cd "$src" && zip -r "$dest" .)
+          echo "Final packages in build directory:"
+          ls -lh "${{ github.workspace }}/build"/Ultralight-WebBrowser-* || true
 
-      - name: 9. Upload Artifact
+      - name: 7.2 Upload Final Packages
         if: steps.prep_sdk.outputs.present == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: ultralight-macos-arm64-build
-          path: ultralight-macos-arm64.zip
+          name: Ultralight-WebBrowser-${{ env.WEBBROWSER_VERSION }}-macOS-arm64
+          path: |
+            ${{ github.workspace }}/build/Ultralight-WebBrowser-*-macOS-arm64.tar.gz
+            ${{ github.workspace }}/build/Ultralight-WebBrowser-*-macOS-arm64.dmg
+          if-no-files-found: warn
+
+      - name: 7.3 Upload Intermediate Packages (Development Only)
+        if: steps.prep_sdk.outputs.present == 'true' && env.DEVELOPMENT_BUILD == 'true'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ultralight-WebBrowser-${{ env.WEBBROWSER_VERSION }}-macOS-arm64-Intermediate
+          path: ${{ github.workspace }}/build/_CPack_Packages/
+          if-no-files-found: warn
