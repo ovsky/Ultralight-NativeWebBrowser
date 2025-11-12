@@ -3,6 +3,24 @@ project(UltralightWebBrowser LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Configure the Windows resource file at configure-time so the resource
+# compiler sees a real icon path instead of an unsubstituted ${APP_ICON_ICO}
+# token. This avoids RC2135 (file not found) when building on Windows CI.
+set(APP_ICON_ICO "")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/browser.ico")
+  set(APP_ICON_ICO "${CMAKE_CURRENT_SOURCE_DIR}/browser.ico")
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon.ico")
+  set(APP_ICON_ICO "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon.ico")
+else()
+  set(APP_ICON_ICO "")
+endif()
+
+# Generate a configured copy of browser.rc into the build dir. The source
+# file contains the placeholder ${APP_ICON_ICO} which will be replaced with
+# the absolute path above during configuration.
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/browser.rc"
+               "${CMAKE_CURRENT_BINARY_DIR}/browser.rc")
+
 # Option: create an installer on Windows via CPack (NSIS)
 option(CREATE_INSTALLER "Create a Windows installer via CPack (NSIS)" OFF)
 
@@ -85,7 +103,7 @@ set(SOURCES "src/Browser.h"
             "src/UI.h"
             "src/UI.cpp"
             "src/main.cpp"
-            "browser.rc"
+            "${CMAKE_CURRENT_BINARY_DIR}/browser.rc"
 )
 
 add_app(Ultralight-WebBrowser ${SOURCES})
