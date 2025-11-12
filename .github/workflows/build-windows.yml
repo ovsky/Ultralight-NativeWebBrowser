@@ -485,6 +485,35 @@ jobs:
             }
           }
 
+      - name: "8.0b Debug: locate/move installer to workspace root (if any)"
+        if: ${{ inputs.create_installer == true }}
+        shell: pwsh
+        run: |
+          Write-Host "Listing build/ tree (top-level, depth 3) for debugging"
+          Get-ChildItem -Path build -Recurse -Depth 3 -File | Sort-Object Length -Descending | Select-Object -First 200 | ForEach-Object { Write-Host " - $($_.FullName) ($([math]::Round(($_.Length/1KB),2)) KB)" }
+
+          # Robust search for installer candidates: prefer names starting with project prefix,
+          # then names containing 'installer' or 'setup', then fall back to largest exe/msi.
+          $candidates = Get-ChildItem -Path build -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.exe','.msi' }
+          $matchPrefixed = $candidates | Where-Object { $_.Name -match '^Ultralight-WebBrowser-.*\.(exe|msi)$' }
+          $matchInstaller = $candidates | Where-Object { $_.Name -match '(installer|setup|setup-?x?)' -or $_.Name -match '\bSetup\b' }
+
+          $chosen = $null
+          if ($matchPrefixed) { $chosen = $matchPrefixed | Sort-Object Length -Descending | Select-Object -First 1 }
+          elseif ($matchInstaller) { $chosen = $matchInstaller | Sort-Object Length -Descending | Select-Object -First 1 }
+          elseif ($candidates) { $chosen = $candidates | Sort-Object Length -Descending | Select-Object -First 1 }
+
+          if ($chosen) {
+            $version = "$env:WEBBROWSER_VERSION"
+            $ext = $chosen.Extension
+            $finalName = "Ultralight-WebBrowser-$version-Windows-Installer$ext"
+            Write-Host "Found installer candidate: $($chosen.FullName) -> copying as $finalName"
+            Copy-Item -Force $chosen.FullName (Join-Path $PWD $finalName)
+            Write-Host "Workspace root now contains:"; Get-ChildItem -Path $PWD -Filter "Ultralight-WebBrowser-*Installer.*" -File | ForEach-Object { Write-Host " - $($_.FullName) ($([math]::Round(($_.Length/1KB),2)) KB)" }
+          } else {
+            Write-Host "No installer candidates found under build/." 
+          }
+
       - name: "8. Upload Artifact"
         uses: actions/upload-artifact@v4
         with:
