@@ -511,7 +511,38 @@ jobs:
             Copy-Item -Force $chosen.FullName (Join-Path $PWD $finalName)
             Write-Host "Workspace root now contains:"; Get-ChildItem -Path $PWD -Filter "Ultralight-WebBrowser-*Installer.*" -File | ForEach-Object { Write-Host " - $($_.FullName) ($([math]::Round(($_.Length/1KB),2)) KB)" }
           } else {
-            Write-Host "No installer candidates found under build/." 
+            Write-Host "No installer candidates found under build/. Trying to parse CPack logs for produced package paths..."
+            $possibleLogFiles = @("build\nsis-cpack.log","build\zip-cpack.log","build\zip-cpack.log")
+            $foundFromLog = $null
+            foreach ($log in $possibleLogFiles) {
+              if (Test-Path $log) {
+                Write-Host "Parsing log: $log"
+                $lines = Get-Content $log -ErrorAction SilentlyContinue
+                foreach ($ln in $lines) {
+                  if ($ln -match 'CPack: - package: (.+)') {
+                    $pkgPath = $Matches[1].Trim()
+                    Write-Host "Found package entry in log: $pkgPath"
+                    # Try absolute path first, then relative to build dir, then workspace root
+                    if (Test-Path $pkgPath) { $foundFromLog = Get-Item $pkgPath; break }
+                    $candidate = Join-Path (Join-Path $PWD 'build') $pkgPath
+                    if (Test-Path $candidate) { $foundFromLog = Get-Item $candidate; break }
+                    $candidate2 = Join-Path $PWD $pkgPath
+                    if (Test-Path $candidate2) { $foundFromLog = Get-Item $candidate2; break }
+                  }
+                }
+                if ($foundFromLog) { break }
+              }
+            }
+            if ($foundFromLog) {
+              $version = "$env:WEBBROWSER_VERSION"
+              $ext = $foundFromLog.Extension
+              $finalName = "Ultralight-WebBrowser-$version-Windows-Installer$ext"
+              Write-Host "Copying package found in logs: $($foundFromLog.FullName) -> $finalName"
+              Copy-Item -Force $foundFromLog.FullName (Join-Path $PWD $finalName)
+              Write-Host "Workspace root now contains:"; Get-ChildItem -Path $PWD -Filter "Ultralight-WebBrowser-*Installer.*" -File | ForEach-Object { Write-Host " - $($_.FullName) ($([math]::Round(($_.Length/1KB),2)) KB)" }
+            } else {
+              Write-Host "CPack logs did not reveal a package path either. No installer will be uploaded."
+            }
           }
 
       - name: "8. Upload Artifact"
@@ -528,7 +559,10 @@ jobs:
           name: ultralight-windows-installer
           path: |
             Ultralight-WebBrowser-*-Windows-Installer.exe
-            build\*.msi
+            build\**\*.exe
+            build\**\*.msi
+            build\_CPack_Packages\**\*.exe
+            build\_CPack_Packages\**\*.msi
           if-no-files-found: warn
 
       - name: "8.2 Upload CPack ZIP"
