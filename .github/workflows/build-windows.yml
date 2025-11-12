@@ -366,7 +366,7 @@ jobs:
         shell: pwsh
         run: |
           $version = "$env:WEBBROWSER_VERSION"
-          # Find the CPack ZIP and installer under build and move them to workspace root with stable names
+          # Find the CPack ZIP and move it to workspace root with a stable name
           $cpackZip = Get-ChildItem -Path build -Filter "*.zip" -File -Recurse | Select-Object -First 1
           if ($cpackZip) {
             $finalZipName = "Ultralight-WebBrowser-$version-Windows-x64.zip"
@@ -376,14 +376,26 @@ jobs:
             Write-Warning "No CPack ZIP found to rename."
           }
 
-          # Optionally rename NSIS installer if present
-          $installer = Get-ChildItem -Path build -Filter "*-Installer.exe" -File -Recurse | Select-Object -First 1
-          if ($installer) {
+          # Robust installer detection:
+          # CPack may emit installers named like 'Ultralight-WebBrowser-<ver>-Windows-x64.exe'
+          # or place them in build/_CPack_Packages. Search for any matching exe under build
+          # that starts with the project prefix and move it to a stable name in workspace root.
+          $installerCandidates = Get-ChildItem -Path build -Include "Ultralight-WebBrowser-*.exe" -File -Recurse -ErrorAction SilentlyContinue
+          if (-not $installerCandidates) {
+            # Also try any .msi produced by some generators
+            $installerCandidates = Get-ChildItem -Path build -Include "*.msi" -File -Recurse -ErrorAction SilentlyContinue
+          }
+          if ($installerCandidates) {
+            $installer = $installerCandidates | Select-Object -First 1
             $finalInstallerName = "Ultralight-WebBrowser-$version-Windows-Installer.exe"
-            Write-Host "Renaming installer: $($installer.Name) -> $finalInstallerName"
+            # If the found file is an MSI, keep .msi extension
+            if ($installer.Extension -ieq ".msi") {
+              $finalInstallerName = "Ultralight-WebBrowser-$version-Windows-Installer.msi"
+            }
+            Write-Host "Renaming installer: $($installer.FullName) -> $finalInstallerName"
             Move-Item -Force $installer.FullName (Join-Path $PWD $finalInstallerName)
           } else {
-            Write-Host "No installer .exe found to rename (OK if NSIS skipped or failed)."
+            Write-Host "No installer (.exe or .msi) found under build to rename (OK if NSIS skipped or failed)."
           }
 
       - name: "6.2.5 Upload NSIS logs (if any)"
