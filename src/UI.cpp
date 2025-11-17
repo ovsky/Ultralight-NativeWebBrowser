@@ -2612,65 +2612,45 @@ void UI::ApplyDarkModeToView(RefPtr<View> v)
   const char *js = R"JS((function(){
     try{
       var sid='__ul_auto_dark';
-      // Remove any previous style to avoid duplicates/conflicts
-      var prev=document.getElementById(sid); if(prev) prev.remove();
-      var css = [
-        'html,body{background:#0e0e0f !important;color:#e0e0e0 !important;color-scheme:dark !important}',
-        // Make common large containers nearly black by default
-        'body > header, body > main, body > footer, body > nav, body > section, body > article{background:#0e0e0f !important}',
-        'div,section,main,article,aside,header,footer,nav{border-color:#333 !important}',
-        // Form controls
-        'input,textarea,select,button{background:#1a1b1c !important;color:#e6e6e6 !important;border-color:#333 !important}',
-        'input::placeholder,textarea::placeholder{color:#9aa0a6 !important}',
-        // Links
-        'a{color:#8ab4f8 !important}',
-        // Tables
-        'table{background:#0f0f10 !important}',
-        'thead,tbody,tr,th,td{background:transparent !important;border-color:#333 !important}',
-        // Code blocks
-        'pre,code,kbd,samp{background:#111215 !important;color:#e0e0e0 !important}',
-        // Shadows
-        '.card, .panel, .box{background:#111213 !important; border:1px solid #2a2b2d !important}'
-      ].join('\n');
-      var s=document.createElement('style'); s.id=sid; s.type='text/css'; s.appendChild(document.createTextNode(css));
+      var prev=document.getElementById(sid);
+      if(prev) prev.remove();
+
+      // Check if page is already dark or very bright
+      function getPageBrightness(){
+        var bgColor = window.getComputedStyle(document.body).backgroundColor;
+        if(!bgColor || bgColor === 'transparent' || bgColor === 'rgba(0, 0, 0, 0)'){
+          bgColor = window.getComputedStyle(document.documentElement).backgroundColor;
+        }
+        if(!bgColor || bgColor === 'transparent' || bgColor === 'rgba(0, 0, 0, 0)'){
+          return 1.0; // Assume bright if we can't detect
+        }
+        var m = bgColor.match(/rgba?\(([^)]+)\)/);
+        if(!m) return 1.0;
+        var parts = m[1].split(',').map(function(x){ return parseFloat(x); });
+        var r = parts[0]/255, g = parts[1]/255, b = parts[2]/255;
+        // Calculate relative luminance
+        function srgb(c){ return (c<=0.03928)? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); }
+        return 0.2126*srgb(r) + 0.7152*srgb(g) + 0.0722*srgb(b);
+      }
+
+      var brightness = getPageBrightness();
+
+      // Only apply dark mode to bright pages (luminance > 0.5)
+      if(brightness < 0.5){
+        // Page is already dark, don't apply filter
+        return false;
+      }
+
+      // Apply filter-based dark mode for bright pages
+      var css = 'html { filter: invert(0.9) hue-rotate(180deg) !important; background: #1e1e1e !important; }\n';
+      css += 'img, video, [style*="background-image"], picture, svg, iframe { filter: invert(1.11) hue-rotate(-180deg) !important; }';
+
+      var s=document.createElement('style');
+      s.id=sid;
+      s.type='text/css';
+      s.appendChild(document.createTextNode(css));
       (document.head||document.documentElement).appendChild(s);
 
-      // Heuristic: darken wide/large containers and backgrounds to near-black.
-      function parseRGB(c){
-        var m=(c||'').match(/rgba?\(([^)]+)\)/i); if(!m) return null; var p=m[1].split(',').map(function(x){return parseFloat(x)});
-        return {r:~~p[0], g:~~p[1], b:~~p[2], a:(p.length>3? p[3]:1)};
-      }
-      function luminance(r,g,b){ // sRGB relative luminance
-        function srgb(u){u/=255; return (u<=0.03928)? u/12.92: Math.pow((u+0.055)/1.055,2.4);}
-        var R=srgb(r), G=srgb(g), B=srgb(b); return 0.2126*R+0.7152*G+0.0722*B;
-      }
-      function isLight(bg){ var c=parseRGB(bg); if(!c) return true; return luminance(c.r,c.g,c.b) > 0.35; }
-
-      function darkenLarge(el){
-        if(!el || !el.getBoundingClientRect) return;
-        var r=el.getBoundingClientRect();
-        var area=r.width*r.height;
-        if (r.width>=600 || r.height>=300 || area>=120000) {
-          var cs=getComputedStyle(el);
-          var bg=cs.backgroundImage && cs.backgroundImage!=='none' ? null : cs.backgroundColor;
-          if (!bg || bg==='transparent' || bg==='rgba(0, 0, 0, 0)' || isLight(bg)){
-            try { el.style.setProperty('background-color', '#0e0e0f', 'important'); el.setAttribute('data-ul-dark','1'); } catch(e){}
-          }
-          // ensure text is readable
-          try { el.style.setProperty('color', '#e0e0e0', 'important'); } catch(e){}
-        }
-      }
-
-      function walk(root){
-        var nodes=root.querySelectorAll('div,section,main,article,aside,header,footer,nav,body,html');
-        for(var i=0;i<nodes.length;i++) darkenLarge(nodes[i]);
-      }
-
-      walk(document);
-      var pending=null;
-      var obs=new MutationObserver(function(){ if(pending) return; pending=requestAnimationFrame(function(){ pending=null; walk(document); }); });
-      obs.observe(document.documentElement||document.body,{childList:true,subtree:true});
-      window.__ul_dark_observer = obs;
       return true;
     }catch(e){return false;}
   })())JS";

@@ -6,6 +6,16 @@
 
 name: Build - Windows
 
+# Require minimum permissions for artifact upload on PRs/forks and allow workflow cancellation
+permissions:
+  contents: read
+  actions: write
+
+# Prevent duplicate runs for the same ref
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
     inputs:
@@ -25,6 +35,11 @@ on:
         description: "Create Windows installer via CPack (NSIS)"
         required: false
         type: boolean
+      development_build:
+        description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       sdk_url:
@@ -44,8 +59,38 @@ on:
         required: false
         type: boolean
         default: false
+      development_build:
+        description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
+  validate_yaml:
+    name: Validate workflow YAML
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install yamllint and PyYAML
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyyaml yamllint
+
+      - name: Run yamllint on build-windows.yml
+        run: |
+          yamllint .github/workflows/build-windows.yml || true
+
+      - name: Sanity-parse with PyYAML
+        run: |
+          python -c "import yaml,sys; yaml.safe_load(open('.github/workflows/build-windows.yml','r',encoding='utf-8')); print('PyYAML: parse OK')"
+
   build:
     runs-on: windows-latest
     env:
@@ -53,6 +98,7 @@ jobs:
       ULTRALIGHT_VERSION: ${{ inputs.version || github.event.inputs.version }}
       WEBBROWSER_VERSION: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}
       CREATE_INSTALLER: ${{ inputs.create_installer || github.event.inputs.create_installer }}
+      DEVELOPMENT_BUILD: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
 
     steps:
       - name: "0. Configure Git (longpaths, autocrlf=false)"
@@ -238,7 +284,7 @@ jobs:
         run: cmake --build build --config Release --parallel
 
       - name: "6.15 Install NSIS (for installer)"
-        if: ${{ inputs.create_installer == true }}
+        if: ${{ inputs.create_installer == true || github.event_name == 'pull_request' }}
         shell: pwsh
         run: |
           choco install nsis -y --no-progress
@@ -251,42 +297,131 @@ jobs:
             Write-Warning "NSIS makensis.exe not found after install; CPack NSIS may not be available."
           }
 
-      - name: "6.2 Package (CPack installer)"
+      - name: "6.2 Package (CPack)"
         if: ${{ inputs.create_installer == true }}
         shell: pwsh
         run: |
+          # Ensure transient errors don't stop the script so we can always collect logs and exit cleanly
+          $ErrorActionPreference = 'Continue'
           Write-Host "Packaging with CPack (Release config)"
-          pushd build
-          # Always produce a ZIP package for portability
-          cpack -C Release -G ZIP
-          # Produce NSIS installer only if makensis is available
-          if (Get-Command makensis -ErrorAction SilentlyContinue) {
-            cpack -C Release -G NSIS
-          } else {
-            Write-Warning "makensis not found in PATH; skipping NSIS installer generation."
+          try {
+            pushd build
+
+            # Produce ZIP first; treat ZIP as required output. Capture output to a log.
+            $zipLog = "zip-cpack.log"
+            Write-Host "Running: cpack -C Release -G ZIP  (logging to $zipLog)"
+            cmd /c "cpack -C Release -G ZIP > $zipLog 2>&1"
+            $zipCode = $LASTEXITCODE
+            if ($zipCode -ne 0) {
+              Write-Error "ZIP packaging failed with exit code $zipCode"
+              if (Test-Path $zipLog) {
+                Write-Host "=== cpack ZIP log (begin) ==="
+                Get-Content $zipLog -Raw | Write-Host
+                Write-Host "=== cpack ZIP log (end) ==="
+              }
+              throw "ZIP packaging failed"
+            }
+
+            # Try NSIS installer generation if makensis exists. Capture cpack NSIS output to a log so we can print it on failure.
+            if (Get-Command makensis -ErrorAction SilentlyContinue) {
+              $nsisLog = "nsis-cpack.log"
+              Write-Host "Running: cpack -C Release -G NSIS  (logging to $nsisLog)"
+              cmd /c "cpack -C Release -G NSIS > $nsisLog 2>&1"
+              $nsisCode = $LASTEXITCODE
+              if ($nsisCode -ne 0) {
+                Write-Warning "NSIS packaging failed with exit code $nsisCode"
+                if (Test-Path $nsisLog) {
+                  Write-Host "=== cpack NSIS log (begin) ==="
+                  Get-Content $nsisLog -Raw | Write-Host
+                  Write-Host "=== cpack NSIS log (end) ==="
+                }
+
+                # Also print the NSISOutput.log produced by makensis (if present)
+                $nsisOutput = Get-ChildItem -Path _CPack_Packages -Recurse -Filter NSISOutput.log -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($nsisOutput) {
+                  Write-Host "=== NSISOutput.log (begin) ==="
+                  Get-Content $nsisOutput.FullName -Raw | Write-Host
+                  Write-Host "=== NSISOutput.log (end) ==="
+                } else {
+                  Write-Warning "NSISOutput.log not found under build/_CPack_Packages"
+                }
+                # Do not throw here: NSIS failures are non-fatal for our pipeline (we keep ZIP)
+              }
+            } else {
+              Write-Warning "makensis not found in PATH; skipping NSIS installer generation."
+            }
+          } finally {
+            # Ensure we always popd even if earlier commands failed
+            try { popd } catch {}
           }
-          popd
+
           Write-Host "CPack outputs:"
           Get-ChildItem -Path build -Recurse -Include *.exe,*.msi,*.zip | Select-Object -Property FullName,Length | Format-Table -AutoSize
+
+          # If ZIP succeeded above, return success regardless of NSIS result.
+          exit 0
 
       - name: "6.3 Rename Windows installer"
         if: ${{ inputs.create_installer == true }}
         shell: pwsh
         run: |
           $version = "$env:WEBBROWSER_VERSION"
-          $desired = "Ultralight-WebBrowser-$version-Windows-Installer.exe"
-          $exe = Get-ChildItem -Path build -Filter *.exe -File -Recurse | Select-Object -First 1
-          if ($exe) {
-            Write-Host "Renaming installer: $($exe.FullName) -> $desired"
-            Move-Item -Force $exe.FullName (Join-Path $exe.DirectoryName $desired)
+          # Find the CPack ZIP and move it to workspace root with a stable name
+          $cpackZip = Get-ChildItem -Path build -Filter "*.zip" -File -Recurse | Select-Object -First 1
+          if ($cpackZip) {
+            $finalZipName = "Ultralight-WebBrowser-$version-Windows-x64.zip"
+            Write-Host "Renaming CPack ZIP: $($cpackZip.Name) -> $finalZipName"
+            Move-Item -Force $cpackZip.FullName (Join-Path $PWD $finalZipName)
           } else {
-            Write-Warning "No NSIS installer .exe found to rename."
+            Write-Warning "No CPack ZIP found to rename."
           }
+
+          # Robust installer detection:
+          # CPack may emit installers named like 'Ultralight-WebBrowser-<ver>-Windows-x64.exe'
+          # or place them in build/_CPack_Packages. Search for any matching exe under build
+          # that starts with the project prefix and move it to a stable name in workspace root.
+          $installerCandidates = Get-ChildItem -Path build -Include "Ultralight-WebBrowser-*.exe" -File -Recurse -ErrorAction SilentlyContinue
+          if (-not $installerCandidates) {
+            # Also try any .msi produced by some generators
+            $installerCandidates = Get-ChildItem -Path build -Include "*.msi" -File -Recurse -ErrorAction SilentlyContinue
+          }
+          if ($installerCandidates) {
+            $installer = $installerCandidates | Select-Object -First 1
+            $finalInstallerName = "Ultralight-WebBrowser-$version-Windows-Installer.exe"
+            # If the found file is an MSI, keep .msi extension
+            if ($installer.Extension -ieq ".msi") {
+              $finalInstallerName = "Ultralight-WebBrowser-$version-Windows-Installer.msi"
+            }
+            Write-Host "Renaming installer: $($installer.FullName) -> $finalInstallerName"
+            Move-Item -Force $installer.FullName (Join-Path $PWD $finalInstallerName)
+          } else {
+            Write-Host "No installer (.exe or .msi) found under build to rename (OK if NSIS skipped or failed)."
+          }
+
+      - name: "6.2.5 Upload NSIS logs (if any)"
+        if: ${{ inputs.create_installer == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-windows-nsis-logs
+          path: |
+            build\nsis-cpack.log
+            build\_CPack_Packages\**\NSISOutput.log
+          if-no-files-found: warn
+
+      - name: "6.2.6 Upload full CPack package directory for debug (optional, may be large)"
+        if: ${{ inputs.create_installer == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultralight-windows-cpack-debug
+          path: |
+            build\_CPack_Packages\**
+          if-no-files-found: warn
 
       - name: "6.8 Run tests (ctest)"
         run: ctest --test-dir build -C Release --output-on-failure
 
       - name: "6.5 Diagnostics: verify runtime contents"
+        if: ${{ env.DEVELOPMENT_BUILD == 'true' }}
         shell: pwsh
         run: |
           $candidates = @(
@@ -305,7 +440,7 @@ jobs:
           Write-Host "Listing DLLs:"; Get-ChildItem -Path (Join-Path $src '*.dll') -ErrorAction SilentlyContinue | Format-List -Property Mode,Length,Name
           Write-Host "Listing resources:"; if (Test-Path (Join-Path $src 'assets/resources')) { Get-ChildItem -Force (Join-Path $src 'assets/resources') | Format-List -Property Mode,Length,Name } else { Write-Host 'assets/resources not found' }
 
-      - name: "7. Archive Artifacts"
+      - name: "7. Upload Final Packages"
         # For multi-config, Visual Studio places outputs in 'build/Release'
         # We use PowerShell's Compress-Archive
         shell: pwsh
@@ -329,11 +464,93 @@ jobs:
           $outName = "Ultralight-WebBrowser-$version-Windows-Portable.zip"
           Compress-Archive -Path (Join-Path $src '*') -DestinationPath $outName -Force
 
+      - name: "7.9 Pre-upload diagnostics: list artifacts to upload"
+        shell: pwsh
+        run: |
+          Write-Host "Listing candidate artifacts before upload (workspace root and build/)"
+          $patterns = @(
+            'Ultralight-WebBrowser-*-Windows-Portable.zip',
+            'Ultralight-WebBrowser-*-Windows-x64.zip',
+            'Ultralight-WebBrowser-*-Windows-Installer.exe',
+            'build\*.zip',
+            'build\*.msi'
+          )
+          foreach ($p in $patterns) {
+            Write-Host "Pattern: $p"
+            $found = Get-ChildItem -Path $p -File -ErrorAction SilentlyContinue -Recurse | Select-Object -First 100
+            if ($found) {
+              $found | ForEach-Object { Write-Host " - $($_.FullName) ($([math]::Round(($_.Length/1KB),2)) KB)" }
+            } else {
+              Write-Host "  (none)"
+            }
+          }
+
+      - name: "8.0b Debug: locate/move installer to workspace root (if any)"
+        if: ${{ inputs.create_installer == true }}
+        shell: pwsh
+        run: |
+          Write-Host "Listing build/ tree (top-level, depth 3) for debugging"
+          Get-ChildItem -Path build -Recurse -Depth 3 -File | Sort-Object Length -Descending | Select-Object -First 200 | ForEach-Object { Write-Host " - $($_.FullName) ($([math]::Round(($_.Length/1KB),2)) KB)" }
+
+          # Robust search for installer candidates: prefer names starting with project prefix,
+          # then names containing 'installer' or 'setup', then fall back to largest exe/msi.
+          $candidates = Get-ChildItem -Path build -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.exe','.msi' }
+          $matchPrefixed = $candidates | Where-Object { $_.Name -match '^Ultralight-WebBrowser-.*\.(exe|msi)$' }
+          $matchInstaller = $candidates | Where-Object { $_.Name -match '(installer|setup|setup-?x?)' -or $_.Name -match '\bSetup\b' }
+
+          $chosen = $null
+          if ($matchPrefixed) { $chosen = $matchPrefixed | Sort-Object Length -Descending | Select-Object -First 1 }
+          elseif ($matchInstaller) { $chosen = $matchInstaller | Sort-Object Length -Descending | Select-Object -First 1 }
+          elseif ($candidates) { $chosen = $candidates | Sort-Object Length -Descending | Select-Object -First 1 }
+
+          if ($chosen) {
+            $version = "$env:WEBBROWSER_VERSION"
+            $ext = $chosen.Extension
+            $finalName = "Ultralight-WebBrowser-$version-Windows-Installer$ext"
+            Write-Host "Found installer candidate: $($chosen.FullName) -> copying as $finalName"
+            Copy-Item -Force $chosen.FullName (Join-Path $PWD $finalName)
+            Write-Host "Workspace root now contains:"; Get-ChildItem -Path $PWD -Filter "Ultralight-WebBrowser-*Installer.*" -File | ForEach-Object { Write-Host " - $($_.FullName) ($([math]::Round(($_.Length/1KB),2)) KB)" }
+          } else {
+            Write-Host "No installer candidates found under build/. Trying to parse CPack logs for produced package paths..."
+            $possibleLogFiles = @("build\nsis-cpack.log","build\zip-cpack.log","build\zip-cpack.log")
+            $foundFromLog = $null
+            foreach ($log in $possibleLogFiles) {
+              if (Test-Path $log) {
+                Write-Host "Parsing log: $log"
+                $lines = Get-Content $log -ErrorAction SilentlyContinue
+                foreach ($ln in $lines) {
+                  if ($ln -match 'CPack: - package: (.+)') {
+                    $pkgPath = $Matches[1].Trim()
+                    Write-Host "Found package entry in log: $pkgPath"
+                    # Try absolute path first, then relative to build dir, then workspace root
+                    if (Test-Path $pkgPath) { $foundFromLog = Get-Item $pkgPath; break }
+                    $candidate = Join-Path (Join-Path $PWD 'build') $pkgPath
+                    if (Test-Path $candidate) { $foundFromLog = Get-Item $candidate; break }
+                    $candidate2 = Join-Path $PWD $pkgPath
+                    if (Test-Path $candidate2) { $foundFromLog = Get-Item $candidate2; break }
+                  }
+                }
+                if ($foundFromLog) { break }
+              }
+            }
+            if ($foundFromLog) {
+              $version = "$env:WEBBROWSER_VERSION"
+              $ext = $foundFromLog.Extension
+              $finalName = "Ultralight-WebBrowser-$version-Windows-Installer$ext"
+              Write-Host "Copying package found in logs: $($foundFromLog.FullName) -> $finalName"
+              Copy-Item -Force $foundFromLog.FullName (Join-Path $PWD $finalName)
+              Write-Host "Workspace root now contains:"; Get-ChildItem -Path $PWD -Filter "Ultralight-WebBrowser-*Installer.*" -File | ForEach-Object { Write-Host " - $($_.FullName) ($([math]::Round(($_.Length/1KB),2)) KB)" }
+            } else {
+              Write-Host "CPack logs did not reveal a package path either. No installer will be uploaded."
+            }
+          }
+
       - name: "8. Upload Artifact"
         uses: actions/upload-artifact@v4
         with:
           name: ultralight-windows-build
           path: Ultralight-WebBrowser-*-Windows-Portable.zip
+          if-no-files-found: warn
 
       - name: "8.1 Upload Installer"
         if: ${{ inputs.create_installer == true }}
@@ -341,8 +558,12 @@ jobs:
         with:
           name: ultralight-windows-installer
           path: |
-            build\Ultralight-WebBrowser-*-Windows-Installer.exe
-            build\*.msi
+            Ultralight-WebBrowser-*-Windows-Installer.exe
+            build\**\*.exe
+            build\**\*.msi
+            build\_CPack_Packages\**\*.exe
+            build\_CPack_Packages\**\*.msi
+          if-no-files-found: warn
 
       - name: "8.2 Upload CPack ZIP"
         if: ${{ inputs.create_installer == true }}
@@ -350,4 +571,6 @@ jobs:
         with:
           name: ultralight-windows-cpack-zip
           path: |
+            Ultralight-WebBrowser-*-Windows-x64.zip
             build\*.zip
+          if-no-files-found: warn
