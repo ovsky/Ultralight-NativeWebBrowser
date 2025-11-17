@@ -366,7 +366,7 @@ jobs:
         shell: pwsh
         run: |
           $version = "$env:WEBBROWSER_VERSION"
-          # Find the CPack ZIP and installer under build and move them to workspace root with stable names
+          # Find the CPack ZIP and move it to workspace root with a stable name
           $cpackZip = Get-ChildItem -Path build -Filter "*.zip" -File -Recurse | Select-Object -First 1
           if ($cpackZip) {
             $finalZipName = "Ultralight-WebBrowser-$version-Windows-x64.zip"
@@ -376,14 +376,26 @@ jobs:
             Write-Warning "No CPack ZIP found to rename."
           }
 
-          # Optionally rename NSIS installer if present
-          $installer = Get-ChildItem -Path build -Filter "*-Installer.exe" -File -Recurse | Select-Object -First 1
-          if ($installer) {
+          # Robust installer detection:
+          # CPack may emit installers named like 'Ultralight-WebBrowser-<ver>-Windows-x64.exe'
+          # or place them in build/_CPack_Packages. Search for any matching exe under build
+          # that starts with the project prefix and move it to a stable name in workspace root.
+          $installerCandidates = Get-ChildItem -Path build -Include "Ultralight-WebBrowser-*.exe" -File -Recurse -ErrorAction SilentlyContinue
+          if (-not $installerCandidates) {
+            # Also try any .msi produced by some generators
+            $installerCandidates = Get-ChildItem -Path build -Include "*.msi" -File -Recurse -ErrorAction SilentlyContinue
+          }
+          if ($installerCandidates) {
+            $installer = $installerCandidates | Select-Object -First 1
             $finalInstallerName = "Ultralight-WebBrowser-$version-Windows-Installer.exe"
-            Write-Host "Renaming installer: $($installer.Name) -> $finalInstallerName"
+            # If the found file is an MSI, keep .msi extension
+            if ($installer.Extension -ieq ".msi") {
+              $finalInstallerName = "Ultralight-WebBrowser-$version-Windows-Installer.msi"
+            }
+            Write-Host "Renaming installer: $($installer.FullName) -> $finalInstallerName"
             Move-Item -Force $installer.FullName (Join-Path $PWD $finalInstallerName)
           } else {
-            Write-Host "No installer .exe found to rename (OK if NSIS skipped or failed)."
+            Write-Host "No installer (.exe or .msi) found under build to rename (OK if NSIS skipped or failed)."
           }
 
       - name: "6.2.5 Upload NSIS logs (if any)"
@@ -473,6 +485,66 @@ jobs:
             }
           }
 
+      - name: "8.0b Debug: locate/move installer to workspace root (if any)"
+        if: ${{ inputs.create_installer == true }}
+        shell: pwsh
+        run: |
+          Write-Host "Listing build/ tree (top-level, depth 3) for debugging"
+          Get-ChildItem -Path build -Recurse -Depth 3 -File | Sort-Object Length -Descending | Select-Object -First 200 | ForEach-Object { Write-Host " - $($_.FullName) ($([math]::Round(($_.Length/1KB),2)) KB)" }
+
+          # Robust search for installer candidates: prefer names starting with project prefix,
+          # then names containing 'installer' or 'setup', then fall back to largest exe/msi.
+          $candidates = Get-ChildItem -Path build -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.exe','.msi' }
+          $matchPrefixed = $candidates | Where-Object { $_.Name -match '^Ultralight-WebBrowser-.*\.(exe|msi)$' }
+          $matchInstaller = $candidates | Where-Object { $_.Name -match '(installer|setup|setup-?x?)' -or $_.Name -match '\bSetup\b' }
+
+          $chosen = $null
+          if ($matchPrefixed) { $chosen = $matchPrefixed | Sort-Object Length -Descending | Select-Object -First 1 }
+          elseif ($matchInstaller) { $chosen = $matchInstaller | Sort-Object Length -Descending | Select-Object -First 1 }
+          elseif ($candidates) { $chosen = $candidates | Sort-Object Length -Descending | Select-Object -First 1 }
+
+          if ($chosen) {
+            $version = "$env:WEBBROWSER_VERSION"
+            $ext = $chosen.Extension
+            $finalName = "Ultralight-WebBrowser-$version-Windows-Installer$ext"
+            Write-Host "Found installer candidate: $($chosen.FullName) -> copying as $finalName"
+            Copy-Item -Force $chosen.FullName (Join-Path $PWD $finalName)
+            Write-Host "Workspace root now contains:"; Get-ChildItem -Path $PWD -Filter "Ultralight-WebBrowser-*Installer.*" -File | ForEach-Object { Write-Host " - $($_.FullName) ($([math]::Round(($_.Length/1KB),2)) KB)" }
+          } else {
+            Write-Host "No installer candidates found under build/. Trying to parse CPack logs for produced package paths..."
+            $possibleLogFiles = @("build\nsis-cpack.log","build\zip-cpack.log","build\zip-cpack.log")
+            $foundFromLog = $null
+            foreach ($log in $possibleLogFiles) {
+              if (Test-Path $log) {
+                Write-Host "Parsing log: $log"
+                $lines = Get-Content $log -ErrorAction SilentlyContinue
+                foreach ($ln in $lines) {
+                  if ($ln -match 'CPack: - package: (.+)') {
+                    $pkgPath = $Matches[1].Trim()
+                    Write-Host "Found package entry in log: $pkgPath"
+                    # Try absolute path first, then relative to build dir, then workspace root
+                    if (Test-Path $pkgPath) { $foundFromLog = Get-Item $pkgPath; break }
+                    $candidate = Join-Path (Join-Path $PWD 'build') $pkgPath
+                    if (Test-Path $candidate) { $foundFromLog = Get-Item $candidate; break }
+                    $candidate2 = Join-Path $PWD $pkgPath
+                    if (Test-Path $candidate2) { $foundFromLog = Get-Item $candidate2; break }
+                  }
+                }
+                if ($foundFromLog) { break }
+              }
+            }
+            if ($foundFromLog) {
+              $version = "$env:WEBBROWSER_VERSION"
+              $ext = $foundFromLog.Extension
+              $finalName = "Ultralight-WebBrowser-$version-Windows-Installer$ext"
+              Write-Host "Copying package found in logs: $($foundFromLog.FullName) -> $finalName"
+              Copy-Item -Force $foundFromLog.FullName (Join-Path $PWD $finalName)
+              Write-Host "Workspace root now contains:"; Get-ChildItem -Path $PWD -Filter "Ultralight-WebBrowser-*Installer.*" -File | ForEach-Object { Write-Host " - $($_.FullName) ($([math]::Round(($_.Length/1KB),2)) KB)" }
+            } else {
+              Write-Host "CPack logs did not reveal a package path either. No installer will be uploaded."
+            }
+          }
+
       - name: "8. Upload Artifact"
         uses: actions/upload-artifact@v4
         with:
@@ -487,7 +559,10 @@ jobs:
           name: ultralight-windows-installer
           path: |
             Ultralight-WebBrowser-*-Windows-Installer.exe
-            build\*.msi
+            build\**\*.exe
+            build\**\*.msi
+            build\_CPack_Packages\**\*.exe
+            build\_CPack_Packages\**\*.msi
           if-no-files-found: warn
 
       - name: "8.2 Upload CPack ZIP"
