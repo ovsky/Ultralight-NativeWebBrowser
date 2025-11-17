@@ -3,23 +3,8 @@ project(UltralightWebBrowser LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Configure the Windows resource file at configure-time so the resource
-# compiler sees a real icon path instead of an unsubstituted ${APP_ICON_ICO}
-# token. This avoids RC2135 (file not found) when building on Windows CI.
-set(APP_ICON_ICO "")
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/browser.ico")
-  set(APP_ICON_ICO "${CMAKE_CURRENT_SOURCE_DIR}/browser.ico")
-elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon.ico")
-  set(APP_ICON_ICO "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon.ico")
-else()
-  set(APP_ICON_ICO "")
-endif()
-
-# Generate a configured copy of browser.rc into the build dir. The source
-# file contains the placeholder ${APP_ICON_ICO} which will be replaced with
-# the absolute path above during configuration.
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/browser.rc"
-               "${CMAKE_CURRENT_BINARY_DIR}/browser.rc")
+  # (Browser resource file will be configured after the icon-detection block
+  # later in this file using configure_file(... @ONLY).)
 
 # Option: create an installer on Windows via CPack (NSIS)
 option(CREATE_INSTALLER "Create a Windows installer via CPack (NSIS)" OFF)
@@ -48,10 +33,7 @@ if(NOT EXISTS "${ULTRALIGHT_SDK_ROOT}/include/AppCore/AppCore.h")
 endif()
 
 # --- Include directories ---
-include_directories(
-  "${CMAKE_CURRENT_SOURCE_DIR}"
-  "${ULTRALIGHT_SDK_ROOT}/include"
-)
+# Use target-based includes to limit scope and avoid global include pollution.
 
 # --- Custom add_app function ---
 function(add_app NAME)
@@ -60,6 +42,12 @@ function(add_app NAME)
   else()
     add_executable(${NAME} ${ARGN})
   endif()
+
+  # Modern CMake: prefer target-specific include directories instead of global include_directories
+  target_include_directories(${NAME} PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${ULTRALIGHT_SDK_ROOT}/include"
+  )
 
   # Disable RTTI
   if(MSVC)
@@ -371,8 +359,17 @@ endif()
 
 # Pass icon path to resource compiler for browser.rc
 if (APP_ICON_ICO)
-  set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/browser.rc PROPERTIES COMPILE_DEFINITIONS "APP_ICON_ICO=\"${APP_ICON_ICO}\"")
+  # We no longer pass APP_ICON_ICO via compile definitions for browser.rc;
+  # instead we generate a configured copy of the resource file with
+  # @APP_ICON_ICO@ replaced by the absolute icon path below.
+  # (Keeping compile-time definitions for other sources is still possible.)
 endif()
+
+# Configure browser.rc into the build directory using @VAR@ style substitution
+# so configure_file(... @ONLY) will replace @APP_ICON_ICO@ with the chosen path.
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/browser.rc"
+               "${CMAKE_CURRENT_BINARY_DIR}/browser.rc"
+               @ONLY)
 
 # Choose default generators per platform; users can always override CPACK_GENERATOR
 if(WIN32)

@@ -5,6 +5,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
+#include "Env.h"
 #elif defined(__APPLE__)
 #include <TargetConditionals.h>
 #include <cstdlib>
@@ -507,8 +508,8 @@ std::filesystem::path DownloadManager::DetermineDefaultDirectory()
 #ifdef _WIN32
     base = std::filesystem::current_path();
 #else
-    const char *home = std::getenv("HOME");
-    if (home && *home)
+    const auto home = GetEnvVar("HOME");
+    if (!home.empty())
         base = std::filesystem::path(home);
     else
         base = std::filesystem::current_path();

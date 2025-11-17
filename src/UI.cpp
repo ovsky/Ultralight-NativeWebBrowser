@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include "DownloadManager.h"
 #include "AdBlocker.h"
+#include "Env.h"
 #ifdef _WIN32
 #include <direct.h> // _mkdir, _getcwd
 #ifndef NOMINMAX
@@ -3632,15 +3633,15 @@ std::filesystem::path UI::SettingsDirectory()
 {
   namespace fs = std::filesystem;
 #if defined(_WIN32)
-  if (const char *appdata = std::getenv("APPDATA"); appdata && *appdata)
+  if (const auto appdata = GetEnvVar("APPDATA"); !appdata.empty())
     return fs::path(appdata) / "UltralightWebBrowser";
 #elif defined(__APPLE__)
-  if (const char *home = std::getenv("HOME"); home && *home)
+  if (const auto home = GetEnvVar("HOME"); !home.empty())
     return fs::path(home) / "Library/Application Support/UltralightWebBrowser";
 #else
-  if (const char *xdg = std::getenv("XDG_CONFIG_HOME"); xdg && *xdg)
+  if (const auto xdg = GetEnvVar("XDG_CONFIG_HOME"); !xdg.empty())
     return fs::path(xdg) / "UltralightWebBrowser";
-  if (const char *home = std::getenv("HOME"); home && *home)
+  if (const auto home = GetEnvVar("HOME"); !home.empty())
     return fs::path(home) / ".config/UltralightWebBrowser";
 #endif
   return fs::current_path() / "data";
