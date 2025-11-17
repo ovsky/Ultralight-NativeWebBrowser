@@ -258,7 +258,13 @@ set(INSTALL_DIR_NAME "UltralightWebBrowser")
 
 # Binary and assets next to each other to preserve relative paths
 install(TARGETS Ultralight-WebBrowser RUNTIME DESTINATION ${INSTALL_DIR_NAME})
-install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets" DESTINATION ${INSTALL_DIR_NAME})
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets" DESTINATION ${INSTALL_DIR_NAME}
+  # Exclude google static files and any filenames that contain '=' or ',' which can break
+  # Windows installer/NSIS packaging (these are saved static resource fragments).
+  PATTERN "static-sties/google-static_files/*" EXCLUDE
+  PATTERN "*=*" EXCLUDE
+  PATTERN "*,*" EXCLUDE
+)
 
 if(WIN32)
   # Runtime DLLs and resources (Windows)
