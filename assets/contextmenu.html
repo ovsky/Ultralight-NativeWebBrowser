@@ -9,6 +9,7 @@
     * {
       transition: all 0.2s ease-in-out;
     }
+
     body {
       background: transparent;
       margin: 0;
@@ -124,7 +125,8 @@
     // Called by native with absolute window coords and info JSON
     function setupContextMenu(x, y, infoJson) {
       const menu = document.getElementById('ctx-menu');
-      menu.innerHTML = '';
+      // Clear menu items efficiently
+      while (menu.firstChild) menu.removeChild(menu.firstChild);
 
       let info = {};
       try { info = JSON.parse(String(infoJson || '{}')); } catch (_) { }

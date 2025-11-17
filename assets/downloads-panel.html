@@ -308,7 +308,8 @@
         function render(data) {
             const list = document.getElementById('downloads-list');
             const empty = document.getElementById('downloads-empty');
-            list.innerHTML = '';
+            // Remove all children instead of using innerHTML to avoid costly reflows
+            while (list.firstChild) list.removeChild(list.firstChild);
             const items = (data && Array.isArray(data.items)) ? data.items.slice().reverse() : [];
             if (!items.length) {
                 empty.style.display = 'block';

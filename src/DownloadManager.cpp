@@ -5,13 +5,14 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
-#include "Env.h"
 #elif defined(__APPLE__)
 #include <TargetConditionals.h>
 #include <cstdlib>
 #else
 #include <cstdlib>
 #endif
+
+#include "Env.h"
 
 #include <system_error>
 #include <algorithm>

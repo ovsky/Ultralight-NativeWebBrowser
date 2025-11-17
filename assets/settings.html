@@ -405,7 +405,8 @@
 
         function renderSettings() {
             const container = document.getElementById('settings-container');
-            container.innerHTML = '';
+            // Remove children to clear settings without using innerHTML
+            while (container.firstChild) container.removeChild(container.firstChild);
             Object.keys(settingsDefinitions).forEach(groupKey => {
                 const group = settingsDefinitions[groupKey];
                 const groupDiv = document.createElement('div');

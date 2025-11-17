@@ -3392,7 +3392,9 @@ void UI::OnFaviconReady(const JSObject &obj, const JSArgs &args)
       ch = '/';
   }
 #else
-  getcwd(cwd_buf, sizeof(cwd_buf));
+  char *cwd = getcwd(cwd_buf, sizeof(cwd_buf));
+  if (!cwd)
+    cwd_buf[0] = '\0';
   std::string abs = std::string("file://") + std::string(cwd_buf) + "/" + file;
 #endif
   favicon_file_cache_[origin] = abs;

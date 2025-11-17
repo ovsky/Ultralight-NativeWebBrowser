@@ -213,7 +213,8 @@
         function render(data) {
             const list = document.getElementById('list');
             const empty = document.getElementById('empty');
-            list.innerHTML = '';
+            // Remove child nodes iteratively to avoid layout thrash when clearing
+            while (list.firstChild) list.removeChild(list.firstChild);
             const items = (data && data.items) || [];
             if (!items.length) {
                 empty.style.display = 'block';

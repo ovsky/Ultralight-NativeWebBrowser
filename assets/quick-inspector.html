@@ -310,7 +310,7 @@
             try {
                 const depth = 3, maxChildren = 30; const j = NativeQuickGetDOMTree ? NativeQuickGetDOMTree(depth, maxChildren) : '{}';
                 const t = JSON.parse(j || '{}');
-                domTree.innerHTML = '';
+                while (domTree.firstChild) domTree.removeChild(domTree.firstChild);
                 function render(n, ul) { if (!n) return; const li = document.createElement('li'); const link = document.createElement('span'); link.className = 'node'; link.textContent = n.tag + (n.id ? ('#' + n.id) : '') + (n.cls ? ('.' + n.cls.toString().replace(/\s+/g, '.')) : ''); link.onclick = () => selectBySelector(toSelector(n)); li.appendChild(link); ul.appendChild(li); if (n.children && n.children.length) { const u = document.createElement('ul'); u.className = 'tree'; li.appendChild(u); n.children.forEach(c => render(c, u)); } }
                 function toSelector(n) { if (!n) return ''; let s = n.tag; if (n.id) return s + '#' + n.id; if (n.cls) { s += '.' + String(n.cls).trim().split(/\s+/).filter(Boolean).join('.'); } return s; }
                 const root = document.createElement('ul'); root.className = 'tree'; render(t, root); domTree.appendChild(root);
@@ -432,7 +432,7 @@
 
         function populateKVTable(tbody, entries, opts = {}) {
             if (!tbody) return;
-            tbody.innerHTML = '';
+            while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
             const list = entries && entries.length ? entries : [];
             if (!list.length) {
                 const tr = document.createElement('tr');
