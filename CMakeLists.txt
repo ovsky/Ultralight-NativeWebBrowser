@@ -262,11 +262,22 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets" DESTINATION ${INSTALL_DIR
 
 if(WIN32)
   # Runtime DLLs and resources (Windows)
+  # Try to locate the runtime DLLs under SDK bin/ or lib/ directories. Some SDK packages
+  # place shared DLLs under 'bin' while others may place them under 'lib'. Prefer bin but
+  # fall back to lib if bin is not present.
+  if(EXISTS "${ULTRALIGHT_SDK_ROOT}/bin")
+    set(ULTRALIGHT_RUNTIME_DIR "${ULTRALIGHT_SDK_ROOT}/bin")
+  elseif(EXISTS "${ULTRALIGHT_SDK_ROOT}/lib")
+    set(ULTRALIGHT_RUNTIME_DIR "${ULTRALIGHT_SDK_ROOT}/lib")
+  else()
+    set(ULTRALIGHT_RUNTIME_DIR "${ULTRALIGHT_SDK_ROOT}/bin") # best effort
+  endif()
+
   install(FILES
-    "${ULTRALIGHT_SDK_ROOT}/bin/AppCore.dll"
-    "${ULTRALIGHT_SDK_ROOT}/bin/Ultralight.dll"
-    "${ULTRALIGHT_SDK_ROOT}/bin/UltralightCore.dll"
-    "${ULTRALIGHT_SDK_ROOT}/bin/WebCore.dll"
+    "${ULTRALIGHT_RUNTIME_DIR}/AppCore.dll"
+    "${ULTRALIGHT_RUNTIME_DIR}/Ultralight.dll"
+    "${ULTRALIGHT_RUNTIME_DIR}/UltralightCore.dll"
+    "${ULTRALIGHT_RUNTIME_DIR}/WebCore.dll"
     DESTINATION ${INSTALL_DIR_NAME}
   )
   install(FILES
