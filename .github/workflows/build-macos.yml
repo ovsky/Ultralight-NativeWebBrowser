@@ -222,6 +222,21 @@ jobs:
         run: |
           brew update
           brew install 7zip || brew install p7zip
+      - name: 3.5 Install libcurl (macOS)
+        run: |
+          # Install curl via Homebrew; headers/libraries will be exposed to CMake's FindCURL
+          brew update
+          brew install curl || true
+          # Optionally, link curl (macOS brew keeps headers in non-standard path)
+          if brew --prefix curl >/dev/null; then
+            echo "CURL_PREFIX=$(brew --prefix curl)" >> $GITHUB_ENV
+          fi
+
+      - name: 3.6 AUTO_INSTALL_CURL (helper script)
+        run: |
+          echo "AUTO_INSTALL_CURL: try helper script (wrapping brew)"
+          chmod +x ./scripts/install_curl.sh || true
+          ./scripts/install_curl.sh || true
           (7z -version || 7zz -version) 2>/dev/null || true
 
       - name: 4. Prepare Ultralight SDK (macOS)
@@ -299,7 +314,7 @@ jobs:
         run: |
           cmake --version
           echo "Configuring with ULTRALIGHT_SDK_ROOT=$ULTRALIGHT_SDK_ROOT"
-          cmake -S . -B build -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT" -DBUILD_TESTING=ON -DWEBBROWSER_VERSION="$WEBBROWSER_VERSION"
+          cmake -S . -B build -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT" -DBUILD_TESTING=ON -DAUTO_INSTALL_CURL=ON -DWEBBROWSER_VERSION="$WEBBROWSER_VERSION"
 
       - name: 6. Build Project (Release)
         if: steps.prep_sdk.outputs.present == 'true'

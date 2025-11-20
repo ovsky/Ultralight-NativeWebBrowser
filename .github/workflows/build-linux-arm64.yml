@@ -76,10 +76,10 @@ jobs:
           githubToken: ${{ github.token }}
           install: |
             apt-get update
-            DEBIAN_FRONTEND=noninteractive apt-get install -y \
-              git curl zip unzip cmake build-essential pkg-config \
-              p7zip-full \
-              libgtk-3-dev libnss3-dev libgdk-pixbuf2.0-dev libxtst-dev libxss-dev libdbus-glib-1-dev
+              DEBIAN_FRONTEND=noninteractive apt-get install -y \
+                git curl zip unzip cmake build-essential pkg-config \
+                p7zip-full \
+                libgtk-3-dev libnss3-dev libgdk-pixbuf2.0-dev libxtst-dev libxss-dev libdbus-glib-1-dev libcurl4-openssl-dev
           run: |
             set -euo pipefail
             cd "$GITHUB_WORKSPACE"
@@ -133,7 +133,7 @@ jobs:
             fi
             echo "Found SDK at: $ROOT"; ls -la "$ROOT/lib" || true
             echo "== ARM64: Configure & Build =="
-            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ROOT" -DBUILD_TESTING=OFF -DWEBBROWSER_VERSION="$WEBBROWSER_VERSION"
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ROOT" -DBUILD_TESTING=OFF -DAUTO_INSTALL_CURL=ON -DWEBBROWSER_VERSION="$WEBBROWSER_VERSION"
             cmake --build build --parallel
             echo "== ARM64: Package (TGZ) =="
             cpack --config build/CPackConfig.cmake -C Release -G TGZ -D CPACK_OUTPUT_FILE_PREFIX="$GITHUB_WORKSPACE/build"
