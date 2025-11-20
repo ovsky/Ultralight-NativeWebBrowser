@@ -74,9 +74,9 @@ Goals:
 ## 🖥️ Supported Platforms & Architectures
 | Platform | Architectures | CI Artifacts | Notes |
 |----------|---------------|--------------|-------|
-| Windows 10+ | x64 | Portable ZIP, optional NSIS installer | ARM64 SDK not yet published |
+| Windows 10/11+ | x64 | Portable ZIP, optional NSIS installer | ARM64 SDK not yet published by Ultralight |
 | macOS 12+ | x64, arm64 | TGZ, optional DMG | ARM64 auto‑detected when runner host is ARM64 |
-| Linux (Ubuntu/Fedora etc.) | AMD64 (arm64 logic present) | TGZ / DEB / RPM | ARM64 requires aarch64 runner; workflow automatically includes detection & fallback |
+| Linux (Ubuntu/Fedora etc.) | x64, arm64 | TGZ / DEB / RPM | ARM64 requires aarch64 runner; workflow automatically includes detection & fallback |
 
 ARM64 archives are probed automatically when available in the `base-sdk` branch (eg: `ultralight-free-sdk-<ver>-linux-arm64.7z`, `...-mac-arm64.7z`). Current public CI uses x64 runners; arm64 builds may require:
 - Self‑hosted runner (Apple Silicon / aarch64 Linux)
@@ -245,6 +245,7 @@ Packages install a desktop entry and icon + CLI launcher `ultralight-webbrowser`
 - **Reader Mode** – Distraction-free article reading
 - **Screenshot Tool** – Capture full page or visible area
 - **Multi-process Isolation** – Optional sandboxing (research phase)
+- **Autosign Project Builds** – Sign project with proper certificates
 
 ---
 
