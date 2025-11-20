@@ -14,8 +14,7 @@
 <strong>A native C++ proof‑of‑concept browser focused on minimal overhead, cold‑start speed, and resource efficiency.</strong><br/>
 No multi‑process bloat, no background daemons, no gigabytes of RAM for a handful of tabs—just a lean renderer + native UI.
 
-> Status: Development / Experimental / Educational
-
+> Download: [Ultralight Web → Browser Releases Page](https://github.com/ovsky/Ultralight-WebBrowser/releases) | Status: Development / Experimental / Educational
 ---
 
 <img width="1366" height="768" alt="ultralight-downloads" src="https://github.com/user-attachments/assets/fe2c4609-6930-483c-9fa3-eab64664b539" />
@@ -50,34 +49,34 @@ Traditional browsers (and desktop web stacks like Electron / CEF) embed full, sa
 
 ![Ultralight Memory Usage](https://ultralig.ht/media/base-memory-usage.webp)
 
-Result: lower memory pressure, near‑instant cold starts, smaller footprint, simple embedding.
+Result: lower memory pressure, near‑instant cold starts, smaller footprint, simple embedding, and much more.
 
 ---
 
 ## 🎯 Project Philosophy & Goals
 | Feature | Ultralight (This Project) | Electron / CEF |
 |--------|---------------------------|----------------|
-| Performance | Up to 6× faster in simple page render ops ⚡ | Chromium baseline |
-| Memory Usage | ~1/10 RAM (no multi-process sandbox) 🧠 | High (multi-process JS + GPU + extensions) |
-| Startup | < 1s typical 🚀 | 3–5s cold start |
-| Disk Footprint | ~30–50 MB packaged 📦 | 1+ GB (runtime + cache) |
-| Rendering | Lightweight GPU 🎨 | Full Chromium stack |
-| Architecture | Native C++ + pixel buffer compositing 🧱 | Node.js + Chromium + interop bridge |
+| Performance | ⚡ Up to 6× faster in simple page render ops | Chromium baseline CEF |
+| Memory Usage | 🧠 ~1/10 RAM (no multi-process sandbox) | High (multi-process JS + GPU + Extensions) |
+| Startup | 🚀 < 1s typical | 3–5s cold start |
+| Disk Footprint | 📦 ~30–50 MB packaged | 1+ GB (runtime + Cache) |
+| Rendering | 🎨 Lightweight GPU | Full Chromium CEF Stack |
+| Architecture | 🧱 Native C++ + pixel buffer compositing | Node.js + Chromium + Interop Bridge |
 
 Goals:
 - Showcase minimal native browser shell design.
-- Provide reference for integrating Ultralight SDK.
-- Experiment with lightweight content / ad blocking.
-- Highlight performance vs conventional frameworks.
+- Provide reference for Ultralight SDK Browser.
+- Preliminary lightweight content / ad-block / tracking-block.
+- Highlight performance vs conventional heavy frameworks.
 
 ---
 
 ## 🖥️ Supported Platforms & Architectures
 | Platform | Architectures | CI Artifacts | Notes |
 |----------|---------------|--------------|-------|
-| Windows 10+ | x64 | Portable ZIP, optional NSIS installer | arm64 not yet published (needs arm64 SDK + runner) |
-| macOS 12+ | x64, arm64 | TGZ, optional DMG | arm64 auto‑detected when runner host is arm64 |
-| Linux (Ubuntu/Fedora etc.) | x64 (arm64 logic present) | TGZ / DEB / RPM | arm64 requires aarch64 runner; workflow includes detection & fallback |
+| Windows 10+ | x64 | Portable ZIP, optional NSIS installer | ARM64 SDK not yet published |
+| macOS 12+ | x64, arm64 | TGZ, optional DMG | ARM64 auto‑detected when runner host is ARM64 |
+| Linux (Ubuntu/Fedora etc.) | AMD64 (arm64 logic present) | TGZ / DEB / RPM | ARM64 requires aarch64 runner; workflow automatically includes detection & fallback |
 
 ARM64 archives are probed automatically when available in the `base-sdk` branch (eg: `ultralight-free-sdk-<ver>-linux-arm64.7z`, `...-mac-arm64.7z`). Current public CI uses x64 runners; arm64 builds may require:
 - Self‑hosted runner (Apple Silicon / aarch64 Linux)
@@ -87,7 +86,7 @@ ARM64 archives are probed automatically when available in the `base-sdk` branch 
 
 ## 📥 Get the App
 Official tagged releases:
-[🎉 Releases Page → Ultralight Web Browser](https://github.com/ovsky/Ultralight-WebBrowser/releases)
+[🎉 Ultralight Web → Browser Releases Page](https://github.com/ovsky/Ultralight-WebBrowser/releases)
 
 Development (continuous) artifacts (latest successful `dev` workflow runs):
 
@@ -98,9 +97,12 @@ Development (continuous) artifacts (latest successful `dev` workflow runs):
 | Windows | x64 | ZIP (portable) / optional Installer | [Open runs](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-windows.yml?query=branch%3Adev) |
 
 Notes:
-- ✅ macOS arm64 artifacts are produced automatically when the CI runner is Apple Silicon.
-- ✅ Linux arm64 artifacts appear when an aarch64 runner is used or when `ULTRALIGHT_SDK_URL` points to an arm64 SDK.
-- ⌛ Windows arm64 artifacts are not yet published (pending arm64 SDK + toolchain).
+- ✅ Linux AMD64 artifacts appear when an x64 runner is used or when `ULTRALIGHT_SDK_URL` points to an AMD64 SDK.
+- ✅ Linux ARM64 artifacts appear when an aarch64 runner is used or when `ULTRALIGHT_SDK_URL` points to an arm64 SDK.
+- ✅ Windows AMD64 artifacts appear when an aarch64 runner is used or when `ULTRALIGHT_SDK_URL` points to an arm64 SDK.
+- ✅ macOS ARM64 artifacts are produced automatically when the CI runner is Apple Silicon.
+- ✅ macOS AMD64 artifacts appear when an x64 runner is used or when `ULTRALIGHT_SDK_URL` points to an AMD64 SDK.
+- 🕒 Windows ARM64 artifacts are not yet published by Ultralight [SOON™].
 
 How to fetch artifacts:
 1. Open the workflow link for your platform/arch.
@@ -200,6 +202,49 @@ Packages install a desktop entry and icon + CLI launcher `ultralight-webbrowser`
 | Graphics | OpenGL 3.3 |
 | Build | CMake + CPack |
 | CI | GitHub Actions |
+
+---
+
+## 🗺️ Roadmap and Ideas
+
+### ✅ Completed
+- ✓ Context Menu System
+- ✓ Local History Management
+- ✓ Optimized Content Filtering
+- ✓ Universal Menu Interface
+- ✓ Keyboard Shortcut Mapping
+- ✓ Dark Theme Support
+- ✓ JavaScript Bridge API
+- ✓ Favicon Support
+- ✓ Autosuggestion / Autocompletion
+- ✓ Download Manager with UI
+- ✓ Tab UX Improvements (Chrome-style draggable tabs)
+- ✓ **Settings System** – Comprehensive preferences panel with 26+ options
+- ✓ **Glassmorphic UI** – Modern semi-transparent design with backdrop blur
+- ✓ **Compact Tabs Mode** – Space-saving layout option
+- ✓ **AdBlock Toolbar Icon** – Quick toggle access
+- ✓ **Runtime Settings Updates** – No restart required for changes
+- ✓ **Persistent Configuration** – JSON-based settings storage
+
+### 🚧 In Progress
+- Performance Optimization (Smooth Scrolling, Hardware Acceleration Toggles)
+- Accessibility Features (Dark Mode, Reduced Motion, Caret Browsing)
+
+### 🧩 Planned / Open
+- **Bookmark System** – Save and organize favorite sites
+- **Session Management** – Restore tabs on startup
+- **Plugin / Extension API** – Script injection framework
+- **Persistent History** – Optional long-term storage
+- **Advanced Privacy Filters** – Cosmetic blocking (CSS selectors)
+- **Multi-profile Support** – Separate settings/history per profile
+- **Sync Service Integration** – Cross-device settings sync
+- **Enhanced Developer Tools** – Integrated console and network inspector
+- **Custom Themes** – User-defined color schemes
+- **Password Manager** – Secure credential storage
+- **Tab Groups** – Organize tabs into collapsible groups
+- **Reader Mode** – Distraction-free article reading
+- **Screenshot Tool** – Capture full page or visible area
+- **Multi-process Isolation** – Optional sandboxing (research phase)
 
 ---
 
@@ -401,49 +446,6 @@ strategy:
 runs-on: ${{ matrix.os }}
 ```
 Set `TARGET_ARCH` and select appropriate SDK archive per matrix entry.
-
----
-
-## 🗺️ Roadmap / Ideas
-
-### ✅ Completed
-- ✓ Context Menu System
-- ✓ Local History Management
-- ✓ Optimized Content Filtering
-- ✓ Universal Menu Interface
-- ✓ Keyboard Shortcut Mapping
-- ✓ Dark Theme Support
-- ✓ JavaScript Bridge API
-- ✓ Favicon Support
-- ✓ Autosuggestion / Autocompletion
-- ✓ Download Manager with UI
-- ✓ Tab UX Improvements (Chrome-style draggable tabs)
-- ✓ **Settings System** – Comprehensive preferences panel with 26+ options
-- ✓ **Glassmorphic UI** – Modern semi-transparent design with backdrop blur
-- ✓ **Compact Tabs Mode** – Space-saving layout option
-- ✓ **AdBlock Toolbar Icon** – Quick toggle access
-- ✓ **Runtime Settings Updates** – No restart required for changes
-- ✓ **Persistent Configuration** – JSON-based settings storage
-
-### 🚧 In Progress
-- Performance Optimization (smooth scrolling, hardware acceleration toggles)
-- Accessibility Features (high contrast, reduced motion, caret browsing)
-
-### 🧩 Planned / Open
-- **Bookmark System** – Save and organize favorite sites
-- **Session Management** – Restore tabs on startup
-- **Plugin / Extension API** – Script injection framework
-- **Persistent History** – Optional long-term storage
-- **Advanced Privacy Filters** – Cosmetic blocking (CSS selectors)
-- **Multi-profile Support** – Separate settings/history per profile
-- **Sync Service Integration** – Cross-device settings sync
-- **Enhanced Developer Tools** – Integrated console and network inspector
-- **Custom Themes** – User-defined color schemes
-- **Password Manager** – Secure credential storage
-- **Tab Groups** – Organize tabs into collapsible groups
-- **Reader Mode** – Distraction-free article reading
-- **Screenshot Tool** – Capture full page or visible area
-- **Multi-process Isolation** – Optional sandboxing (research phase)
 
 ---
 
