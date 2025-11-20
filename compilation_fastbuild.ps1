@@ -18,7 +18,7 @@
 [CmdletBinding()]
 param(
     [string]$Configuration = 'Release',
-    [Parameter(ValueFromRemainingArguments=$true)]
+    [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$RemainingArgs = @()
 )
 
@@ -44,7 +44,8 @@ function Invoke-Tool([string]$Exe, [string[]]$Arguments) {
     try {
         $proc = Start-Process -FilePath $Exe -ArgumentList $Arguments -NoNewWindow -RedirectStandardOutput $outFile -RedirectStandardError $errFile -Wait -PassThru -ErrorAction Stop
         $exit = $proc.ExitCode
-    } catch {
+    }
+    catch {
         Write-Warning "Start-Process failed: $_"
         $orig = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
@@ -52,14 +53,15 @@ function Invoke-Tool([string]$Exe, [string[]]$Arguments) {
             $output = & $Exe @Arguments 2>&1 | Out-String
             if ($output -and $output.Trim()) { Write-Host $output }
             $exit = $LASTEXITCODE
-        } finally { $ErrorActionPreference = $orig }
+        }
+        finally { $ErrorActionPreference = $orig }
         return $exit
     }
     $stdout = Get-Content -Raw -LiteralPath $outFile -ErrorAction SilentlyContinue
     $stderr = Get-Content -Raw -LiteralPath $errFile -ErrorAction SilentlyContinue
     if ($stdout -and $stdout.Trim()) { Write-Host $stdout }
     if ($stderr -and $stderr.Trim()) { Write-Host $stderr }
-    Remove-Item -LiteralPath $outFile,$errFile -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $outFile, $errFile -ErrorAction SilentlyContinue
     return $exit
 }
 
@@ -73,31 +75,33 @@ Write-Host "Build step completed with exit code $code" -ForegroundColor Green
 
 # After a successful build, locate the executable and launch it (detached by default)
 function Find-Executable {
-  param([string]$BasePath)
-  $search = Get-ChildItem -Path $BasePath -Recurse -File -ErrorAction SilentlyContinue | Where-Object {
-    ($_.Extension -ieq '.exe' -and $_.BaseName -eq 'Ultralight-WebBrowser') -or
-    ($_.BaseName -eq 'Ultralight-WebBrowser' -and $_.Extension -eq '')
-  }
-  if ($search) { return $search[0].FullName }
-  $win = Join-Path (Join-Path $BasePath 'Release') 'Ultralight-WebBrowser.exe'
-  if (Test-Path $win) { return $win }
-  $other = Join-Path $BasePath 'Ultralight-WebBrowser'
-  if (Test-Path $other) { return $other }
-  return $null
+    param([string]$BasePath)
+    $search = Get-ChildItem -Path $BasePath -Recurse -File -ErrorAction SilentlyContinue | Where-Object {
+        ($_.Extension -ieq '.exe' -and $_.BaseName -eq 'Ultralight-WebBrowser') -or
+        ($_.BaseName -eq 'Ultralight-WebBrowser' -and $_.Extension -eq '')
+    }
+    if ($search) { return $search[0].FullName }
+    $win = Join-Path (Join-Path $BasePath 'Release') 'Ultralight-WebBrowser.exe'
+    if (Test-Path $win) { return $win }
+    $other = Join-Path $BasePath 'Ultralight-WebBrowser'
+    if (Test-Path $other) { return $other }
+    return $null
 }
 
 Write-Host "Searching for executable under: $PWD\build" -ForegroundColor Cyan
 $exe = Find-Executable -BasePath (Join-Path $scriptRoot 'build')
 if ($exe) {
-  Write-Host "Found executable: $exe" -ForegroundColor Green
-  try {
-    Write-Host "Launching executable (detached)..." -ForegroundColor Yellow
-    $proc = Start-Process -FilePath $exe -PassThru -ErrorAction Stop
-    Write-Host "Launched PID: $($proc.Id)" -ForegroundColor Yellow
-  } catch {
-    Write-Warning "Failed to launch executable: $_"
-    exit 4
-  }
-} else {
-  Write-Warning "Could not find built executable under build/. Skipping launch."
+    Write-Host "Found executable: $exe" -ForegroundColor Green
+    try {
+        Write-Host "Launching executable (detached)..." -ForegroundColor Yellow
+        $proc = Start-Process -FilePath $exe -PassThru -ErrorAction Stop
+        Write-Host "Launched PID: $($proc.Id)" -ForegroundColor Yellow
+    }
+    catch {
+        Write-Warning "Failed to launch executable: $_"
+        exit 4
+    }
+}
+else {
+    Write-Warning "Could not find built executable under build/. Skipping launch."
 }

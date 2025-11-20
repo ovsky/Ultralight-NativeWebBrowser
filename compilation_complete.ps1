@@ -14,7 +14,7 @@
 
 [CmdletBinding()]
 param(
-    [Parameter(ValueFromRemainingArguments=$true)]
+    [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$RemainingArgs = @()
 )
 
@@ -50,7 +50,8 @@ function Invoke-Tool([string]$Exe, [string[]]$Arguments) {
     try {
         $proc = Start-Process -FilePath $Exe -ArgumentList $Arguments -NoNewWindow -RedirectStandardOutput $outFile -RedirectStandardError $errFile -Wait -PassThru -ErrorAction Stop
         $exit = $proc.ExitCode
-    } catch {
+    }
+    catch {
         Write-Warning "Start-Process failed or behaved unexpectedly: $_"
         $orig = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
@@ -58,7 +59,8 @@ function Invoke-Tool([string]$Exe, [string[]]$Arguments) {
             $output = & $Exe @Arguments 2>&1 | Out-String
             if ($output -and $output.Trim()) { Write-Host $output }
             $exit = $LASTEXITCODE
-        } finally {
+        }
+        finally {
             $ErrorActionPreference = $orig
         }
         return $exit
@@ -68,7 +70,7 @@ function Invoke-Tool([string]$Exe, [string[]]$Arguments) {
     $stderr = Get-Content -Raw -LiteralPath $errFile -ErrorAction SilentlyContinue
     if ($stdout -and $stdout.Trim()) { Write-Host $stdout }
     if ($stderr -and $stderr.Trim()) { Write-Host $stderr }
-    Remove-Item -LiteralPath $outFile,$errFile -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $outFile, $errFile -ErrorAction SilentlyContinue
     return $exit
 }
 
@@ -83,7 +85,8 @@ if (Test-Path $cachePath) {
     Write-Host "Removing previous CMake cache/build to avoid generator mismatch..." -ForegroundColor Yellow
     try {
         Remove-Item -LiteralPath $buildPath -Recurse -Force -ErrorAction Stop
-    } catch {
+    }
+    catch {
         Write-Warning "Failed to remove build directory: $_"
     }
 }
@@ -96,11 +99,12 @@ function Normalize-RemainingArgs([string[]]$argsList) {
         $out = @()
         for ($i = 0; $i -lt $argsList.Length; $i++) {
             $arg = $argsList[$i].Trim('"')
-            if ($arg -match '^-D[^=]+$' -and ($i + 1) -lt $argsList.Length -and -not ($argsList[$i+1] -like '-*')) {
-                $next = $argsList[$i+1].Trim('"')
+            if ($arg -match '^-D[^=]+$' -and ($i + 1) -lt $argsList.Length -and -not ($argsList[$i + 1] -like '-*')) {
+                $next = $argsList[$i + 1].Trim('"')
                 $out += ($arg + '=' + $next)
                 $i++
-            } else {
+            }
+            else {
                 $out += $arg
             }
         }
@@ -110,7 +114,8 @@ function Normalize-RemainingArgs([string[]]$argsList) {
     if ($argsList) {
         $normArgs = Join-Args $argsList
         Write-Host "Normalized remaining args for CMake: $($normArgs -join ' ')" -ForegroundColor Yellow
-    } else {
+    }
+    else {
         $normArgs = @()
     }
 
@@ -140,7 +145,8 @@ try {
     Write-Host "Attempting install step (may be optional)..." -ForegroundColor Yellow
     $installCode = Invoke-Tool 'cmake' @('--install', 'build', '--config', 'Release')
     Write-Host "CMake install returned code: $installCode" -ForegroundColor Yellow
-} catch {
+}
+catch {
     Write-Warning "cmake --install threw an exception: $_"
 }
 
@@ -166,7 +172,8 @@ if (-not $exe) {
     Write-Error "Could not locate Ultralight-WebBrowser executable under $buildPath. Listing build directory for debugging..."
     try {
         Get-ChildItem -Path $buildPath -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
-    } catch {
+    }
+    catch {
         Write-Warning "Unable to list build directory: $_"
     }
     exit 3
@@ -183,17 +190,20 @@ try {
         Write-Host "Launching in background (detached)." -ForegroundColor Yellow
         if ($normArgs -and $normArgs.Count -gt 0) {
             $proc = Start-Process -FilePath $exe -ArgumentList $normArgs -PassThru -ErrorAction Stop
-        } else {
+        }
+        else {
             $proc = Start-Process -FilePath $exe -PassThru -ErrorAction Stop
         }
         Write-Host "Launched PID: $($proc.Id)" -ForegroundColor Yellow
         $ret = 0
-    } else {
+    }
+    else {
         # Run via Invoke-Tool so stdout/stderr are captured consistently
         $ret = Invoke-Tool $exe $normArgs
     }
     Write-Host "Executable exited with code: $ret" -ForegroundColor Cyan
-} finally {
+}
+finally {
     Pop-Location
 }
 
