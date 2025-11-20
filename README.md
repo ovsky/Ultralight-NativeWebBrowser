@@ -230,10 +230,21 @@ cmake --build build --parallel
 cmake --build build --config Release
 ```
 
-Windows helper scripts:
+PowerShell helper scripts (cross-platform):
 ```powershell
-./build.bat   # configure + build (Release)
-./run.bat     # run build\Release\Ultralight-WebBrowser.exe
+# Windows (PowerShell):
+./compile.ps1           # configure + build (Release)
+./compile_and_run.ps1   # configure + build (Release) + run built executable
+./run.ps1               # run the built executable from build folder
+
+# Linux / macOS (PowerShell Core / pwsh):
+pwsh ./compile.ps1 -- -DULTRALIGHT_SDK_ROOT=/path/to/sdk
+pwsh ./compile_and_run.ps1 -- -DULTRALIGHT_SDK_ROOT=/path/to/sdk
+pwsh ./run.ps1 -- "--some-app-flag"
+
+# You can also make the scripts executable on Unix and run them directly
+chmod +x ./compile.ps1 ./compile_and_run.ps1 ./run.ps1
+./compile.ps1 -- -DULTRALIGHT_SDK_ROOT=/path/to/sdk
 ```
 
 Tests (if enabled):
