@@ -230,10 +230,28 @@ cmake --build build --parallel
 cmake --build build --config Release
 ```
 
-Windows helper scripts:
+PowerShell helper scripts (cross-platform):
 ```powershell
-./build.bat   # configure + build (Release)
-./run.bat     # run build\Release\Ultralight-WebBrowser.exe
+# Windows (PowerShell):
+./compilation_compile.ps1           # configure + build (Release)
+./compilation_complete.ps1          # configure + build (Release) + run built executable
+./compilation_run.ps1               # run the built executable from build folder
+./compilation_fastbuild.ps1         # fast incremental build (then launches the built exe by default)
+
+# Linux / macOS (PowerShell Core / pwsh):
+
+pwsh ./compilation_compile.ps1 -- -DULTRIGHT_SDK_ROOT=/path/to/sdk
+pwsh ./compilation_complete.ps1 -- -DULTRALIGHT_SDK_ROOT=/path/to/sdk
+pwsh ./compilation_run.ps1 -- "--some-app-flag"
+pwsh ./compilation_fastbuild.ps1 -- Release  # runs cmake --build and then launches exe (detached)
+
+# You can also make the scripts executable on Unix and run them directly
+chmod +x ./compilation_compile.ps1 ./compilation_complete.ps1 ./compilation_run.ps1 ./compilation_fastbuild.ps1
+./compilation_compile.ps1 -- -DULTRALIGHT_SDK_ROOT=/path/to/sdk
+
+Note: `compilation_fastbuild.ps1` runs only the incremental build step ("cmake --build build --config <CONFIG>")
+and then attempts to launch the built `Ultralight-WebBrowser` executable automatically (detached by default).
+Pass an explicit configuration (e.g. `Debug`) as the first argument, and any extra `cmake --build` args after `--`.
 ```
 
 Tests (if enabled):
