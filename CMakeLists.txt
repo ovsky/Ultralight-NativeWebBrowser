@@ -3,6 +3,14 @@ project(UltralightWebBrowser LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# If the install prefix wasn't explicitly set by the caller, default to a
+# local, user-writable directory inside the build folder to avoid attempts
+# to install into system locations (eg. "C:/Program Files (x86)") which
+# require elevated permissions during `cmake --install`.
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "Install path" FORCE)
+endif()
+
   # (Browser resource file will be configured after the icon-detection block
   # later in this file using configure_file(... @ONLY).)
 
@@ -79,6 +87,7 @@ endfunction()
 # --- Original project definition ---
 set(SOURCES "src/Browser.h"
             "src/Browser.cpp"
+            # Dependency manager and sidecar compiled only when enabled & libcurl available
             "src/AdBlocker.h"
             "src/AdBlocker.cpp"
             "src/DownloadManager.h"
@@ -91,7 +100,117 @@ set(SOURCES "src/Browser.h"
             "${CMAKE_CURRENT_BINARY_DIR}/browser.rc"
 )
 
+option(ENABLE_DRM_SIDECAR "Enable DRM Sidecar support (downloads heavy engine components)" ON)
+option(AUTO_INSTALL_CURL "Attempt to auto-install libcurl dev libraries during configure (CI/local helper)" OFF)
+
+# Try to find libcurl only when the option is on.
+if(ENABLE_DRM_SIDECAR)
+  # If requested, attempt to auto-install curl dev headers via helper script (best-effort).
+  if(AUTO_INSTALL_CURL)
+    if(UNIX AND NOT APPLE)
+      message(STATUS "AUTO_INSTALL_CURL enabled: attempting to install libcurl via scripts/install_curl.sh")
+      execute_process(COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/install_curl.sh" RESULT_VARIABLE _auto_curl_res)
+      if(NOT _auto_curl_res EQUAL 0)
+        message(WARNING "AUTO_INSTALL_CURL attempted but failed on this host. Proceeding; FindCURL will try to locate libcurl.")
+      endif()
+    elseif(APPLE)
+      execute_process(COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/install_curl.sh" RESULT_VARIABLE _auto_curl_res)
+      if(NOT _auto_curl_res EQUAL 0)
+        message(WARNING "AUTO_INSTALL_CURL attempted but failed on macOS; please install via brew if needed.")
+      endif()
+    elseif(WIN32)
+      # Attempt to bootstrap vcpkg and install curl dependencies (best-effort).
+  message(STATUS "AUTO_INSTALL_CURL enabled: attempting to install libcurl via scripts/install_curl.ps1")
+  execute_process(COMMAND powershell -ExecutionPolicy Bypass -File "${CMAKE_CURRENT_SOURCE_DIR}/scripts/install_curl.ps1" OUTPUT_VARIABLE _vcpkg_out RESULT_VARIABLE _auto_curl_res ERROR_VARIABLE _vcpkg_err OUTPUT_STRIP_TRAILING_WHITESPACE)
+      if(_vcpkg_out)
+        # Extract the last non-empty line from the script output (script logs may precede the path)
+        string(REPLACE "\r\n" "\n" _vcpkg_out_clean "${_vcpkg_out}")
+        string(REPLACE "\r" "\n" _vcpkg_out_clean "${_vcpkg_out_clean}")
+        string(REGEX MATCHALL "[^
+]+" _vcpkg_lines "${_vcpkg_out_clean}")
+        list(LENGTH _vcpkg_lines _vlen)
+        if(_vlen GREATER 0)
+          math(EXPR _last_index "${_vlen} - 1")
+          list(GET _vcpkg_lines ${_last_index} _vcpkg_path)
+          string(STRIP "${_vcpkg_path}" _vcpkg_path)
+          message(STATUS "install_curl script reported vcpkg path: ${_vcpkg_path}")
+          # Export to environment for later auto-detection
+          set(ENV{VCPKG_ROOT} "${_vcpkg_path}")
+        endif()
+      endif()
+      if(NOT _auto_curl_res EQUAL 0)
+        message(WARNING "AUTO_INSTALL_CURL attempted but failed on Windows; vcpkg or choco may be unavailable.")
+      endif()
+    endif()
+  endif()
+
+  find_package(CURL)
+  # On Windows, if find_package failed, try common vcpkg-installed locations or repo-local vcpkg
+  if (NOT CURL_FOUND AND WIN32)
+    message(STATUS "CURL not found by find_package(); attempting auto-detect from common vcpkg locations...")
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+      set(_vcpkg_triplet "x64-windows")
+    else()
+      set(_vcpkg_triplet "x86-windows")
+    endif()
+
+    set(_vcpkg_candidates
+      $ENV{VCPKG_ROOT}
+      "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg"
+      "C:/vcpkg"
+    )
+
+    foreach(_c ${_vcpkg_candidates})
+      if(_c STREQUAL "" )
+        continue()
+      endif()
+      set(_inst_dir "${_c}/installed/${_vcpkg_triplet}")
+      if(EXISTS "${_inst_dir}/include/curl/curl.h")
+        # prefer static import lib then import lib
+        if(EXISTS "${_inst_dir}/lib/libcurl.lib")
+          set(_libpath "${_inst_dir}/lib/libcurl.lib")
+        elseif(EXISTS "${_inst_dir}/lib/libcurl_imp.lib")
+          set(_libpath "${_inst_dir}/lib/libcurl_imp.lib")
+        elseif(EXISTS "${_inst_dir}/bin/libcurl.dll")
+          # fallback: use dll path (linker may still require import lib)
+          set(_libpath "${_inst_dir}/bin/libcurl.dll")
+        endif()
+        if(DEFINED _libpath)
+          message(STATUS "Auto-detected libcurl at ${_inst_dir}; using include and lib from vcpkg installed tree")
+          set(CURL_FOUND TRUE CACHE BOOL "Found libcurl (auto-detected)" FORCE)
+          set(CURL_INCLUDE_DIRS "${_inst_dir}/include" CACHE PATH "Curl include dir" FORCE)
+          set(CURL_LIBRARIES "${_libpath}" CACHE FILEPATH "Curl library" FORCE)
+          set(CURL_VERSION_STRING "(vcpkg-installed)" CACHE STRING "Curl version string" FORCE)
+          break()
+        endif()
+      endif()
+    endforeach()
+  endif()
+  if(NOT CURL_FOUND AND DEFINED ENV{VCPKG_ROOT})
+    message(WARNING "VCPKG_ROOT is present, but CMake wasn't invoked with vcpkg toolchain file. Re-run cmake with -DCMAKE_TOOLCHAIN_FILE=$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake to let find_package() locate vcpkg-installed libraries.")
+  endif()
+  if(CURL_FOUND)
+    message(STATUS "Found CURL: ${CURL_VERSION_STRING}. Enabling DRM sidecar support.")
+    add_definitions(-DENABLE_DRM_SIDECAR=1)
+    list(APPEND SOURCES "src/DependencyManager.h" "src/DependencyManager.cpp" "src/SidecarProcess.h" "src/SidecarProcess.cpp")
+  else()
+    message(WARNING "libcurl not found. DRM sidecar support will be disabled. Install libcurl or set ENABLE_DRM_SIDECAR=OFF to ignore this warning.")
+    set(ENABLE_DRM_SIDECAR OFF)
+  endif()
+endif()
+
 add_app(Ultralight-WebBrowser ${SOURCES})
+
+if(ENABLE_DRM_SIDECAR)
+  if(CURL_FOUND)
+    if(TARGET CURL::libcurl)
+      target_link_libraries(Ultralight-WebBrowser PRIVATE CURL::libcurl)
+    else()
+      target_link_libraries(Ultralight-WebBrowser PRIVATE ${CURL_LIBRARIES})
+      include_directories(${CURL_INCLUDE_DIRS})
+    endif()
+  endif()
+endif()
 
 # Work around GCC 11 ICE on aarch64 when compiling UI.cpp at higher optimisation levels
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
@@ -122,28 +241,72 @@ endif()
 if(WIN32)
   add_custom_command(
     TARGET Ultralight-WebBrowser POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    "${ULTRALIGHT_SDK_ROOT}/bin/AppCore.dll"
-    "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/AppCore.dll"
+    COMMAND ${CMAKE_COMMAND} -E echo "Copying AppCore.dll if present"
   )
+  if(EXISTS "${ULTRALIGHT_SDK_ROOT}/bin/AppCore.dll")
+    add_custom_command(
+      TARGET Ultralight-WebBrowser POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${ULTRALIGHT_SDK_ROOT}/bin/AppCore.dll"
+      "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/AppCore.dll"
+    )
+  else()
+    message(WARNING "AppCore.dll not found at ${ULTRALIGHT_SDK_ROOT}/bin/AppCore.dll; skipping copy")
+  endif()
   add_custom_command(
     TARGET Ultralight-WebBrowser POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    "${ULTRALIGHT_SDK_ROOT}/bin/Ultralight.dll"
-    "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/Ultralight.dll"
+    COMMAND ${CMAKE_COMMAND} -E echo "Copying Ultralight.dll if present"
   )
+  if(EXISTS "${ULTRALIGHT_SDK_ROOT}/bin/Ultralight.dll")
+    add_custom_command(
+      TARGET Ultralight-WebBrowser POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${ULTRALIGHT_SDK_ROOT}/bin/Ultralight.dll"
+      "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/Ultralight.dll"
+    )
+  else()
+    message(WARNING "Ultralight.dll not found at ${ULTRALIGHT_SDK_ROOT}/bin/Ultralight.dll; skipping copy")
+  endif()
   add_custom_command(
     TARGET Ultralight-WebBrowser POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    "${ULTRALIGHT_SDK_ROOT}/bin/UltralightCore.dll"
-    "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/UltralightCore.dll"
+    COMMAND ${CMAKE_COMMAND} -E echo "Copying UltralightCore.dll if present"
   )
+  if(EXISTS "${ULTRALIGHT_SDK_ROOT}/bin/UltralightCore.dll")
+    add_custom_command(
+      TARGET Ultralight-WebBrowser POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${ULTRALIGHT_SDK_ROOT}/bin/UltralightCore.dll"
+      "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/UltralightCore.dll"
+    )
+  else()
+    message(WARNING "UltralightCore.dll not found at ${ULTRALIGHT_SDK_ROOT}/bin/UltralightCore.dll; skipping copy")
+  endif()
   add_custom_command(
     TARGET Ultralight-WebBrowser POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    "${ULTRALIGHT_SDK_ROOT}/bin/WebCore.dll"
-    "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/WebCore.dll"
+    COMMAND ${CMAKE_COMMAND} -E echo "Copying WebCore.dll if present"
   )
+  if(EXISTS "${ULTRALIGHT_SDK_ROOT}/bin/WebCore.dll")
+    add_custom_command(
+      TARGET Ultralight-WebBrowser POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${ULTRALIGHT_SDK_ROOT}/bin/WebCore.dll"
+      "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/WebCore.dll"
+    )
+  else()
+    message(WARNING "WebCore.dll not found at ${ULTRALIGHT_SDK_ROOT}/bin/WebCore.dll; skipping copy")
+  endif()
+  # If we auto-detected a vcpkg-installed libcurl (_inst_dir), copy any runtime DLLs
+  # (libcurl and its OpenSSL/zlib dependencies) from the vcpkg installed bin folder
+  # into the target output directory so the EXE can find them at runtime.
+  if(DEFINED _inst_dir AND EXISTS "${_inst_dir}/bin")
+    file(GLOB CURL_RUNTIME_DLLS "${_inst_dir}/bin/*.dll")
+    foreach(_dll ${CURL_RUNTIME_DLLS})
+      add_custom_command(
+        TARGET Ultralight-WebBrowser POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_dll}" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/"
+      )
+    endforeach()
+  endif()
 else()
   # On macOS/Linux, copy the shared libraries we link against next to the executable
   add_custom_command(
@@ -186,12 +349,28 @@ if(APPLE OR UNIX)
 endif()
 
 # --- Copy assets to the output directory ---
-add_custom_command(
-  TARGET Ultralight-WebBrowser POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_directory
-  "${CMAKE_CURRENT_SOURCE_DIR}/assets"
-  "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets"
-)
+# Copy assets file-by-file (more robust than copy_directory which can fail
+# under some MSBuild/environment setups). We create destination subdirs as
+# needed and use copy_if_different to avoid touching unchanged files.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets")
+  file(GLOB_RECURSE _ASSET_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/assets" "${CMAKE_CURRENT_SOURCE_DIR}/assets/*")
+  foreach(_af ${_ASSET_FILES})
+    # Create subdirectory in the target output if the asset lives in a nested folder
+    get_filename_component(_af_dir "${_af}" DIRECTORY)
+    if(NOT _af_dir STREQUAL "")
+      add_custom_command(
+        TARGET Ultralight-WebBrowser POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/${_af_dir}"
+      )
+    endif()
+    add_custom_command(
+      TARGET Ultralight-WebBrowser POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/assets/${_af}" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/${_af}"
+    )
+  endforeach()
+else()
+  message(WARNING "Assets directory not found at ${CMAKE_CURRENT_SOURCE_DIR}/assets; skipping asset copy")
+endif()
 
 # --- Copy ICU data to the output directory (Windows SDK layout) ---
 if(WIN32)
@@ -200,18 +379,26 @@ if(WIN32)
     COMMAND ${CMAKE_COMMAND} -E make_directory
     "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources"
   )
-  add_custom_command(
-    TARGET Ultralight-WebBrowser POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    "${ULTRALIGHT_SDK_ROOT}/bin/ICU/icudt67l.dat"
-    "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/icudt67l.dat"
-  )
-  add_custom_command(
-    TARGET Ultralight-WebBrowser POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    "${ULTRALIGHT_SDK_ROOT}/bin/ICU/cacert.pem"
-    "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/cacert.pem"
-  )
+  if(EXISTS "${ULTRALIGHT_SDK_ROOT}/bin/ICU/icudt67l.dat")
+    add_custom_command(
+      TARGET Ultralight-WebBrowser POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${ULTRALIGHT_SDK_ROOT}/bin/ICU/icudt67l.dat"
+      "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/icudt67l.dat"
+    )
+  else()
+    message(WARNING "ICU data file icudt67l.dat not found at ${ULTRALIGHT_SDK_ROOT}/bin/ICU/icudt67l.dat; skipping copy")
+  endif()
+  if(EXISTS "${ULTRALIGHT_SDK_ROOT}/bin/ICU/cacert.pem")
+    add_custom_command(
+      TARGET Ultralight-WebBrowser POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${ULTRALIGHT_SDK_ROOT}/bin/ICU/cacert.pem"
+      "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/cacert.pem"
+    )
+  else()
+    message(WARNING "cacert.pem not found at ${ULTRALIGHT_SDK_ROOT}/bin/ICU/cacert.pem; skipping copy")
+  endif()
 endif()
 
 # --- Copy SDK resources for macOS/Linux if present (eg. cacert.pem, ICU data) ---
