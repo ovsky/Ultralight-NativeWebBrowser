@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { margin: 0; padding: 6px; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; font-size: 12px; color: #EDF2F7; background: rgba(0,0,0,0.6); }
+    #debug-info { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <div id="debug-info">Debug overlay</div>
+  <script>
+    function appendDebugLine(text) {
+      var el = document.getElementById('debug-info');
+      if (!el) return;
+      // Append with newline while preserving previous content
+      el.textContent = (el.textContent && el.textContent.length ? el.textContent + '\n' : '') + text;
+    }
+    window.HandleInstallSidecarProgress = function(p) {
+      var percent = Math.round(p*100);
+      appendDebugLine('Installing sidecar: ' + percent + '%');
+    };
+    window.HandleInstallSidecarComplete = function(ok) {
+      appendDebugLine('Sidecar installed: ' + (ok ? 'OK' : 'Failed'));
+    };
+    // Textual status messages (which file is downloading, extraction steps, fallbacks)
+    window.HandleInstallSidecarStatus = function(msg) {
+      appendDebugLine('Status: ' + msg);
+    };
+  </script>
+</body>
+</html>

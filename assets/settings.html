@@ -294,6 +294,17 @@
             <h1>Settings</h1>
             <p class="subtitle">Configure your browser preferences</p>
         </header>
+        <div style="padding:10px 30px; border-bottom:1px solid rgba(255,255,255,0.04); background:var(--bg-secondary);">
+            <strong style="font-size:12px;color:var(--accent-primary);">Current action:</strong>
+            <div id="current-action" style="margin-top:6px;padding:10px;background:var(--bg-tertiary);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);font-family:Consolas,monospace;white-space:pre-wrap;">Idle</div>
+            <div id="install-progress" style="margin-top:8px;">
+                <div style="font-size:12px;color:var(--text-secondary); margin-bottom:6px;">Install progress</div>
+                <div style="height:12px;background:#3a3a3a;border-radius:8px;overflow:hidden;">
+                    <div id="install-progress-bar" style="width:0%;height:100%;background:linear-gradient(90deg,var(--accent-primary),#6f66f1);transition:width 200ms ease;"></div>
+                </div>
+                <div id="install-progress-label" style="font-size:11px;color:var(--text-tertiary);margin-top:6px;">0%</div>
+            </div>
+        </div>
         <div id="settings-container">
             <div class="loading">Loading settings...</div>
         </div>
@@ -305,12 +316,33 @@
         <div class="debug-info" id="debug-info"></div>
     </div>
     <script>
+        let __installLogInterval = null;
+
         function log(msg) {
             console.log('[Settings]', msg);
             const debug = document.getElementById('debug-info');
             if (debug) {
                 debug.textContent += new Date().toLocaleTimeString() + ': ' + msg + '\n';
                 debug.scrollTop = debug.scrollHeight;
+            }
+            // Also update current action if the message looks like a status
+            tryUpdateCurrentActionFromMessage(msg);
+        }
+
+        function tryUpdateCurrentActionFromMessage(msg) {
+            if (!msg) return;
+            const lower = msg.toLowerCase();
+            // Treat messages starting with 'status:' or containing 'download'/'extract'/'install' as actionable
+            if (lower.startsWith('status:') || lower.includes('download') || lower.includes('extract') || lower.includes('install') || lower.includes('heartbeat')) {
+                const el = document.getElementById('current-action');
+                if (!el) return;
+                // strip 'Status: ' prefix if present
+                let out = msg.replace(/^Status:\s*/i, '');
+                out = out.replace(/^Heartbeat:\s*/i, '');
+                el.textContent = out;
+                // small highlight flash
+                el.style.boxShadow = '0 0 12px rgba(139,124,245,0.18)';
+                setTimeout(() => { el.style.boxShadow = 'none'; }, 900);
             }
         }
 
@@ -365,7 +397,9 @@
             developer: {
                 title: 'Developer', settings: [
                     { key: 'enable_remote_inspector', name: 'Remote Inspector', description: 'Enable Chrome DevTools Protocol' },
-                    { key: 'show_performance_overlay', name: 'Performance Overlay', description: 'Show FPS counter' }
+                    { key: 'show_performance_overlay', name: 'Performance Overlay', description: 'Show FPS counter' },
+                    { key: 'enable_sidecar', name: 'Enable Sidecar (DRM)', description: 'Allow switching to heavy rendering for DRM sites' },
+                    { key: 'enable_debug_info', name: 'Enable Debug Info', description: 'Show debug overlay with FPS and sidecar status' }
                 ]
             }
         };
@@ -446,6 +480,107 @@
                 container.appendChild(groupDiv);
             });
             log('Rendered UI');
+                // Add button to install sidecar deps if OnInstallSidecarDeps is defined
+                const installBtn = document.createElement('button');
+                installBtn.textContent = 'Install Sidecar Dependencies';
+                installBtn.className = 'btn-primary';
+                installBtn.addEventListener('click', async () => {
+                    log('Installing sidecar dependencies...');
+                    installBtn.disabled = true;
+                    if (typeof window.OnInstallSidecarDeps === 'function') {
+                        try {
+                            // Provide progress via global handlers
+                            window.HandleInstallSidecarProgress = (p) => {
+                                log('Install progress: ' + (p*100).toFixed(0) + '%');
+                                try {
+                                    const pct = Math.round(p * 100);
+                                    const bar = document.getElementById('install-progress-bar');
+                                    const label = document.getElementById('install-progress-label');
+                                    if (bar) bar.style.width = pct + '%';
+                                    if (label) label.textContent = pct + '%';
+                                } catch(e) {}
+                            };
+                            window.HandleInstallSidecarStatus = (s) => { log('Status: ' + s); tryUpdateCurrentActionFromMessage(s); };
+                            // When install completes we need to stop polling the native install.log
+                            window.HandleInstallSidecarComplete = (ok) => {
+                                // Try one final fetch of the install log
+                                try {
+                                    if (typeof window.GetInstallLog === 'function') {
+                                        const txt = window.GetInstallLog();
+                                        if (txt) document.getElementById('debug-info').textContent = txt;
+                                    }
+                                } catch(e) {}
+                                installBtn.disabled = false;
+                                if (__installLogInterval) { clearInterval(__installLogInterval); __installLogInterval = null; }
+                            };
+                            // Provide a progress hook so UI can be updated while downloading
+                            if (typeof window.HandleInstallSidecarProgress === 'function') {
+                                window.HandleInstallSidecarProgress(0.0);
+                            }
+                            // Start polling the native install.log (if exposed)
+                            if (typeof window.GetInstallLog === 'function') {
+                                try {
+                                    // immediate fetch
+                                    const initial = window.GetInstallLog();
+                                    if (initial) document.getElementById('debug-info').textContent = initial;
+                                } catch(e) {}
+                                __installLogInterval = setInterval(() => {
+                                    try {
+                                        if (typeof window.GetInstallLog === 'function') {
+                                            const txt = window.GetInstallLog();
+                                            if (txt) {
+                                                const debugEl = document.getElementById('debug-info');
+                                                debugEl.textContent = txt;
+                                                debugEl.scrollTop = debugEl.scrollHeight;
+                                            }
+                                        }
+                                    } catch(e) { /* ignore bridge errors while starting */ }
+                                }, 2000);
+                            }
+                            window.OnInstallSidecarDeps();
+                        } catch (e) { log('ERROR: ' + e.message); installBtn.disabled = false; }
+                    } else {
+                        log('OnInstallSidecarDeps not available');
+                        installBtn.disabled = false;
+                    }
+                });
+                const actions = document.querySelector('.actions');
+                if (actions) { actions.insertBefore(installBtn, actions.firstChild); }
+                // Add Show Install Log button (ensure it's visible even if .actions is missing)
+                const showLogBtn = document.createElement('button');
+                showLogBtn.textContent = 'Show install log';
+                showLogBtn.className = 'btn-secondary';
+                showLogBtn.addEventListener('click', () => {
+                    // Prefer native opener
+                    if (typeof window.OpenInstallLog === 'function') {
+                        try { window.OpenInstallLog(); return; } catch(e) { log('OpenInstallLog failed: ' + e.message); }
+                    }
+                    // Else try to fetch via bridge; if not ready, retry for a few seconds
+                    let attempts = 0;
+                    const maxAttempts = 25; // ~5s with 200ms interval
+                    const tryFetch = () => {
+                        if (typeof window.GetInstallLog === 'function') {
+                            try {
+                                const txt = window.GetInstallLog();
+                                if (txt) document.getElementById('debug-info').textContent = txt;
+                                return;
+                            } catch(e) { log('GetInstallLog failed: ' + e.message); return; }
+                        }
+                        attempts++;
+                        if (attempts < maxAttempts) {
+                            setTimeout(tryFetch, 200);
+                        } else {
+                            log('No install-log bridge available');
+                        }
+                    };
+                    tryFetch();
+                });
+                if (actions) { actions.insertBefore(showLogBtn, actions.firstChild); }
+                else {
+                    // fallback: append to container header if actions not present
+                    const container = document.querySelector('.container');
+                    if (container) container.insertBefore(showLogBtn, container.firstChild);
+                }
         }
 
         function updateDirtyState() {
