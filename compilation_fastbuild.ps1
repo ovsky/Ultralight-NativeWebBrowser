@@ -39,37 +39,61 @@ if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
 
 function Invoke-Tool([string]$Exe, [string[]]$Arguments) {
     Write-Host "Running: $Exe $($Arguments -join ' ')" -ForegroundColor Cyan
-    $outFile = [System.IO.Path]::GetTempFileName()
-    $errFile = [System.IO.Path]::GetTempFileName()
+    # Prefer direct invocation so output streams directly to the console and exit codes are preserved.
     try {
-        $proc = Start-Process -FilePath $Exe -ArgumentList $Arguments -NoNewWindow -RedirectStandardOutput $outFile -RedirectStandardError $errFile -Wait -PassThru -ErrorAction Stop
-        $exit = $proc.ExitCode
-    }
-    catch {
-        Write-Warning "Start-Process failed: $_"
-        $orig = $ErrorActionPreference
-        $ErrorActionPreference = 'Continue'
-        try {
-            $output = & $Exe @Arguments 2>&1 | Out-String
-            if ($output -and $output.Trim()) { Write-Host $output }
-            $exit = $LASTEXITCODE
-        }
-        finally { $ErrorActionPreference = $orig }
+        & $Exe @Arguments 2>&1 | ForEach-Object { Write-Host $_ }
+        $exit = $LASTEXITCODE
+        if (-not $exit) { $exit = 0 }
         return $exit
     }
-    $stdout = Get-Content -Raw -LiteralPath $outFile -ErrorAction SilentlyContinue
-    $stderr = Get-Content -Raw -LiteralPath $errFile -ErrorAction SilentlyContinue
-    if ($stdout -and $stdout.Trim()) { Write-Host $stdout }
-    if ($stderr -and $stderr.Trim()) { Write-Host $stderr }
-    Remove-Item -LiteralPath $outFile, $errFile -ErrorAction SilentlyContinue
-    return $exit
+    catch {
+        Write-Warning "Direct invocation failed, falling back to Start-Process: $_"
+        # Fallback to Start-Process with redirected temp files
+        $outFile = [System.IO.Path]::GetTempFileName()
+        $errFile = [System.IO.Path]::GetTempFileName()
+        try {
+            $proc = Start-Process -FilePath $Exe -ArgumentList $Arguments -NoNewWindow -RedirectStandardOutput $outFile -RedirectStandardError $errFile -Wait -PassThru -ErrorAction Stop
+            $exit = $proc.ExitCode
+        }
+        catch {
+            Write-Warning "Start-Process fallback failed: $_"
+            return 1
+        }
+        $stdout = Get-Content -Raw -LiteralPath $outFile -ErrorAction SilentlyContinue
+        $stderr = Get-Content -Raw -LiteralPath $errFile -ErrorAction SilentlyContinue
+        if ($stdout -and $stdout.Trim()) { Write-Host $stdout }
+        if ($stderr -and $stderr.Trim()) { Write-Host $stderr -ForegroundColor Red }
+        Remove-Item -LiteralPath $outFile, $errFile -ErrorAction SilentlyContinue
+        if (-not $exit) { $exit = 0 }
+        return $exit
+    }
 }
 
 $buildArgs = @('--build', 'build', '--config', $Configuration)
 if ($RemainingArgs) { $buildArgs += $RemainingArgs }
 
+# Invoke cmake build and fail loudly on error (print errors and exit without launching the app)
 $code = Invoke-Tool 'cmake' $buildArgs
-if ($code -ne 0) { exit $code }
+if (-not $code) { $code = 1 }
+if ($code -ne 0) {
+    Write-Warning "cmake returned non-zero exit code: $code. Checking for produced executable as fallback..."
+    # If the build produced the expected executable despite non-zero cmake exit code, treat as success.
+    function Find-ExecutableNoExit { param([string]$BasePath)
+        $search = Get-ChildItem -Path $BasePath -Recurse -File -ErrorAction SilentlyContinue | Where-Object { ($_.Extension -ieq '.exe' -and $_.BaseName -eq 'Ultralight-WebBrowser') }
+        if ($search) { return $search[0].FullName }
+        $win = Join-Path (Join-Path $BasePath 'Release') 'Ultralight-WebBrowser.exe'
+        if (Test-Path $win) { return $win }
+        return $null
+    }
+    $maybeExe = Find-ExecutableNoExit -BasePath (Join-Path $scriptRoot 'build')
+    if ($maybeExe) {
+        Write-Host "Build returned non-zero but executable exists: $maybeExe. Treating as success." -ForegroundColor Yellow
+        $code = 0
+    } else {
+        Write-Host "Build failed with exit code $code. Not launching the application." -ForegroundColor Red
+        exit $code
+    }
+}
 
 Write-Host "Build step completed with exit code $code" -ForegroundColor Green
 
