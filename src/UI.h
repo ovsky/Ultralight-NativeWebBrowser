@@ -6,6 +6,10 @@
 #include <string>
 #include <vector>
 #include <filesystem>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
 
 using ultralight::JSArgs;
 using ultralight::JSFunction;
@@ -67,8 +71,11 @@ public:
     bool enable_caret_browsing = false;
 
     // Developer
-    bool enable_remote_inspector = false;
-    bool show_performance_overlay = false;
+  bool enable_remote_inspector = false;
+  bool show_performance_overlay = false;
+  // Sidecar & debugging
+  bool enable_sidecar = true;
+  bool enable_debug_info = false;
 
     bool operator==(const BrowserSettings &other) const;
     bool operator!=(const BrowserSettings &other) const { return !(*this == other); }
@@ -123,6 +130,9 @@ public:
   void OnCloseSettingsPanel(const JSObject &obj, const JSArgs &args);
   ultralight::JSValue OnGetSettings(const JSObject &obj, const JSArgs &args);
   void OnUpdateSetting(const JSObject &obj, const JSArgs &args);
+  void OnInstallSidecarDeps(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnGetInstallLog(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnOpenInstallLog(const JSObject &obj, const JSArgs &args);
   ultralight::JSValue OnRestoreSettingsDefaults(const JSObject &obj, const JSArgs &args);
   void OnSaveSettings(const JSObject &obj, const JSArgs &args);
   // Suggestions callback (address bar autocomplete)
@@ -215,6 +225,9 @@ protected:
   double GetOriginScore(const std::string &origin);
   void PruneFaviconDiskCacheToLimit();
 
+  // DRM/Heavy-renderer navigation helper: check DRM domain and switch to the heavy renderer sidecar if needed.
+  void NavigateMaybeHeavy(Tab *tab, const std::string &url);
+
   Tab *active_tab() { return tabs_.empty() ? nullptr : tabs_[active_tab_id_].get(); }
 
   RefPtr<View> view() { return overlay_->view(); }
@@ -228,7 +241,22 @@ protected:
   RefPtr<Overlay> downloads_overlay_;
   RefPtr<Overlay> context_menu_overlay_;
   RefPtr<Overlay> suggestions_overlay_;
+  // Overlay to display debug info when enabled
+  RefPtr<Overlay> debug_overlay_;
   float scale_;
+  // In-memory debug/status log for sidecar dependency installs
+  std::vector<std::string> debug_log_;
+  std::mutex debug_log_mutex_;
+  
+  // DRM host list loaded from setup/drm.txt (allow user editing)
+  std::vector<std::string> drm_list_;
+  void LoadDrmList();
+  // Check if a url is in the DRM host list
+  bool IsDrmDomain(const std::string &url) const;
+  // Track whether sidecar is active for a given tab id
+  void SetSidecarActiveForTab(uint64_t tab_id, bool active);
+  // Update the visual debug overlay with performance & sidecar status
+  void UpdateDebugOverlay();
   // Optional ad/tracker blocker references (may be unused in this build)
   AdBlocker *adblock_ = nullptr;
   AdBlocker *trackerblock_ = nullptr;
@@ -247,6 +275,14 @@ protected:
   ultralight::String pending_sugg_json_;
 
   std::map<uint64_t, std::unique_ptr<Tab>> tabs_;
+  // Track which tabs currently have an active sidecar.
+  std::map<uint64_t, bool> sidecar_active_map_;
+  std::map<uint64_t, uint64_t> sidecar_pid_map_;
+  // Sidecar monitor thread; watches child PIDs and restores UI when they exit
+  std::thread sidecar_monitor_thread_;
+  std::atomic<bool> sidecar_monitor_running_ = false;
+  std::mutex sidecar_monitor_mutex_;
+  std::condition_variable sidecar_monitor_cv_;
   uint64_t active_tab_id_ = 0;
   uint64_t tab_id_counter_ = 0;
   Cursor cur_cursor_;
@@ -324,4 +360,7 @@ protected:
   std::string settings_storage_path_;
 
   friend class Tab;
+  void StartSidecarMonitor();
+  void StopSidecarMonitor();
+  void OnSidecarProcessExited(uint64_t tab_id, uint64_t pid);
 };

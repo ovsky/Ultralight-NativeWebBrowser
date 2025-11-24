@@ -5,11 +5,19 @@ param(
 Write-Host "PowerShell: Attempting to install libcurl or vcpkg curl for development (Windows)..."
 
 function Install-VcpkgAndCurl {
-  $tempRoot = $env:RUNNER_TEMP
-  if (-not $tempRoot) { $tempRoot = $env:TEMP }
-  if (-not $tempRoot) { $tempRoot = $env:USERPROFILE }
-  if (-not $tempRoot) { $tempRoot = "C:\vcpkg_temp" }
-  $vcpkg = Join-Path $tempRoot 'vcpkg'
+  # Prefer a repo-local vcpkg folder if present; otherwise clone into a temp location
+  $repoRoot = Split-Path -Parent $PSScriptRoot
+  $repoVcpkg = Join-Path $repoRoot 'vcpkg'
+  if (Test-Path $repoVcpkg) {
+    Write-Host "Using repository-local vcpkg at $repoVcpkg"
+    $vcpkg = $repoVcpkg
+  } else {
+    $tempRoot = $env:RUNNER_TEMP
+    if (-not $tempRoot) { $tempRoot = $env:TEMP }
+    if (-not $tempRoot) { $tempRoot = $env:USERPROFILE }
+    if (-not $tempRoot) { $tempRoot = "C:\vcpkg_temp" }
+    $vcpkg = Join-Path $tempRoot 'vcpkg'
+  }
   if (-not (Test-Path $vcpkg)) {
     Write-Host "Cloning vcpkg to $vcpkg"
     git clone https://github.com/microsoft/vcpkg.git $vcpkg
@@ -24,6 +32,7 @@ function Install-VcpkgAndCurl {
   # Persist VCPKG_ROOT to GitHub Actions environment file if present
   if ($env:GITHUB_ENV) { "VCPKG_ROOT=$vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append }
   Pop-Location
+  $global:VCPKG_INSTALLED_PATH = $vcpkg
   return $true
 }
 
@@ -44,6 +53,7 @@ try {
     }
   }
   Write-Host "Install script finished. If build does not detect curl, consider enabling vcpkg toolchain for CMake by setting -DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+  if ($global:VCPKG_INSTALLED_PATH) { Write-Output $global:VCPKG_INSTALLED_PATH }
   exit 0
 } catch {
   Write-Error "Failed to install libcurl: $_"

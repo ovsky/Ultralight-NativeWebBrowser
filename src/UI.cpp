@@ -19,12 +19,29 @@
 #include <cstdlib>
 #include "DownloadManager.h"
 #include "AdBlocker.h"
+#include <thread>
+#include <atomic>
+#include <condition_variable>
+#include <chrono>
+#include <signal.h>
+#include <errno.h>
+#ifdef ENABLE_DRM_SIDECAR
+#include "DependencyManager.h"
+#include "SidecarProcess.h"
+#endif
 #ifdef _WIN32
 #include <direct.h> // _mkdir, _getcwd
 #ifndef NOMINMAX
 #define NOMINMAX 1
 #endif
 #include <windows.h> // GetModuleFileNameW
+#include <tlhelp32.h>
+// For SHGetKnownFolderPath and FOLDERID_*
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+#include <shlobj.h>
+#include <shellapi.h>
 #else
 #include <sys/stat.h> // mkdir
 #include <unistd.h>   // getcwd
@@ -50,8 +67,8 @@ namespace
     bool default_value;
   };
 
-  constexpr std::array<SettingDescriptor, 26> kFallbackSettingsCatalog = {
-      // Appearance
+  constexpr std::array<SettingDescriptor, 28> kFallbackSettingsCatalog = {
+      // Additional cleanup if necessary
       SettingDescriptor{"launch_dark_theme", "Launch in dark theme",
                         "Start Ultralight with dark chrome, toolbars, and tabs by default.",
                         "appearance", nullptr, &UI::BrowserSettings::launch_dark_theme, false},
@@ -133,12 +150,18 @@ namespace
                         "accessibility", nullptr, &UI::BrowserSettings::enable_caret_browsing, false},
 
       // Developer
-      SettingDescriptor{"enable_remote_inspector", "Enable remote inspector",
-                        "Allow remote debugging via Chrome DevTools Protocol.",
-                        "developer", nullptr, &UI::BrowserSettings::enable_remote_inspector, false},
-      SettingDescriptor{"show_performance_overlay", "Show performance overlay",
-                        "Display FPS counter and rendering statistics on screen.",
-                        "developer", nullptr, &UI::BrowserSettings::show_performance_overlay, false}};
+  SettingDescriptor{"enable_remote_inspector", "Enable remote inspector",
+        "Allow remote debugging via Chrome DevTools Protocol.",
+        "developer", nullptr, &UI::BrowserSettings::enable_remote_inspector, false},
+  SettingDescriptor{"show_performance_overlay", "Show performance overlay",
+        "Display FPS counter and rendering statistics on screen.",
+        "developer", nullptr, &UI::BrowserSettings::show_performance_overlay, false},
+  SettingDescriptor{"enable_sidecar", "Enable Sidecar (DRM)",
+        "Switch to heavy rendering for DRM sites.",
+        "developer", nullptr, &UI::BrowserSettings::enable_sidecar, true},
+  SettingDescriptor{"enable_debug_info", "Enable Debug Info",
+        "Show debug overlay with FPS and sidecar status",
+        "developer", nullptr, &UI::BrowserSettings::enable_debug_info, false}};
 
   struct ParsedCatalogEntry
   {
@@ -464,6 +487,81 @@ namespace
   }
 }
 
+// Tiny DRM domain detection helper - simple substring-based check; can be expanded
+// Check if a URL belongs to DRM domain list. Reads drm_list_ if available.
+bool UI::IsDrmDomain(const std::string &url) const {
+  if (url.empty())
+    return false;
+  std::string lc = url;
+  std::transform(lc.begin(), lc.end(), lc.begin(), [](unsigned char c) { return std::tolower(c); });
+  // If user-provided list exists, test against it
+  for (const auto &h : drm_list_) {
+    if (h.empty())
+      continue;
+    std::string hh = h;
+    std::transform(hh.begin(), hh.end(), hh.begin(), [](unsigned char c) { return std::tolower(c); });
+    if (lc.find(hh) != std::string::npos)
+      return true;
+  }
+  // Fallback heuristic list if none configured
+  const std::vector<std::string> fallback = {"netflix.com", "youtube.com", "youtube-nocookie.com", "primevideo.com", "hulu.com", "bbc.co.uk", "disneyplus.com"};
+  for (const auto &h : fallback) {
+    if (lc.find(h) != std::string::npos)
+      return true;
+  }
+  return false;
+}
+
+// Try to navigate using heavy engine if DRM domain is detected; otherwise load URL in existing view.
+void UI::NavigateMaybeHeavy(Tab *tab, const std::string &url) {
+  if (!tab) return;
+  // Respect user toggle: allow disabling sidecar in settings
+  if (!settings_.enable_sidecar || !IsDrmDomain(url)) {
+    tab->view()->LoadURL(String(url.c_str()));
+    return;
+  }
+
+  // DRM domain - try to ensure heavy engine ready when built with DRM support.
+#ifdef ENABLE_DRM_SIDECAR
+  SetLoading(true);
+  bool ok = DependencyManager::EnsureHeavyEngineReady([this](float progress) {
+    SetLoading(progress < 1.0f);
+  });
+  SetLoading(false);
+  if (!ok) {
+    // Fallback to normal load (or show error)
+    tab->view()->LoadURL(String(url.c_str()));
+    return;
+  }
+
+  // Launch sidecar and hide the underlying Ultralight UI for this tab
+  void *native_handle = nullptr;
+  if (window_)
+    native_handle = window_->native_handle();
+  uint64_t pid = SidecarProcess::LaunchAndEmbed(native_handle, url);
+  if (pid != 0) {
+    // find tab id
+    uint64_t tab_id = 0;
+    for (auto &p : tabs_) { if (p.second.get() == tab) { tab_id = p.first; break; } }
+    if (tab_id != 0) {
+      sidecar_pid_map_[tab_id] = pid;
+      SetSidecarActiveForTab(tab_id, true);
+      StartSidecarMonitor();
+    }
+  }
+  tab->Hide();
+  // Find tab id associated with this Tab* pointer
+  uint64_t tab_id = 0;
+  for (auto &p : tabs_) {
+    if (p.second.get() == tab) { tab_id = p.first; break; }
+  }
+  if (tab_id != 0) SetSidecarActiveForTab(tab_id, true);
+#else
+  // DRM sidecar disabled at build time; just load normally
+  tab->view()->LoadURL(String(url.c_str()));
+#endif
+}
+
 UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
                                 is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false)
 {
@@ -501,6 +599,10 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
 
   // Load history from disk
   LoadHistoryFromDisk();
+  // Load DRM domain list to allow user-editable DRM hosts
+  LoadDrmList();
+  // Update debug overlay if requested
+  UpdateDebugOverlay();
 }
 
 // Compatibility overload: accepts optional ad/tracker blockers (ignored if not used)
@@ -541,6 +643,10 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
 
   // Load history from disk
   LoadHistoryFromDisk();
+  // Load DRM domain list to allow user-editable DRM hosts
+  LoadDrmList();
+  // Update debug overlay if requested
+  UpdateDebugOverlay();
 
   adblock_enabled_cached_ = adblock_ ? adblock_->enabled() : adblock_enabled_cached_;
 }
@@ -567,6 +673,8 @@ UI::~UI()
   HideDownloadsOverlay();
   HideContextMenuOverlay();
   HideSuggestionsOverlay();
+  // Stop sidecar monitor thread if running
+  StopSidecarMonitor();
 
   view()->set_load_listener(nullptr);
   view()->set_view_listener(nullptr);
@@ -962,6 +1070,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   bool is_sugg_view = url_utf8.data() && std::strstr(url_utf8.data(), "suggestions.html") != nullptr;
   bool is_downloads_overlay_view = url_utf8.data() && std::strstr(url_utf8.data(), "downloads-panel.html") != nullptr;
   bool is_settings_page_view = url_utf8.data() && std::strstr(url_utf8.data(), "settings.html") != nullptr;
+  bool is_debug_overlay_view = url_utf8.data() && std::strstr(url_utf8.data(), "debug_overlay.html") != nullptr;
 
   if (!is_menu_view && !is_ctx_view && !is_sugg_view && !is_downloads_overlay_view && !is_settings_page_view)
   {
@@ -998,9 +1107,24 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   // Bind settings bridge functions to ALL views (not just UI overlay)
   // This ensures settings.html can call GetSettingsSnapshot when loaded in a tab
   global["GetSettingsSnapshot"] = BindJSCallbackWithRetval(&UI::OnGetSettings);
+  global["GetInstallLog"] = BindJSCallbackWithRetval(&UI::OnGetInstallLog);
+  global["OpenInstallLog"] = BindJSCallbackWithRetval(&UI::OnOpenInstallLog);
   global["OnUpdateSetting"] = BindJSCallback(&UI::OnUpdateSetting);
   global["OnRestoreSettingsDefaults"] = BindJSCallbackWithRetval(&UI::OnRestoreSettingsDefaults);
   global["OnSaveSettings"] = BindJSCallback(&UI::OnSaveSettings);
+  global["OnInstallSidecarDeps"] = BindJSCallback(&UI::OnInstallSidecarDeps);
+
+  if (is_debug_overlay_view) {
+    // Initialize overlay text to current debug status
+    std::ostringstream ss;
+    ss << "Sidecar enabled: " << (settings_.enable_sidecar ? "true" : "false") << "\n";
+    ss << "Debug overlay: " << (settings_.enable_debug_info ? "true" : "false") << "\n";
+    ss << "Active sidecar tabs: ";
+    if (sidecar_active_map_.empty()) ss << "none";
+    else { bool first = true; for (auto &p : sidecar_active_map_) { if (!first) ss << ", "; ss << p.first; first=false; } }
+    std::string js = std::string("(function(){ var el = document.getElementById('debug-info'); if(el) el.textContent = '") + EscapeJson(ss.str()) + "'; })();";
+    caller->EvaluateScript(js.c_str());
+  }
 
   if (is_ctx_view)
   {
@@ -1078,6 +1202,71 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   }
 }
 
+static bool IsProcessAlivePlatform(uint64_t pid) {
+#if defined(_WIN32)
+  HANDLE h = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
+  if (!h) return false;
+  DWORD exitCode = 0;
+  BOOL ok = GetExitCodeProcess(h, &exitCode);
+  CloseHandle(h);
+  return ok && exitCode == STILL_ACTIVE;
+#else
+  // Seek process via kill 0 (doesn't send a signal)
+  int r = kill(static_cast<pid_t>(pid), 0);
+  if (r == 0) return true;
+  if (r == -1 && errno == EPERM) return true;
+  return false;
+#endif
+}
+
+void UI::StartSidecarMonitor()
+{
+  std::lock_guard<std::mutex> lk(sidecar_monitor_mutex_);
+  if (sidecar_monitor_running_) return;
+  sidecar_monitor_running_ = true;
+  sidecar_monitor_thread_ = std::thread([this]() {
+    while (sidecar_monitor_running_) {
+      std::vector<std::pair<uint64_t, uint64_t>> checks;
+      {
+        std::lock_guard<std::mutex> lk(sidecar_monitor_mutex_);
+        for (auto &p : sidecar_pid_map_) checks.emplace_back(p.first, p.second);
+      }
+      for (auto &entry : checks) {
+        uint64_t tab_id = entry.first;
+        uint64_t pid = entry.second;
+        bool alive = IsProcessAlivePlatform(pid);
+        if (!alive) {
+          OnSidecarProcessExited(tab_id, pid);
+        }
+      }
+      std::unique_lock<std::mutex> lk(sidecar_monitor_mutex_);
+      sidecar_monitor_cv_.wait_for(lk, std::chrono::milliseconds(500));
+    }
+  });
+}
+
+void UI::StopSidecarMonitor()
+{
+  {
+    std::lock_guard<std::mutex> lk(sidecar_monitor_mutex_);
+    if (!sidecar_monitor_running_) return;
+    sidecar_monitor_running_ = false;
+  }
+  sidecar_monitor_cv_.notify_all();
+  if (sidecar_monitor_thread_.joinable()) sidecar_monitor_thread_.join();
+}
+
+void UI::OnSidecarProcessExited(uint64_t tab_id, uint64_t pid)
+{
+  // Called when sidecar process exits
+  sidecar_pid_map_.erase(tab_id);
+  SetSidecarActiveForTab(tab_id, false);
+  auto it = tabs_.find(tab_id);
+  if (it != tabs_.end() && it->second) {
+    it->second->Show();
+  }
+}
+
 void UI::OnBack(const JSObject &obj, const JSArgs &args)
 {
   if (active_tab())
@@ -1130,6 +1319,24 @@ void UI::OnRequestTabClose(const JSObject &obj, const JSArgs &args)
     {
       tabs_[id].reset();
       tabs_.erase(id);
+      // If we had a sidecar for this tab, clear it
+      sidecar_active_map_.erase(id);
+      // If a sidecar is running for this tab, try to terminate it
+      auto it_pid = sidecar_pid_map_.find(id);
+      if (it_pid != sidecar_pid_map_.end() && it_pid->second != 0) {
+    uint64_t pid = it_pid->second;
+    // Attempt graceful termination
+  #if defined(_WIN32)
+    HANDLE hProc = OpenProcess(PROCESS_TERMINATE, FALSE, static_cast<DWORD>(pid));
+    if (hProc) { TerminateProcess(hProc, 0); CloseHandle(hProc); }
+  #else
+    kill(static_cast<pid_t>(pid), SIGTERM);
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    kill(static_cast<pid_t>(pid), SIGKILL);
+  #endif
+    sidecar_pid_map_.erase(it_pid);
+      }
+      if (sidecar_pid_map_.empty()) StopSidecarMonitor();
     }
     else
     {
@@ -1182,7 +1389,7 @@ void UI::OnRequestChangeURL(const JSObject &obj, const JSArgs &args)
     if (!tabs_.empty())
     {
       auto &tab = tabs_[active_tab_id_];
-      tab->view()->LoadURL(url);
+      NavigateMaybeHeavy(tab.get(), std::string(url.utf8().data()));
     }
   }
 }
@@ -1197,7 +1404,7 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
     if (!tabs_.empty())
     {
       auto &tab = tabs_[active_tab_id_];
-      tab->view()->LoadURL(url);
+      NavigateMaybeHeavy(tab.get(), std::string(url.utf8().data()));
     }
   }
 }
@@ -1786,6 +1993,102 @@ ultralight::JSValue UI::OnGetSettings(const JSObject &, const JSArgs &)
   return ultralight::JSValue(ul_payload);
 }
 
+// Return the contents of the persistent install log (if any). Tries the user-local bin first
+// and falls back to a ./install.log in the current working directory. If neither exists,
+// returns the in-memory debug log collected during the session.
+ultralight::JSValue UI::OnGetInstallLog(const JSObject &, const JSArgs &)
+{
+  namespace fs = std::filesystem;
+  try {
+    fs::path localBin;
+#if defined(_WIN32)
+    PWSTR path = nullptr;
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, NULL, &path))) {
+      localBin = fs::path(path) / "MyApp" / "bin";
+      CoTaskMemFree(path);
+    }
+#elif defined(__APPLE__)
+    const char *home = getenv("HOME");
+    localBin = fs::path(home ? home : ".") / ".local" / "share" / "MyApp" / "bin";
+#else
+    const char *home = getenv("HOME");
+    localBin = fs::path(home ? home : ".") / ".local" / "share" / "MyApp" / "bin";
+#endif
+    fs::path p1 = localBin / "install.log";
+    fs::path p2 = fs::current_path() / "install.log";
+    std::string content;
+    if (fs::exists(p1)) {
+      std::ifstream in(p1.string(), std::ios::in);
+      if (in) {
+        std::ostringstream ss;
+        ss << in.rdbuf();
+        content = ss.str();
+      }
+    } else if (fs::exists(p2)) {
+      std::ifstream in(p2.string(), std::ios::in);
+      if (in) {
+        std::ostringstream ss;
+        ss << in.rdbuf();
+        content = ss.str();
+      }
+    } else {
+      // Fallback to in-memory debug log
+      std::lock_guard<std::mutex> lock(debug_log_mutex_);
+      std::ostringstream ss;
+      for (const auto &line : debug_log_) ss << line << "\n";
+      content = ss.str();
+    }
+    ultralight::String ul(content.c_str());
+    return ultralight::JSValue(ul);
+  } catch (...) {
+    ultralight::String empty("");
+    return ultralight::JSValue(empty);
+  }
+}
+
+ultralight::JSValue UI::OnOpenInstallLog(const JSObject &, const JSArgs &)
+{
+  namespace fs = std::filesystem;
+  try {
+    fs::path localBin;
+#if defined(_WIN32)
+    PWSTR path = nullptr;
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, NULL, &path))) {
+      localBin = fs::path(path) / "MyApp" / "bin";
+      CoTaskMemFree(path);
+    }
+#elif defined(__APPLE__)
+    const char *home = getenv("HOME");
+    localBin = fs::path(home ? home : ".") / ".local" / "share" / "MyApp" / "bin";
+#else
+    const char *home = getenv("HOME");
+    localBin = fs::path(home ? home : ".") / ".local" / "share" / "MyApp" / "bin";
+#endif
+    fs::path p1 = localBin / "install.log";
+    fs::path p2 = fs::current_path() / "install.log";
+    fs::path toOpen;
+    if (fs::exists(p1)) toOpen = p1;
+    else if (fs::exists(p2)) toOpen = p2;
+    else return ultralight::JSValue(false);
+
+#if defined(_WIN32)
+    // Use ShellExecuteA to open with associated program
+    std::string cmd = toOpen.string();
+    HINSTANCE res = ShellExecuteA(NULL, "open", cmd.c_str(), NULL, NULL, SW_SHOWNORMAL);
+    bool ok = (reinterpret_cast<intptr_t>(res) > 32);
+    return ultralight::JSValue(ok);
+#else
+    // POSIX: try xdg-open or open
+    std::string esc = toOpen.string();
+    std::string c = "xdg-open \"" + esc + "\" 2>/dev/null || open \"" + esc + "\" &";
+    int rc = std::system(c.c_str());
+    return ultralight::JSValue(rc == 0);
+#endif
+  } catch (...) {
+    return ultralight::JSValue(false);
+  }
+}
+
 void UI::OnUpdateSetting(const JSObject &, const JSArgs &args)
 {
   if (args.size() < 2 || !args[0].IsString())
@@ -1838,6 +2141,113 @@ void UI::OnSaveSettings(const JSObject &, const JSArgs &)
 {
   bool saved = SaveSettingsToDisk();
   SyncSettingsStateToUI(saved);
+}
+
+#include <sstream>
+
+void UI::OnInstallSidecarDeps(const JSObject &obj, const JSArgs &args)
+{
+#ifdef ENABLE_DRM_SIDECAR
+  SetLoading(true);
+  // Determine if settings view is open so we can post progress messages
+  RefPtr<View> settings_view;
+  for (auto &entry : tabs_)
+  {
+    if (!entry.second)
+      continue;
+    auto v = entry.second->view();
+    if (!v)
+      continue;
+    auto url = v->url().utf8();
+    if (url.data() && std::strstr(url.data(), "settings.html"))
+    {
+      settings_view = v;
+      break;
+    }
+  }
+
+  float last_progress_reported = -1.0f;
+  bool ok = DependencyManager::EnsureHeavyEngineReady([this, settings_view, last_progress_reported](float progress) mutable {
+    SetLoading(progress < 1.0f);
+    UpdateDebugOverlay();
+    // If settings view exists and defines the JS progress handler, call it
+    if (settings_view && !settings_view->is_loading()) {
+      std::ostringstream js;
+      js << "if(window.HandleInstallSidecarProgress) window.HandleInstallSidecarProgress(" << progress << ");";
+      RefPtr<JSContext> lock(settings_view->LockJSContext());
+      settings_view->EvaluateScript(String(js.str().c_str()), nullptr);
+    }
+    // Update overlay debug log with progress (throttle to 1% increments)
+    try {
+      if (progress >= 1.0f || last_progress_reported < 0.0f || (progress - last_progress_reported) >= 0.01f) {
+        last_progress_reported = progress;
+        std::ostringstream ss;
+        ss << "Install progress: " << (int)std::round(progress * 100.0f) << "%";
+        {
+          std::lock_guard<std::mutex> lock(debug_log_mutex_);
+          debug_log_.push_back(ss.str());
+        }
+        UpdateDebugOverlay();
+      }
+    } catch(...) {}
+  }, [this, settings_view](const std::string &status) {
+    // Textual status updates: forward to settings page if present, otherwise append to debug overlay log
+    if (settings_view && !settings_view->is_loading()) {
+      std::ostringstream js;
+      // Provide a safe-escaped string by simple replacement of backslashes and quotes
+      std::string esc = status;
+      size_t pos = 0;
+      while ((pos = esc.find("\\", pos)) != std::string::npos) { esc.replace(pos, 1, "\\\\"); pos += 2; }
+      pos = 0;
+      while ((pos = esc.find("\"", pos)) != std::string::npos) { esc.replace(pos, 1, "\\\""); pos += 2; }
+      js << "if(window.HandleInstallSidecarStatus) window.HandleInstallSidecarStatus(\"" << esc << "\");";
+      RefPtr<JSContext> lock(settings_view->LockJSContext());
+      settings_view->EvaluateScript(String(js.str().c_str()), nullptr);
+    } else {
+      // Fallback: append to in-memory debug log and refresh overlay
+      std::lock_guard<std::mutex> lock(debug_log_mutex_);
+      debug_log_.push_back(status);
+      UpdateDebugOverlay();
+    }
+  });
+  SetLoading(false);
+  UpdateDebugOverlay();
+
+  // Inform settings page (if open)
+  for (auto &entry : tabs_)
+  {
+    if (!entry.second)
+      continue;
+    auto v = entry.second->view();
+    if (!v)
+      continue;
+    auto url = v->url().utf8();
+    if (url.data() && std::strstr(url.data(), "settings.html"))
+    {
+        settings_view = v;
+      break;
+    }
+  }
+  if (settings_view && !settings_view->is_loading())
+  {
+    RefPtr<JSContext> lock(settings_view->LockJSContext());
+    std::string js = std::string("if(window.HandleInstallSidecarComplete) window.HandleInstallSidecarComplete(") + (ok ? "true" : "false") + ");";
+    settings_view->EvaluateScript(js.c_str());
+  }
+  else
+  {
+    // As a fallback, post to UI overlay console
+    if (overlay_ && overlay_->view())
+    {
+      std::string msg = std::string("console.info('Sidecar install ") + (ok ? "succeeded' );" : "failed' );");
+      overlay_->view()->EvaluateScript(msg.c_str());
+    }
+  }
+#else
+  // DRM sidecar support not compiled into this build
+  SetLoading(false);
+  UpdateDebugOverlay();
+#endif
 }
 
 ultralight::JSValue UI::OnGetDarkModeEnabled(const JSObject &obj, const JSArgs &args)
@@ -1981,6 +2391,8 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
   SyncAdblockStateToUI();
   UpdateSettingsDirtyFlag();
   SyncSettingsStateToUI(snapshot_is_baseline);
+  // If debug overlay is enabled or settings changed, update display
+  UpdateDebugOverlay();
 }
 
 void UI::SetDarkModeEnabled(bool enabled)
@@ -3484,6 +3896,119 @@ void UI::LoadSuggestionsFaviconsFlag()
     suggestion_favicons_enabled_ = false;
 }
 
+// Read setup/drm.txt and populate drm_list_
+void UI::LoadDrmList()
+{
+  drm_list_.clear();
+  std::filesystem::path p1 = std::filesystem::current_path() / "setup" / "drm.txt";
+  std::filesystem::path p2 = std::filesystem::path("setup/drm.txt");
+  std::filesystem::path chosen;
+  if (std::filesystem::exists(p1))
+    chosen = p1;
+  else if (std::filesystem::exists(p2))
+    chosen = p2;
+  else
+    return; // no list found
+
+  std::ifstream in(chosen);
+  if (!in.is_open())
+    return;
+  std::string line;
+  while (std::getline(in, line))
+  {
+    // strip whitespace
+    auto trim_left = [](std::string &s) {
+      s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) { return !std::isspace(ch); }));
+    };
+    auto trim_right = [](std::string &s) {
+      s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(), s.end());
+    };
+    trim_left(line);
+    trim_right(line);
+    if (line.empty() || line.rfind("#", 0) == 0)
+      continue;
+    // strip inline comments starting with //
+    size_t idx = line.find("//");
+    if (idx != std::string::npos)
+      line = line.substr(0, idx);
+    if (line.empty())
+      continue;
+    drm_list_.push_back(line);
+  }
+  in.close();
+}
+
+void UI::SetSidecarActiveForTab(uint64_t tab_id, bool active)
+{
+  if (active)
+    sidecar_active_map_[tab_id] = true;
+  else
+    sidecar_active_map_.erase(tab_id);
+  UpdateDebugOverlay();
+}
+
+void UI::UpdateDebugOverlay()
+{
+  // Do not show debug overlay unless enabled
+  if (!settings_.enable_debug_info)
+  {
+    if (debug_overlay_)
+      debug_overlay_->Hide();
+    return;
+  }
+  // Create overlay if necessary
+  if (!debug_overlay_ && window_)
+  {
+    int w = 320;
+    int h = 80;
+    debug_overlay_ = Overlay::Create(window_, w, h, (int)window_->width() - w - 8, 8);
+    debug_overlay_->Show();
+    if (debug_overlay_->view())
+    {
+      debug_overlay_->view()->LoadURL("file:///debug_overlay.html");
+      debug_overlay_->view()->set_load_listener(this);
+    }
+  }
+  if (!debug_overlay_ || !debug_overlay_->view())
+    return;
+
+  // Build status text to display
+  std::ostringstream ss;
+  ss << "Sidecar enabled: " << (settings_.enable_sidecar ? "true" : "false") << "\n";
+  ss << "Debug overlay: " << (settings_.enable_debug_info ? "true" : "false") << "\n";
+  ss << "Active sidecar tabs: ";
+  if (sidecar_active_map_.empty())
+    ss << "none";
+  else
+  {
+    bool first = true;
+    for (auto &p : sidecar_active_map_)
+    {
+      if (!first) ss << ", ";
+      ss << p.first;
+      first = false;
+    }
+  }
+
+  // Append recent textual debug/install log lines (if any)
+  {
+    std::lock_guard<std::mutex> lock(debug_log_mutex_);
+    if (!debug_log_.empty()) {
+      ss << "\nInstall log:\n";
+      for (const auto &line : debug_log_) {
+        ss << line << "\n";
+      }
+    }
+  }
+
+  std::string js = "(function(){ var el = document.getElementById('debug-info'); if(el) el.textContent = '";
+  js += std::string(EscapeJson(ss.str()).c_str());
+  js += "'; })();";
+  // Safely evaluate script in overlay view (guarded by load state implicitly)
+  debug_overlay_->view()->EvaluateScript(String(js.c_str()));
+}
+
+
 void UI::ShowSuggestionsOverlay(int x, int y, int width, const ultralight::String &json_items)
 {
   // Recreate each time for simplicity
@@ -3567,11 +4092,11 @@ void UI::OnSuggestionPick(const JSObject &obj, const JSArgs &args)
       child->LoadURL(s);
     return;
   }
-  if (!tabs_.empty())
-  {
-    auto &tab = tabs_[active_tab_id_];
-    tab->view()->LoadURL(s);
-  }
+    if (!tabs_.empty())
+    {
+      auto &tab = tabs_[active_tab_id_];
+      NavigateMaybeHeavy(tab.get(), std::string(s.utf8().data()));
+    }
 }
 
 void UI::OnSuggestionPaste(const JSObject &obj, const JSArgs &args)

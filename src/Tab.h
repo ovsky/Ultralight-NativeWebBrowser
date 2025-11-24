@@ -122,6 +122,9 @@ public:
   void JS_UpdateSetting(const JSObject &obj, const JSArgs &args);
   void JS_SaveSettings(const JSObject &obj, const JSArgs &args);
   JSValue JS_RestoreSettingsDefaults(const JSObject &obj, const JSArgs &args);
+  void JS_InstallSidecarDeps(const JSObject &obj, const JSArgs &args);
+  JSValue JS_GetInstallLog(const JSObject &obj, const JSArgs &args);
+  JSValue JS_OpenInstallLog(const JSObject &obj, const JSArgs &args);
 
 protected:
   UI *ui_;

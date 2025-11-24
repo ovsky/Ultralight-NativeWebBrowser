@@ -287,6 +287,11 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
       global["OnUpdateSetting"] = BindJSCallback(&Tab::JS_UpdateSetting);
       global["OnSaveSettings"] = BindJSCallback(&Tab::JS_SaveSettings);
       global["OnRestoreSettingsDefaults"] = BindJSCallbackWithRetval(&Tab::JS_RestoreSettingsDefaults);
+      // Forward install-sidecar request to UI so the settings page can trigger dependency install
+      global["OnInstallSidecarDeps"] = BindJSCallback(&Tab::JS_InstallSidecarDeps);
+      // Forward install log helpers to UI
+      global["GetInstallLog"] = BindJSCallbackWithRetval(&Tab::JS_GetInstallLog);
+      global["OpenInstallLog"] = BindJSCallbackWithRetval(&Tab::JS_OpenInstallLog);
       std::cout << "[Tab::OnDOMReady] Settings page detected, bridge functions bound" << std::endl;
     }
 
@@ -826,7 +831,10 @@ void Tab::JS_Navigate(const JSObject &obj, const JSArgs &args)
   if (args.size() >= 1 && view())
   {
     ultralight::String url = args[0];
-    view()->LoadURL(url);
+    if (ui_)
+      ui_->NavigateMaybeHeavy(this, std::string(url.utf8().data()));
+    else
+      view()->LoadURL(url);
   }
 }
 
@@ -974,6 +982,26 @@ JSValue Tab::JS_GetSettingsSnapshot(const JSObject &obj, const JSArgs &args)
   if (!ui_)
     return JSValue();
   return ui_->OnGetSettings(obj, args);
+}
+
+void Tab::JS_InstallSidecarDeps(const JSObject &obj, const JSArgs &args)
+{
+  if (ui_)
+    ui_->OnInstallSidecarDeps(obj, args);
+}
+
+JSValue Tab::JS_GetInstallLog(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_)
+    return JSValue();
+  return ui_->OnGetInstallLog(obj, args);
+}
+
+JSValue Tab::JS_OpenInstallLog(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_)
+    return JSValue(false);
+  return ui_->OnOpenInstallLog(obj, args);
 }
 
 void Tab::JS_UpdateSetting(const JSObject &obj, const JSArgs &args)
