@@ -302,6 +302,19 @@
             <button id="btn-save" class="btn-primary" disabled>Save Changes</button>
         </div>
         <div class="storage-path" id="storage-path"></div>
+        <div id="sidecar-status"
+            style="padding:14px 18px; background:var(--bg-tertiary); border:1px solid var(--border-subtle); border-radius:8px; margin-top:12px; display:none;">
+            <div style="font-weight:600; margin-bottom:6px;">DRM Sidecar Installer</div>
+            <div id="sidecar-download-link" style="font-size:12px; color:var(--accent-primary); word-break:break-all;">
+            </div>
+            <div id="sidecar-progress"
+                style="margin-top:8px; height:10px; background:rgba(255,255,255,0.05); border-radius:6px; overflow:hidden;">
+                <div id="sidecar-progress-bar"
+                    style="height:100%; width:0%; background:linear-gradient(90deg,var(--accent-primary), #6f62f0); transition:width 0.2s;">
+                </div>
+            </div>
+            <div id="sidecar-status-text" style="margin-top:6px; font-size:12px; color:var(--text-tertiary);"></div>
+        </div>
         <div class="debug-info" id="debug-info"></div>
     </div>
     <script>
@@ -377,6 +390,35 @@
             loadSettings();
             document.getElementById('btn-save').addEventListener('click', saveSettings);
             document.getElementById('btn-restore').addEventListener('click', restoreDefaults);
+            // Expose callbacks to be invoked by native when sidecar install starts/progresses
+            window.OnSidecarInstallStarted = function (url) {
+                try {
+                    const st = document.getElementById('sidecar-status');
+                    const link = document.getElementById('sidecar-download-link');
+                    const bar = document.getElementById('sidecar-progress-bar');
+                    const text = document.getElementById('sidecar-status-text');
+                    if (st && link && bar && text) {
+                        st.style.display = 'block';
+                        link.innerHTML = '<a href="' + url + '" target="_blank" rel="noreferrer">' + url + '</a>';
+                        bar.style.width = '0%';
+                        text.textContent = 'Download started';
+                    }
+                    log('Sidecar install started: ' + url);
+                } catch (e) { log('OnSidecarInstallStarted error: ' + e); }
+            };
+
+            window.OnSidecarInstallProgress = function (p) {
+                try {
+                    const bar = document.getElementById('sidecar-progress-bar');
+                    const text = document.getElementById('sidecar-status-text');
+                    if (bar && text) {
+                        const pct = Math.round(p * 100);
+                        bar.style.width = pct + '%';
+                        text.textContent = 'Download progress: ' + pct + '%';
+                    }
+                    log('Sidecar progress: ' + p);
+                } catch (e) { log('OnSidecarInstallProgress error: ' + e); }
+            };
         });
 
         function loadSettings() {

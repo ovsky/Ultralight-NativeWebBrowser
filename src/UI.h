@@ -15,6 +15,7 @@ using namespace ultralight;
 class Console;
 class AdBlocker; // forward declaration, optional dependency
 class DownloadManager;
+class DrmSidecarManager;
 
 /**
  * Browser UI implementation. Renders the toolbar/addressbar/tabs in top pane.
@@ -69,6 +70,8 @@ public:
     // Developer
     bool enable_remote_inspector = false;
     bool show_performance_overlay = false;
+    // DRM sidecar feature toggle (enable/disable sidecar usage)
+    bool enable_sidecar = true;
 
     bool operator==(const BrowserSettings &other) const;
     bool operator!=(const BrowserSettings &other) const { return !(*this == other); }
@@ -203,6 +206,12 @@ protected:
   // Receive favicon image data (as data URL) from suggestions overlay and persist cache
   void OnFaviconReady(const JSObject &obj, const JSArgs &args);
 
+  // Sidecar (DRM) controls exposed to UI JS
+  void OnInstallSidecar(const JSObject &obj, const JSArgs &args);
+  void OnToggleSidecar(const JSObject &obj, const JSArgs &args);
+  void OnLaunchSidecar(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnGetSidecarEnabled(const JSObject &obj, const JSArgs &args);
+
   // Compute a best-effort favicon URL (origin + "/favicon.ico") for http/https URLs
   String GetFaviconURL(const String &page_url);
   // Get origin string (scheme+host+optional port)
@@ -306,6 +315,8 @@ protected:
   // Suggestions favicons toggle (read from assets/suggestions_favicons.txt: on/off)
   bool suggestion_favicons_enabled_ = true;
   void LoadSuggestionsFaviconsFlag();
+
+  std::unique_ptr<DrmSidecarManager> drm_manager_;
 
   // Auto Dark Mode state
   bool dark_mode_enabled_ = false;

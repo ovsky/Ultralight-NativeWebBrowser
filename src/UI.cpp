@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include "DownloadManager.h"
 #include "AdBlocker.h"
+#include "DrmSidecarManager.h"
 #ifdef _WIN32
 #include <direct.h> // _mkdir, _getcwd
 #ifndef NOMINMAX
@@ -50,7 +51,7 @@ namespace
     bool default_value;
   };
 
-  constexpr std::array<SettingDescriptor, 26> kFallbackSettingsCatalog = {
+  constexpr std::array<SettingDescriptor, 27> kFallbackSettingsCatalog = {
       // Appearance
       SettingDescriptor{"launch_dark_theme", "Launch in dark theme",
                         "Start Ultralight with dark chrome, toolbars, and tabs by default.",
@@ -138,7 +139,11 @@ namespace
                         "developer", nullptr, &UI::BrowserSettings::enable_remote_inspector, false},
       SettingDescriptor{"show_performance_overlay", "Show performance overlay",
                         "Display FPS counter and rendering statistics on screen.",
-                        "developer", nullptr, &UI::BrowserSettings::show_performance_overlay, false}};
+                        "developer", nullptr, &UI::BrowserSettings::show_performance_overlay, false},
+      // DRM Sidecar toggle
+      SettingDescriptor{"enable_sidecar", "Enable DRM Sidecar",
+                        "Allow launching an external Chromium/CEF sidecar for Widevine DRM playback.",
+                        "privacy", "Experimental", &UI::BrowserSettings::enable_sidecar, true}};
 
   struct ParsedCatalogEntry
   {
@@ -479,6 +484,16 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
   settings_storage_path_ = SettingsFilePath().string();
   LoadSettingsFromDisk();
 
+  // Initialize DRM sidecar manager and apply persisted setting
+  drm_manager_ = std::make_unique<DrmSidecarManager>();
+  try
+  {
+    drm_manager_->SetEnabled(settings_.enable_sidecar);
+  }
+  catch (...)
+  {
+  }
+
   // Hook listeners and then load UI document
   view()->set_load_listener(this);
   view()->set_view_listener(this);
@@ -519,6 +534,16 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
   EnsureDataDirectoryExists();
   settings_storage_path_ = SettingsFilePath().string();
   LoadSettingsFromDisk();
+
+  // Initialize DRM sidecar manager and apply persisted setting
+  drm_manager_ = std::make_unique<DrmSidecarManager>();
+  try
+  {
+    drm_manager_->SetEnabled(settings_.enable_sidecar);
+  }
+  catch (...)
+  {
+  }
 
   view()->set_load_listener(this);
   view()->set_view_listener(this);
@@ -992,6 +1017,11 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["GetDarkModeEnabled"] = BindJSCallbackWithRetval(&UI::OnGetDarkModeEnabled);
   global["OnToggleAdblock"] = BindJSCallback(&UI::OnToggleAdblock);
   global["GetAdblockEnabled"] = BindJSCallbackWithRetval(&UI::OnGetAdblockEnabled);
+  // Sidecar (DRM) controls
+  global["OnInstallSidecar"] = BindJSCallback(&UI::OnInstallSidecar);
+  global["OnToggleSidecar"] = BindJSCallback(&UI::OnToggleSidecar);
+  global["OnLaunchSidecar"] = BindJSCallback(&UI::OnLaunchSidecar);
+  global["GetSidecarEnabled"] = BindJSCallbackWithRetval(&UI::OnGetSidecarEnabled);
   global["OnOpenSettingsPanel"] = BindJSCallback(&UI::OnOpenSettingsPanel);
   global["OnCloseSettingsPanel"] = BindJSCallback(&UI::OnCloseSettingsPanel);
 
@@ -1909,6 +1939,81 @@ void UI::SyncSettingsStateToUI(bool snapshot_is_baseline)
       applySettingsPanel = JSFunction();
     }
   }
+}
+
+void UI::OnInstallSidecar(const JSObject &obj, const JSArgs &args)
+{
+  if (!drm_manager_)
+    return;
+  // Notify UI which URL will be downloaded and then start install.
+  try
+  {
+    std::string url = drm_manager_->GetDownloadUrl();
+    RefPtr<JSContext> lock(view()->LockJSContext());
+    std::ostringstream ss;
+    ss << "(function(u){ if (window.OnSidecarInstallStarted) { try { window.OnSidecarInstallStarted(\"" << url << "\"); } catch(e){} } })(\"" << url << "\");";
+    view()->EvaluateScript(ss.str().c_str(), nullptr);
+  }
+  catch (...)
+  {
+  }
+
+  // Start install asynchronously and forward progress to UI via a JS callback if present
+  drm_manager_->InstallSidecar([this](float progress)
+                               {
+    try {
+      RefPtr<JSContext> lock(view()->LockJSContext());
+      // Call a JS function if exists: window.OnSidecarInstallProgress(progress)
+      std::ostringstream ss;
+      ss << "(function(p){ if (window.OnSidecarInstallProgress) { try { window.OnSidecarInstallProgress(" << progress << "); } catch(e){} } })(" << progress << ");";
+      view()->EvaluateScript(ss.str().c_str(), nullptr);
+    } catch (...) {
+      // ignore errors evaluating JS
+    } });
+}
+
+void UI::OnToggleSidecar(const JSObject &obj, const JSArgs &args)
+{
+  bool next_state = true;
+  if (args.size() == 1)
+    next_state = (bool)args[0];
+
+  settings_.enable_sidecar = next_state;
+  if (drm_manager_)
+    drm_manager_->SetEnabled(next_state);
+
+  // Persist setting
+  SaveSettingsToDisk();
+  SyncSettingsStateToUI(true);
+}
+
+void UI::OnLaunchSidecar(const JSObject &obj, const JSArgs &args)
+{
+  if (!drm_manager_)
+    return;
+
+  std::string url;
+  if (args.size() >= 1)
+  {
+    ultralight::String s = args[0];
+    url = s.utf8().data() ? s.utf8().data() : std::string();
+  }
+
+  // Use main window size as initial size
+  int w = (int)window_->width();
+  int h = (int)window_->height();
+  // Parent handle: not always available; pass nullptr for a standalone child.
+  void *parentHandle = nullptr;
+
+  drm_manager_->LaunchSidecar(parentHandle, url, 0, 0, w, h);
+}
+
+ultralight::JSValue UI::OnGetSidecarEnabled(const JSObject &obj, const JSArgs &args)
+{
+  bool enabled = settings_.enable_sidecar;
+  if (drm_manager_)
+    enabled = drm_manager_->IsEnabled();
+  return ultralight::JSValue(enabled);
 }
 
 void UI::ApplySettings(bool initial, bool snapshot_is_baseline)

@@ -82,6 +82,14 @@
                 <path d="M12 2L4 5v6.09c0 5.06 3.43 9.8 8 10.91c4.57-1.11 8-5.85 8-10.91V5l-8-3z" fill="currentColor" />
             </svg>
         </span>
+        <!-- DRM Sidecar icon (install/launch) -->
+        <span id="toggle-sidecar" class="icon" role="button" tabindex="0" aria-label="DRM Sidecar"
+            data-tooltip="DRM Sidecar">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path d="M12 2L2 7v8c0 5 4 9 10 9s10-4 10-9V7l-10-5zM12 6l6 3v6c0 3-2 6-6 6s-6-3-6-6V9l6-3z"
+                    fill="currentColor" />
+            </svg>
+        </span>
         <!-- Overflow menu (three dots) -->
         <span id="toggle-menu" class="icon" role="button" tabindex="0" aria-label="Open menu" aria-haspopup="true"
             data-tooltip="Menu">
@@ -206,6 +214,41 @@
                         adblockBtn.classList.toggle('active', isEnabled);
                     }
                 }, 100);
+            }
+            const sidecarBtn = document.querySelector('#toggle-sidecar');
+            if (sidecarBtn) {
+                const installSidecar = () => {
+                    if (window.OnInstallSidecar) OnInstallSidecar();
+                };
+                const launchSidecar = () => {
+                    if (window.OnLaunchSidecar) {
+                        const url = (document.querySelector('#address') || { value: '' }).value || '';
+                        OnLaunchSidecar(url);
+                    }
+                };
+                sidecarBtn.addEventListener('click', event => {
+                    event.stopPropagation();
+                    // Single click initiates download/install
+                    installSidecar();
+                });
+                sidecarBtn.addEventListener('dblclick', event => {
+                    event.stopPropagation();
+                    // Double-click launches the sidecar for the current URL
+                    launchSidecar();
+                });
+                sidecarBtn.addEventListener('keydown', event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        installSidecar();
+                    }
+                });
+                // Initialize state on load
+                setTimeout(() => {
+                    if (window.GetSidecarEnabled) {
+                        const isEnabled = GetSidecarEnabled();
+                        sidecarBtn.classList.toggle('active', isEnabled);
+                    }
+                }, 150);
             }
             var address = document.querySelector('#address');
             address.onkeypress = (function (e) {
