@@ -240,14 +240,20 @@ jobs:
       - name: 5. Install Linux Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libnss3-dev libgdk-pixbuf2.0-dev libxtst-dev libxss-dev libdbus-glib-1-dev
+          sudo apt-get install -y libgtk-3-dev libnss3-dev libgdk-pixbuf2.0-dev libxtst-dev libxss-dev libdbus-glib-1-dev libcurl4-openssl-dev
+
+      - name: 5.5 AUTO_INSTALL_CURL (helper script)
+        run: |
+          echo "AUTO_INSTALL_CURL: invoke helper script if necessary"
+          chmod +x ./scripts/install_curl.sh || true
+          ./scripts/install_curl.sh || true
 
       - name: 6. Configure CMake
         if: steps.prep_sdk.outputs.present == 'true'
         run: |
           cmake --version
           echo "Configuring with ULTRALIGHT_SDK_ROOT=$ULTRALIGHT_SDK_ROOT"
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT" -DBUILD_TESTING=ON -DWEBBROWSER_VERSION="$WEBBROWSER_VERSION"
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT" -DBUILD_TESTING=ON -DAUTO_INSTALL_CURL=ON -DWEBBROWSER_VERSION="$WEBBROWSER_VERSION"
 
       - name: 7. Build Project
         if: steps.prep_sdk.outputs.present == 'true'
