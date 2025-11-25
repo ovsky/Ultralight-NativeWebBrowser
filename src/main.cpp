@@ -10,13 +10,45 @@ static void PauseForDebugger() { MessageBoxA(NULL, "Pause", "Caption", MB_OKCANC
 static void PauseForDebugger() {}
 #endif
 
+#include <fstream>
+#include <exception>
+
 #if defined(_WIN32)
 #include <Windows.h>
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
   PauseForDebugger();
-  Browser browser;
-  browser.Run();
+  try
+  {
+    // Early diagnostic logging to help identify startup crashes
+    std::ofstream diag("startup_diag.log", std::ios::app);
+    diag << "Starting WinMain..." << std::endl;
+    diag.flush();
+    Browser browser;
+    diag << "Constructed Browser" << std::endl;
+    diag.flush();
+    browser.Run();
+    diag << "Run returned" << std::endl;
+    diag.close();
+  }
+  catch (const std::system_error &se)
+  {
+    std::ofstream diag("startup_diag.log", std::ios::app);
+    diag << "system_error in WinMain: code=" << se.code().value() << " category=" << se.code().category().name() << " msg=" << se.what() << std::endl;
+    diag.close();
+  }
+  catch (const std::exception &ex)
+  {
+    std::ofstream diag("startup_diag.log", std::ios::app);
+    diag << "Exception in WinMain: " << ex.what() << std::endl;
+    diag.close();
+  }
+  catch (...)
+  {
+    std::ofstream diag("startup_diag.log", std::ios::app);
+    diag << "Unknown exception in WinMain" << std::endl;
+    diag.close();
+  }
   return 0;
 }
 #else

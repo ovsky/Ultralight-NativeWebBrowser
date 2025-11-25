@@ -3,6 +3,13 @@ project(UltralightWebBrowser LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Debug mode option (off by default). When building from VS Code, enable automatically.
+option(DEBUG_MODE "Enable internal debug UI features" OFF)
+if(DEFINED ENV{VSCODE_PID})
+  message(STATUS "Detected VS Code environment; enabling DEBUG_MODE")
+  set(DEBUG_MODE ON CACHE BOOL "Enable internal debug UI features" FORCE)
+endif()
+
   # (Browser resource file will be configured after the icon-detection block
   # later in this file using configure_file(... @ONLY).)
 
@@ -37,6 +44,25 @@ include_directories(
   "${CMAKE_CURRENT_SOURCE_DIR}"
   "${ULTRALIGHT_SDK_ROOT}/include"
 )
+
+# Ensure nlohmann/json.hpp is available. Prefer system package, fall back to downloading single-header.
+find_package(nlohmann_json QUIET)
+if(NOT nlohmann_json_FOUND)
+  message(STATUS "nlohmann_json package not found; fetching single-header into third_party/nlohmann")
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/third_party/nlohmann")
+  if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/nlohmann/json.hpp")
+    file(DOWNLOAD "https://raw.githubusercontent.com/nlohmann/json/develop/single_include/nlohmann/json.hpp"
+                 "${CMAKE_CURRENT_SOURCE_DIR}/third_party/nlohmann/json.hpp"
+                 SHOW_PROGRESS STATUS _dl_status)
+    list(GET _dl_status 0 _dl_code)
+    if(NOT _dl_code EQUAL 0)
+      message(WARNING "Failed to download nlohmann/json.hpp; please install nlohmann_json or add the header to third_party/nlohmann/json.hpp")
+    endif()
+  endif()
+  include_directories("${CMAKE_CURRENT_SOURCE_DIR}/third_party")
+else()
+  message(STATUS "Found nlohmann_json package")
+endif()
 
 # --- Custom add_app function ---
 function(add_app NAME)
@@ -87,11 +113,48 @@ set(SOURCES "src/Browser.h"
             "src/Tab.cpp"
             "src/UI.h"
             "src/UI.cpp"
+            "src/DrmPlaybackSystem/DrmLogger.cpp"
+            "src/DrmPlaybackSystem/DrmConfig.cpp"
+            "src/DrmPlaybackSystem/NativeDrmWindow.cpp"
+            "src/DrmPlaybackSystem/DrmManager.cpp"
             "src/main.cpp"
             "${CMAKE_CURRENT_BINARY_DIR}/browser.rc"
 )
 
 add_app(Ultralight-WebBrowser ${SOURCES})
+
+# DRM subsystem library
+add_library(drm_system STATIC
+  src/DrmPlaybackSystem/DrmLogger.cpp
+  src/DrmPlaybackSystem/DrmConfig.cpp
+  src/DrmPlaybackSystem/NativeDrmWindow.cpp
+  src/DrmPlaybackSystem/DrmManager.cpp
+)
+target_include_directories(drm_system PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# Find libcurl for embedded HTTP downloads (optional)
+find_package(CURL QUIET)
+if(CURL_FOUND)
+  target_link_libraries(drm_system PRIVATE CURL::libcurl)
+  target_compile_definitions(drm_system PRIVATE HAVE_LIBCURL=1)
+  message(STATUS "Linking drm_system with libcurl")
+else()
+  message(WARNING "libcurl not found; falling back to shell downloader. Embedded downloader disabled.")
+endif()
+
+# Link drm_system into main app
+target_link_libraries(Ultralight-WebBrowser PRIVATE drm_system)
+if(DEBUG_MODE)
+  target_compile_definitions(Ultralight-WebBrowser PRIVATE DEBUG_MODE=1)
+  message(STATUS "Compiling with DEBUG_MODE enabled")
+endif()
+# Diagnostic console app to isolate DrmManager startup
+add_executable(drm_diag src/drm_diag.cpp)
+target_include_directories(drm_diag PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+if(MSVC)
+  target_compile_options(drm_diag PRIVATE /EHsc)
+endif()
+target_link_libraries(drm_diag PRIVATE drm_system)
 
 # Work around GCC 11 ICE on aarch64 when compiling UI.cpp at higher optimisation levels
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
