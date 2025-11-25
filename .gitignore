@@ -16,3 +16,4 @@ CMakeUserPresets.json
 .vscode/tasks.json
 /data/favicons
 /.vscode
+/third_party/cef/extracted
