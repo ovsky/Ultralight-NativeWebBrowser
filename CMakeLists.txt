@@ -21,6 +21,20 @@ endif()
 option(USE_CEF "Link the sidecar against a local CEF SDK (must set CEF_ROOT)" ON)
 set(CEF_ROOT "" CACHE PATH "Path to local CEF SDK root (contains include/ and lib/)")
 
+# If the user didn't provide a CEF_ROOT explicitly, prefer a locally-extracted
+# copy under `third_party/cef/extracted` when present (convenient for offline
+# workflows where the archive has already been downloaded and extracted).
+if(NOT CEF_ROOT)
+  set(_default_cef_extracted "${CMAKE_CURRENT_SOURCE_DIR}/third_party/cef/extracted")
+  if(EXISTS "${_default_cef_extracted}/include")
+    # Basic sanity: presence of include and either Windows or Unix runtime libs
+    if(EXISTS "${_default_cef_extracted}/Release/libcef.dll" OR EXISTS "${_default_cef_extracted}/lib/libcef.so")
+      set(CEF_ROOT "${_default_cef_extracted}" CACHE PATH "Path to local CEF SDK root (contains include/ and lib/)" FORCE)
+      message(STATUS "Using extracted CEF SDK at: ${CEF_ROOT}")
+    endif()
+  endif()
+endif()
+
 # Optional: automatically download a prebuilt CEF binary bundle on Windows.
 # Set -DCEF_AUTO_DOWNLOAD=ON -DCEF_AUTO_URL="https://.../cef_binary_windows.zip"
 # to enable. The ExternalProject will extract into the build directory and set
@@ -79,8 +93,8 @@ endif()
 # If the user has not provided `ULTRALIGHT_SDK_ROOT` and automatic download
 # is disabled, fail early with a clear message describing how to proceed.
 if(NOT ULTRALIGHT_AUTO_DOWNLOAD)
-  if(NOT ULTRALIGHT_SDK_ROOT OR NOT EXISTS "${ULTRALIGHT_SDK_ROOT}/lib" 
-     OR NOT EXISTS "${ULTRALIGHT_SDK_ROOT}/include/AppCore/AppCore.h" 
+  if(NOT ULTRALIGHT_SDK_ROOT OR NOT EXISTS "${ULTRALIGHT_SDK_ROOT}/lib"
+     OR NOT EXISTS "${ULTRALIGHT_SDK_ROOT}/include/AppCore/AppCore.h"
      OR NOT EXISTS "${ULTRALIGHT_SDK_ROOT}/include/Ultralight/Listener.h")
     message(FATAL_ERROR "No Ultralight SDK found or the SDK appears incomplete.\n\nProvide a valid SDK path: -DULTRALIGHT_SDK_ROOT=\"/path/to/ultralight_sdk\"\n (the path must contain 'include/AppCore/AppCore.h' and 'include/Ultralight/Listener.h' and a 'lib/' folder).\n\nOr enable automatic download: -DULTRALIGHT_AUTO_DOWNLOAD=ON -DULTRALIGHT_AUTO_URL=\"<url>\" -DULTRALIGHT_AUTO_URL_HASH=\"SHA256=<hex>\"\n")
   endif()
@@ -324,7 +338,13 @@ if(BUILD_SIDECAR)
     endif()
 
     message(STATUS "Configuring sidecar; attempting to locate CEF under: ${CEF_ROOT}")
-    target_include_directories(sidecar PRIVATE "${CEF_ROOT}/include")
+    # Some CEF headers use paths like "include/cef_base.h" so add both
+    # the SDK root and the SDK include directory to the include path.
+    target_include_directories(sidecar PRIVATE "${CEF_ROOT}" "${CEF_ROOT}/include")
+
+    # Clear any previous compile definitions that might have been cached
+    # (ensures stale HAVE_CEF=1 doesn't persist across reconfigures).
+    set_target_properties(sidecar PROPERTIES COMPILE_DEFINITIONS "")
 
     # Try to locate common CEF import libraries. If we cannot find import
     # libraries, we will build the sidecar as a non-CEF stub (HAVE_CEF not set).
@@ -336,7 +356,13 @@ if(BUILD_SIDECAR)
     if(NOT LIBCEF AND NOT LIBCEF_WRAPPER)
       message(WARNING "Could not find CEF import libraries under ${CEF_ROOT}. The sidecar will be built as a non-CEF stub. To enable CEF, provide a valid CEF_ROOT or run the 'cef_auto' download target.")
     else()
-      # Link libraries and enable CEF codepaths
+      # Ensure headers appear usable before enabling CEF codepaths. Some archives
+      # extract with a layout that places headers under a nested include/ directory
+      # or require additional extraction steps. Verify `cef_app.h` is present.
+      if(NOT EXISTS "${CEF_ROOT}/include/cef_app.h")
+        message(WARNING "CEF import libraries found, but CEF headers not found under ${CEF_ROOT}/include. Building sidecar as non-CEF stub to avoid compile errors.")
+      else()
+      # Link libraries
       if(LIBCEF)
         target_link_libraries(sidecar PRIVATE ${LIBCEF})
       endif()
@@ -344,34 +370,77 @@ if(BUILD_SIDECAR)
         target_link_libraries(sidecar PRIVATE ${LIBCEF_WRAPPER})
       endif()
 
-      # Expose a compile-time macro so the sidecar source can enable CEF codepaths
-      target_compile_definitions(sidecar PRIVATE HAVE_CEF=1)
+      # Before enabling CEF codepaths, verify headers + compile with the
+      # current include/library layout to avoid surprising compile failures.
+      set(_cef_test_src "${CMAKE_BINARY_DIR}/CMakeFiles/cef_test_compile.cpp")
+      file(WRITE ${_cef_test_src} "#include \"${CEF_ROOT}/include/cef_app.h\"\nint main(){return 0;}\n")
+      try_compile(_cef_compiles
+        ${CMAKE_BINARY_DIR}
+        ${_cef_test_src}
+        LINK_LIBRARIES ${LIBCEF}
+        CMAKE_FLAGS "-DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}" "-DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}")
+
+      if(NOT _cef_compiles)
+        message(WARNING "CEF headers/libraries appear unusable for compilation in this environment. Building sidecar as non-CEF stub to avoid errors.")
+      else()
+        # Expose a compile-time macro so the sidecar source can enable CEF codepaths
+        target_compile_definitions(sidecar PRIVATE HAVE_CEF=1)
+      endif()
 
       # Copy runtime CEF artifacts next to the built sidecar binary so it can run
       # without additional system setup. This attempts to copy common files and
       # directories such as the CEF DLL, resources, icudtl.dat, and locales.
       if(WIN32)
-        add_custom_command(TARGET sidecar POST_BUILD
-          COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CEF_ROOT}/Release/libcef.dll" "$<TARGET_FILE_DIR:sidecar>/libcef.dll"
-          COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CEF_ROOT}/Release/icudtl.dat" "$<TARGET_FILE_DIR:sidecar>/icudtl.dat"
-          COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CEF_ROOT}/Resources" "$<TARGET_FILE_DIR:sidecar>/Resources"
-          COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CEF_ROOT}/locales" "$<TARGET_FILE_DIR:sidecar>/locales"
-        )
+        if(EXISTS "${CEF_ROOT}/Release/libcef.dll")
+          add_custom_command(TARGET sidecar POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+              "${CEF_ROOT}/Release/libcef.dll" "$<TARGET_FILE_DIR:sidecar>/libcef.dll"
+          )
+        endif()
+        if(EXISTS "${CEF_ROOT}/Release/icudtl.dat")
+          add_custom_command(TARGET sidecar POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+              "${CEF_ROOT}/Release/icudtl.dat" "$<TARGET_FILE_DIR:sidecar>/icudtl.dat"
+          )
+        endif()
+        if(EXISTS "${CEF_ROOT}/Resources")
+          add_custom_command(TARGET sidecar POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+              "${CEF_ROOT}/Resources" "$<TARGET_FILE_DIR:sidecar>/Resources"
+          )
+        endif()
+        if(EXISTS "${CEF_ROOT}/locales")
+          add_custom_command(TARGET sidecar POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+              "${CEF_ROOT}/locales" "$<TARGET_FILE_DIR:sidecar>/locales"
+          )
+        endif()
       else()
-        add_custom_command(TARGET sidecar POST_BUILD
-          COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CEF_ROOT}/lib/libcef.so" "$<TARGET_FILE_DIR:sidecar>/libcef.so"
-          COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CEF_ROOT}/libicudtl.dat" "$<TARGET_FILE_DIR:sidecar>/icudtl.dat"
-          COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CEF_ROOT}/Resources" "$<TARGET_FILE_DIR:sidecar>/Resources"
-          COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CEF_ROOT}/locales" "$<TARGET_FILE_DIR:sidecar>/locales"
-        )
+        if(EXISTS "${CEF_ROOT}/lib/libcef.so")
+          add_custom_command(TARGET sidecar POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+              "${CEF_ROOT}/lib/libcef.so" "$<TARGET_FILE_DIR:sidecar>/libcef.so"
+          )
+        endif()
+        if(EXISTS "${CEF_ROOT}/libicudtl.dat")
+          add_custom_command(TARGET sidecar POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+              "${CEF_ROOT}/libicudtl.dat" "$<TARGET_FILE_DIR:sidecar>/icudtl.dat"
+          )
+        endif()
+        if(EXISTS "${CEF_ROOT}/Resources")
+          add_custom_command(TARGET sidecar POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+              "${CEF_ROOT}/Resources" "$<TARGET_FILE_DIR:sidecar>/Resources"
+          )
+        endif()
+        if(EXISTS "${CEF_ROOT}/locales")
+          add_custom_command(TARGET sidecar POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+              "${CEF_ROOT}/locales" "$<TARGET_FILE_DIR:sidecar>/locales"
+          )
+        endif()
+      endif()
       endif()
     endif()
   endif()
