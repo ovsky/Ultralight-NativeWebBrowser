@@ -339,10 +339,42 @@ __ul.back();                              // Navigate back
 __ul.forward();                           // Navigate forward
 __ul.reload();                            // Reload current page
 __ul.stop();                              // Stop loading
+
+### Embedded Downloader (libcurl)
+
+This project optionally uses `libcurl` for the built-in HTTP downloader used by the DRM subsystem. When `libcurl` is found by CMake at configure time, the embedded downloader is enabled and provides accurate byte-level progress reporting and reliable cross-platform behavior. If `libcurl` is not found, the build falls back to a shell-based downloader (PowerShell on Windows or `curl` on Unix) with file-size polling.
+
+To enable the embedded downloader, install the `libcurl` development package on your platform and re-run CMake:
+
+- Windows (recommended via vcpkg):
+```powershell
+# Example using vcpkg
 __ul.navigate("https://example.com");     // Navigate to URL
 __ul.newTab("https://example.org");       // Open new tab with URL
 __ul.closeTab();                          // Close current tab
 __ul.closeTab(id);                        // Close specific tab by ID
+```
+
+- Debian/Ubuntu:
+```bash
+sudo apt update
+sudo apt install libcurl4-openssl-dev
+cmake -S . -B build -DULTRALIGHT_SDK_ROOT=/path/to/sdk
+```
+
+- Fedora/CentOS:
+```bash
+sudo dnf install libcurl-devel
+```
+
+- macOS (Homebrew):
+```bash
+brew install curl
+# You may need to point CMake at Homebrew's curl using CMAKE_PREFIX_PATH
+cmake -S . -B build -DULTRALIGHT_SDK_ROOT=/path/to/sdk -DCMAKE_PREFIX_PATH="/usr/local/opt/curl"
+```
+
+After installing `libcurl`, re-run CMake to pick it up and rebuild. The build will print a message when it links the `drm_system` library with libcurl.
 __ul.openHistory();                       // Open history overlay
 ```
 
