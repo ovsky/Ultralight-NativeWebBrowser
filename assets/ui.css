@@ -11,7 +11,6 @@ body {
      font-size: 14px;
      background: #16151d;
      color: #c4c2d0;
-     /* Fade in on load using CSS animation (no JS required) */
      animation: ul_fade_in 1s ease forwards;
      -webkit-animation: ul_fade_in 1s ease forwards;
 }
@@ -37,7 +36,7 @@ body {
 }
 
 #address {
-     /* Pill shape and no default outline */
+     
      border-radius: 9999px;
      border: none;
      height: 32px;
