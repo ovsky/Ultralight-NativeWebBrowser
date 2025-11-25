@@ -24,6 +24,10 @@
             background: var(--bg);
             color: var(--fg);
             pointer-events: auto;
+            opacity: 0;
+            /* Fade in on load (CSS only) */
+            animation: ul_fade_in 1s ease forwards;
+            -webkit-animation: ul_fade_in 1s ease forwards;
         }
 
         .toolbar {
@@ -213,6 +217,8 @@
             border-radius: 4px;
             border: 1px solid var(--border);
         }
+    @keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
+    @-webkit-keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
     </style>
     <script>
         // Global event sinks from native C++
@@ -710,3 +716,7 @@
 </body>
 
 </html>
+
+<script>
+    <!-- Fade-in handled by CSS animation; no JS needed -->
+</script>

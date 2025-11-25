@@ -9,7 +9,6 @@
     <link rel="stylesheet" type="text/css" href="ui.css">
     <style>
         * {
-            transition: all 0.2s ease-in-out;
         }
 
         :root {
@@ -29,6 +28,10 @@
             background: var(--bg, #f6f7f9);
             color: var(--fg, #111);
             min-height: 100vh;
+            opacity: 0;
+            /* Fade in on load (CSS only) */
+            animation: ul_fade_in 1s ease forwards;
+            -webkit-animation: ul_fade_in 1s ease forwards;
         }
 
         .container {
@@ -121,6 +124,8 @@
         }
 
         /* No toggle anymore */
+    @keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
+    @-webkit-keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 
@@ -140,8 +145,13 @@
     </div>
 
     <script>
-        function fmtTime(ts) {
-            try { return new Date(ts).toLocaleString(); } catch { return '' + ts; }
+    </body>
+
+    <script>
+        <!-- Fade-in handled by CSS animation; no JS needed -->
+    </script>
+
+    </html>
         }
         function render(data) {
             const list = document.getElementById('history-list');
