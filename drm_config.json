@@ -1,0 +1,10 @@
+{
+    "force_native_webview": false,
+    "is_drm_globally_enabled": true,
+    "known_drm_domains": {
+        "disneyplus.com": true,
+        "netflix.com": true,
+        "spotify.com": true,
+        "youtube.com": false
+    }
+}

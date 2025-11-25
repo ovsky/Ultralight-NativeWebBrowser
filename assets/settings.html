@@ -266,6 +266,37 @@
             line-height: 1.5;
         }
 
+        .drm-progress-wrap {
+            margin-top: 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 8px;
+        }
+
+        .drm-progress {
+            width: 100%;
+            height: 14px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .drm-progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent-primary), #6bb3ff);
+            transition: width 300ms ease;
+        }
+
+        .drm-progress-label {
+            margin-top: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-family: system-ui, -apple-system, Segoe UI, Roboto;
+        }
+
         /* Scrollbar styling */
         ::-webkit-scrollbar {
             width: 8px;
@@ -370,6 +401,14 @@
             }
         };
 
+        // DRM UI definitions (injected separately so it appears near top)
+        settingsDefinitions.drm = {
+            title: 'DRM / Hybrid Playback', settings: [
+                { key: 'is_drm_globally_enabled', name: 'Enable Hybrid DRM Mode', description: 'When enabled, protected streams open in a native browser window.' },
+                { key: 'force_native_webview', name: 'Force Native Webview', description: 'Force all navigations to open in native webview (useful for testing).' }
+            ]
+        };
+
         let currentSettings = {}, originalSettings = {}, isDirty = false;
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -377,6 +416,65 @@
             loadSettings();
             document.getElementById('btn-save').addEventListener('click', saveSettings);
             document.getElementById('btn-restore').addEventListener('click', restoreDefaults);
+            // Start periodic DRM dependency info polling. Show DRM UI only when activity is detected.
+            setInterval(() => {
+                const drmLogEl = document.getElementById('drm-log');
+                const drmMetaEl = document.getElementById('drm-meta');
+                const progressWrapEl = document.getElementById('drm-progress-wrap');
+                const progressBarEl = document.getElementById('drm-progress-bar');
+                const progressLabelEl = document.getElementById('drm-progress-label');
+
+                // Query dependency info first and decide visibility
+                if (drmMetaEl && typeof window.GetDrmDependencyInfo === 'function') {
+                    try {
+                        const info = window.GetDrmDependencyInfo();
+                        if (info) {
+                            let obj = typeof info === 'string' ? JSON.parse(info) : info;
+                            const active = Boolean(obj.in_progress) || (obj.exit_code && Number(obj.exit_code) >= 0) || (obj.bytes_downloaded && Number(obj.bytes_downloaded) > 0);
+                            if (active) {
+                                drmMetaEl.style.display = '';
+                                if (progressWrapEl) progressWrapEl.style.display = '';
+                                if (drmLogEl) drmLogEl.style.display = '';
+                            } else {
+                                drmMetaEl.style.display = 'none';
+                                if (progressWrapEl) progressWrapEl.style.display = 'none';
+                                if (drmLogEl) drmLogEl.style.display = 'none';
+                            }
+
+                            drmMetaEl.textContent = `URL: ${obj.url || ''} | Target: ${obj.target || ''} | InProgress: ${obj.in_progress} | ExitCode: ${obj.exit_code} | Downloaded: ${obj.bytes_downloaded || 0}/${obj.bytes_total || 0}`;
+
+                            if (progressBarEl && progressLabelEl) {
+                                const bytes = Number(obj.bytes_downloaded || 0);
+                                const total = Number(obj.bytes_total || 0);
+                                if (total > 0) {
+                                    const pct = Math.max(0, Math.min(100, Math.round((bytes / total) * 100)));
+                                    progressBarEl.style.width = pct + '%';
+                                    progressLabelEl.textContent = pct + '% — ' + bytes + ' / ' + total + ' bytes';
+                                } else if (obj.in_progress) {
+                                    progressBarEl.style.width = '6%';
+                                    progressLabelEl.textContent = 'Starting...';
+                                } else {
+                                    progressBarEl.style.width = '0%';
+                                    progressLabelEl.textContent = 'No active download';
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Failed to fetch DRM dependency info', e);
+                    }
+                }
+
+                // Update DRM log only when visible
+                if (drmLogEl && drmLogEl.style.display !== 'none' && typeof window.GetDrmLog === 'function') {
+                    try {
+                        const txt = window.GetDrmLog();
+                        drmLogEl.textContent = txt || '';
+                        drmLogEl.scrollTop = drmLogEl.scrollHeight;
+                    } catch (e) {
+                        console.warn('Failed to fetch DRM log', e);
+                    }
+                }
+            }, 3000);
         });
 
         function loadSettings() {
@@ -392,6 +490,17 @@
                 if (data && data.values) {
                     currentSettings = { ...data.values };
                     originalSettings = { ...data.values };
+                    // Merge DRM meta values into current settings so toggles reflect DrmConfig
+                    if (data.meta && data.meta.drm) {
+                        const drm = data.meta.drm;
+                        if (typeof drm.is_drm_globally_enabled !== 'undefined')
+                            currentSettings['is_drm_globally_enabled'] = drm.is_drm_globally_enabled;
+                        if (typeof drm.force_native_webview !== 'undefined')
+                            currentSettings['force_native_webview'] = drm.force_native_webview;
+                        // Ensure original also reflects these values
+                        originalSettings['is_drm_globally_enabled'] = currentSettings['is_drm_globally_enabled'];
+                        originalSettings['force_native_webview'] = currentSettings['force_native_webview'];
+                    }
                     log('Loaded ' + Object.keys(currentSettings).length + ' settings');
                     if (data.meta && data.meta.storage_path) {
                         document.getElementById('storage-path').textContent = 'Storage: ' + data.meta.storage_path;
@@ -443,6 +552,99 @@
                     itemDiv.appendChild(toggleDiv);
                     groupDiv.appendChild(itemDiv);
                 });
+                // If this is the DRM group, add download button and log viewer
+                if (groupKey === 'drm') {
+                    const drmActions = document.createElement('div');
+                    drmActions.style.display = 'flex';
+                    drmActions.style.gap = '8px';
+                    drmActions.style.marginTop = '8px';
+
+                    const btnDownload = document.createElement('button');
+                    btnDownload.className = 'btn-primary';
+                    btnDownload.textContent = 'Download DRM Dependencies';
+                    btnDownload.addEventListener('click', () => {
+                        log('Starting DRM dependency download...');
+                        if (typeof window.OnStartDrmDependencyDownload === 'function') {
+                            window.OnStartDrmDependencyDownload();
+                            // Immediately request dependency info to show URL/target
+                            if (typeof window.GetDrmDependencyInfo === 'function') {
+                                try {
+                                    const info = window.GetDrmDependencyInfo();
+                                    const drmMeta = document.getElementById('drm-meta');
+                                    if (drmMeta) {
+                                        let obj = typeof info === 'string' ? JSON.parse(info) : info;
+                                        drmMeta.textContent = `URL: ${obj.url || ''} | Target: ${obj.target || ''} | InProgress: ${obj.in_progress} | ExitCode: ${obj.exit_code} | Downloaded: ${obj.bytes_downloaded || 0}/${obj.bytes_total || 0}`;
+                                        // Update graphical progress bar
+                                        const progressBar = document.getElementById('drm-progress-bar');
+                                        const progressLabel = document.getElementById('drm-progress-label');
+                                        if (progressBar && progressLabel) {
+                                            const bytes = Number(obj.bytes_downloaded || 0);
+                                            const total = Number(obj.bytes_total || 0);
+                                            if (total > 0) {
+                                                const pct = Math.max(0, Math.min(100, Math.round((bytes / total) * 100)));
+                                                progressBar.style.width = pct + '%';
+                                                progressLabel.textContent = pct + '% — ' + bytes + ' / ' + total + ' bytes';
+                                            } else if (obj.in_progress) {
+                                                progressBar.style.width = '6%';
+                                                progressLabel.textContent = 'Starting...';
+                                            } else {
+                                                progressBar.style.width = '0%';
+                                                progressLabel.textContent = 'No active download';
+                                            }
+                                        }
+                                    }
+                                } catch (e) {
+                                    log('Failed to read dependency info: ' + e.message);
+                                }
+                            }
+                        }
+                    });
+
+                    const btnRefreshLog = document.createElement('button');
+                    btnRefreshLog.className = 'btn-secondary';
+                    btnRefreshLog.textContent = 'Refresh DRM Log';
+                    btnRefreshLog.addEventListener('click', () => {
+                        fetchDrmLog();
+                    });
+
+                    drmActions.appendChild(btnDownload);
+                    drmActions.appendChild(btnRefreshLog);
+                    groupDiv.appendChild(drmActions);
+
+                    const drmMeta = document.createElement('div');
+                    drmMeta.id = 'drm-meta';
+                    drmMeta.className = 'storage-path';
+                    drmMeta.textContent = 'Dependency: N/A';
+                    groupDiv.appendChild(drmMeta);
+
+                    const progressWrap = document.createElement('div');
+                    progressWrap.className = 'drm-progress-wrap';
+                    const progressOuter = document.createElement('div');
+                    progressOuter.className = 'drm-progress';
+                    const progressBar = document.createElement('div');
+                    progressBar.id = 'drm-progress-bar';
+                    progressBar.className = 'drm-progress-bar';
+                    progressOuter.appendChild(progressBar);
+                    const progressLabel = document.createElement('div');
+                    progressLabel.id = 'drm-progress-label';
+                    progressLabel.className = 'drm-progress-label';
+                    progressLabel.textContent = 'No active download';
+                    progressWrap.id = 'drm-progress-wrap';
+                    progressWrap.appendChild(progressOuter);
+                    progressWrap.appendChild(progressLabel);
+                    groupDiv.appendChild(progressWrap);
+
+                    const drmLog = document.createElement('div');
+                    drmLog.id = 'drm-log';
+                    drmLog.className = 'debug-info';
+                    drmLog.textContent = 'DRM log will appear here...';
+                    drmLog.style.display = 'none';
+                    groupDiv.appendChild(drmLog);
+
+                    // Initially hide meta/progress/log until there is activity
+                    drmMeta.style.display = 'none';
+                    progressWrap.style.display = 'none';
+                }
                 container.appendChild(groupDiv);
             });
             log('Rendered UI');
@@ -483,6 +685,31 @@
                         updateDirtyState();
                         log('Restored');
                     }
+
+                    // DRM log fetcher
+                    function fetchDrmLog() {
+                        if (typeof window.GetDrmLog !== 'function') {
+                            log('GetDrmLog bridge not ready, retrying...');
+                            setTimeout(fetchDrmLog, 200);
+                            return;
+                        }
+                        try {
+                            const txt = window.GetDrmLog();
+                            const drmLog = document.getElementById('drm-log');
+                            if (drmLog) {
+                                drmLog.textContent = txt || '';
+                                drmLog.scrollTop = drmLog.scrollHeight;
+                            }
+                        } catch (e) {
+                            log('Failed to fetch DRM log: ' + e.message);
+                        }
+                    }
+
+                    // Poll DRM log periodically when settings tab is open
+                    setInterval(() => {
+                        const drmLog = document.getElementById('drm-log');
+                        if (drmLog) fetchDrmLog();
+                    }, 3000);
                 } catch (error) {
                     log('ERROR: ' + error.message);
                 }
