@@ -10,7 +10,6 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            transition: all 0.2s ease-in-out;
         }
 
         :root {
@@ -41,6 +40,9 @@
             padding: 40px 20px;
             line-height: 1.6;
             min-height: 100vh;
+            /* Fade in on load via CSS animation (no JS required) */
+            animation: ul_fade_in 1s ease forwards;
+            -webkit-animation: ul_fade_in 1s ease forwards;
         }
 
         .container {
@@ -285,6 +287,8 @@
         ::-webkit-scrollbar-thumb:hover {
             background: rgba(255, 255, 255, 0.25);
         }
+    @keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
+    @-webkit-keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 
@@ -304,9 +308,9 @@
         <div class="storage-path" id="storage-path"></div>
         <div class="debug-info" id="debug-info"></div>
     </div>
-    <script>
-        function log(msg) {
-            console.log('[Settings]', msg);
+    </body>
+
+    </html>
             const debug = document.getElementById('debug-info');
             if (debug) {
                 debug.textContent += new Date().toLocaleTimeString() + ': ' + msg + '\n';
