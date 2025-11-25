@@ -467,11 +467,23 @@ namespace
 UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
                                 is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false)
 {
+  // Trace UI startup steps
+  {
+    std::ofstream trace("startup_trace.log", std::ios::app);
+    if (trace.good())
+      trace << "UI::UI(window) - start\n";
+  }
   uint32_t window_width = window_->width();
   ui_height_ = (uint32_t)std::round(UI_HEIGHT * window_->scale());
   base_ui_height_ = ui_height_;
   overlay_ = Overlay::Create(window_, window_width, ui_height_, 0, 0);
   g_ui = this;
+
+  {
+    std::ofstream trace("startup_trace.log", std::ios::app);
+    if (trace.good())
+      trace << "UI::UI(window) - overlay created\n";
+  }
 
   // Prepare settings and state BEFORE loading the main UI document so the first snapshot reflects persisted values.
   LoadSuggestionsFaviconsFlag();
@@ -480,9 +492,18 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
   LoadSettingsFromDisk();
 
   // Hook listeners and then load UI document
+  // Hook listeners and load a minimal placeholder HTML to avoid running
+  // complex UI scripts during early startup. If the crash is triggered by
+  // UI script execution, this prevents it and allows the app to initialize.
   view()->set_load_listener(this);
   view()->set_view_listener(this);
-  view()->LoadURL("file:///ui.html");
+  {
+    std::ofstream trace("startup_trace.log", std::ios::app);
+    if (trace.good())
+      trace << "UI::UI(window) - loading placeholder UI (LoadHTML)\n";
+  }
+  // Minimal, safe placeholder to render until full UI is loaded later.
+  view()->LoadHTML("<!doctype html><html><head><meta charset='utf-8'><title>UI</title></head><body></body></html>");
 
   download_manager_ = std::make_unique<DownloadManager>();
   download_manager_->SetOnChangeCallback([this]()
@@ -509,20 +530,39 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
       is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false),
       adblock_(adblock), trackerblock_(tracker)
 {
+  // Trace UI startup when adblock/tracker overload used
+  {
+    std::ofstream trace("startup_trace.log", std::ios::app);
+    if (trace.good())
+      trace << "UI::UI(window, adblock, tracker) - start\n";
+  }
   uint32_t window_width = window_->width();
   ui_height_ = (uint32_t)std::round(UI_HEIGHT * window_->scale());
   base_ui_height_ = ui_height_;
   overlay_ = Overlay::Create(window_, window_width, ui_height_, 0, 0);
   g_ui = this;
 
+  {
+    std::ofstream trace("startup_trace.log", std::ios::app);
+    if (trace.good())
+      trace << "UI::UI(window, adblock, tracker) - overlay created\n";
+  }
+
   LoadSuggestionsFaviconsFlag();
   EnsureDataDirectoryExists();
   settings_storage_path_ = SettingsFilePath().string();
   LoadSettingsFromDisk();
 
+  // Hook listeners and load a minimal placeholder HTML to avoid running
+  // complex UI scripts during early startup. See note above in single-arg ctor.
   view()->set_load_listener(this);
   view()->set_view_listener(this);
-  view()->LoadURL("file:///ui.html");
+  {
+    std::ofstream trace("startup_trace.log", std::ios::app);
+    if (trace.good())
+      trace << "UI::UI(window, adblock, tracker) - loading placeholder UI (LoadHTML)\n";
+  }
+  view()->LoadHTML("<!doctype html><html><head><meta charset='utf-8'><title>UI</title></head><body></body></html>");
 
   download_manager_ = std::make_unique<DownloadManager>();
   download_manager_->SetOnChangeCallback([this]()

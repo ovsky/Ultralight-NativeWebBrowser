@@ -4,6 +4,7 @@
 #include <Ultralight/platform/Config.h>
 #include <Ultralight/Renderer.h>
 #include <memory>
+#include <fstream>
 
 #include "AdBlocker.h"
 
@@ -16,14 +17,45 @@
 
 Browser::Browser()
 {
+  // Startup trace (append-only) to help isolate crashes before debugger attach
+  {
+    std::ofstream trace("startup_trace.log", std::ios::app);
+    if (trace.good())
+      trace << "Browser::Browser() - start\n";
+  }
   Settings settings;
   Config config;
   config.scroll_timer_delay = 1.0 / 90.0;
   app_ = App::Create(settings, config);
+  {
+    std::ofstream trace("startup_trace.log", std::ios::app);
+    if (trace.good())
+      trace << "Browser::Browser() - app created\n";
+  }
 
   window_ = Window::Create(app_->main_monitor(), 1024, 768, false,
                            kWindowFlags_Resizable | kWindowFlags_Titled | kWindowFlags_Maximizable);
   window_->SetTitle("Ultralight | Web Browser");
+
+#if defined(_WIN32)
+  // Set the native window background to a dark gray so the app shows a dark
+  // background before any web content paints. This uses a per-class brush.
+  HWND hwnd_bg = (HWND)window_->native_handle();
+  if (hwnd_bg) {
+    HBRUSH hBrush = CreateSolidBrush(RGB(22, 21, 29)); // #16151d dark gray
+    // Replace the class background brush for this window's class.
+    SetClassLongPtr(hwnd_bg, GCLP_HBRBACKGROUND, (LONG_PTR)hBrush);
+    // Force a repaint so the background is visible immediately.
+    InvalidateRect(hwnd_bg, NULL, TRUE);
+    UpdateWindow(hwnd_bg);
+  }
+#endif
+
+  {
+    std::ofstream trace("startup_trace.log", std::ios::app);
+    if (trace.good())
+      trace << "Browser::Browser() - window created\n";
+  }
 
 #if defined(_WIN32)
   HWND hwnd = (HWND)window_->native_handle();
@@ -53,16 +85,40 @@ Browser::Browser()
     SendMessage((HWND)window_->native_handle(), WM_SETICON, ICON_BIG, (LPARAM)hIconBig);
     SendMessage((HWND)window_->native_handle(), WM_SETICON, ICON_SMALL, (LPARAM)hIconSmall);
   }
+
+  {
+    std::ofstream trace("startup_trace.log", std::ios::app);
+    if (trace.good())
+      trace << "Browser::Browser() - window icons set\n";
+  }
 #endif
 
   // Create the UI
-  // Initialize ad/tracker blocker with default blocklist and additional filters
+  // NOTE: Temporarily disable AdBlocker initialization/loads and pass
+  // null pointers into UI. This is a reversible mitigation to determine
+  // whether AdBlocker startup code is triggering the crash.
   adblock_ = std::make_unique<AdBlocker>();
-  adblock_->Clear();
-  adblock_->LoadBlocklist("assets/blocklist.txt", true);
-  adblock_->LoadBlocklistsInDirectory("assets/filters");
+  {
+    std::ofstream trace("startup_trace.log", std::ios::app);
+    if (trace.good())
+      trace << "Browser::Browser() - adblock constructed\n";
+  }
+  //adblock_->Clear();
+  //adblock_->LoadBlocklist("assets/blocklist.txt", true);
+  //adblock_->LoadBlocklistsInDirectory("assets/filters");
 
-  ui_.reset(new UI(window_, adblock_.get(), adblock_.get()));
+  // Pass nullptrs for adblock/tracker to avoid early adblock interactions.
+  {
+    std::ofstream trace("startup_trace.log", std::ios::app);
+    if (trace.good())
+      trace << "Browser::Browser() - creating UI (null adblock)\n";
+  }
+  ui_.reset(new UI(window_, nullptr, nullptr));
+  {
+    std::ofstream trace("startup_trace.log", std::ios::app);
+    if (trace.good())
+      trace << "Browser::Browser() - UI created\n";
+  }
   window_->set_listener(ui_.get());
 }
 

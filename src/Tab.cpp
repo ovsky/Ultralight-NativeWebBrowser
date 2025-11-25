@@ -11,10 +11,22 @@
 Tab::Tab(UI *ui, uint64_t id, uint32_t width, uint32_t height, int x, int y)
     : ui_(ui), id_(id), container_width_(width), container_height_(height)
 {
-  overlay_ = Overlay::Create(ui->window_, width, height, x, y);
-  view()->set_view_listener(this);
-  view()->set_load_listener(this);
-  view()->set_download_listener(ui->download_manager());
+  // Create a transparent view so the underlying window background shows
+  // through while pages are loading (prevents white flash). The view will
+  // still render page content normally once it paints.
+  ultralight::ViewConfig cfg;
+  cfg.initial_device_scale = ui->window_->scale();
+  cfg.is_transparent = true;
+  // Disable GPU acceleration for tab content views to avoid GPU driver
+  // texture binding errors on some systems. Using a non-accelerated view
+  // forces the renderer to composite without creating GPU textures.
+  cfg.is_accelerated = false;
+  auto view = App::instance()->renderer()->CreateView(width, height, cfg, nullptr);
+  overlay_ = Overlay::Create(ui->window_, view, x, y);
+  // Hook listeners on the created view
+  overlay_->view()->set_view_listener(this);
+  overlay_->view()->set_load_listener(this);
+  overlay_->view()->set_download_listener(ui->download_manager());
 }
 
 Tab::~Tab()
