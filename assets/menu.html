@@ -7,6 +7,9 @@
         body {
             margin: 0;
             background: transparent;
+            opacity: 0;
+            animation: ul_fade_in 0.2s ease-in forwards;
+            -webkit-animation: ul_fade_in 0.2s ease-in forwards;
         }
 
         /* Ensure the dropdown is fixed relative to the window */
@@ -43,6 +46,8 @@
             font-size: 12px;
             color: rgba(226, 225, 234, 0.7);
         }
+    @keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
+    @-webkit-keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 
@@ -148,6 +153,9 @@
                 closeMenu();
             });
         })();
+    </script>
+    <script>
+    
     </script>
 </body>
 

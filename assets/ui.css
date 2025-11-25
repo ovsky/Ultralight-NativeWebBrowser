@@ -2,7 +2,6 @@
      overflow: hidden;
      user-select: none;
      -webkit-user-select: none;
-     transition: all 0.2s ease-in-out;
 }
 
 body {
@@ -12,6 +11,18 @@ body {
      font-size: 14px;
      background: #16151d;
      color: #c4c2d0;
+     animation: ul_fade_in 1s ease forwards;
+     -webkit-animation: ul_fade_in 1s ease forwards;
+}
+
+@keyframes ul_fade_in {
+     from { opacity: 0; }
+     to { opacity: 1; }
+}
+
+@-webkit-keyframes ul_fade_in {
+     from { opacity: 0; }
+     to { opacity: 1; }
 }
 
 #bar {
@@ -25,7 +36,7 @@ body {
 }
 
 #address {
-     /* Pill shape and no default outline */
+     
      border-radius: 9999px;
      border: none;
      height: 32px;

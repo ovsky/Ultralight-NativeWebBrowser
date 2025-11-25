@@ -7,7 +7,6 @@
     <style>
         * {
             box-sizing: border-box;
-            transition: all 0.2s ease-in-out;
         }
 
         :root {
@@ -19,6 +18,10 @@
             font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
             color: #ecebfd;
             background: transparent;
+            opacity: 0;
+            /* Fade in on load (CSS only) */
+            animation: ul_fade_in 1s ease forwards;
+            -webkit-animation: ul_fade_in 1s ease forwards;
         }
 
         #downloads-root {
@@ -241,6 +244,8 @@
                 background: rgba(216, 143, 22, 0.18);
             }
         }
+    @keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
+    @-webkit-keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 
@@ -485,3 +490,7 @@
 </body>
 
 </html>
+
+<script>
+    
+</script>

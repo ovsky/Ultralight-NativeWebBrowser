@@ -10,6 +10,9 @@
       font-weight: 300;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
       color: #e3e3e3;
+          /* Fade in on load (CSS only) */
+          animation: ul_fade_in 1s ease forwards;
+          -webkit-animation: ul_fade_in 1s ease forwards;
     }
 
     h1, h2, h3, h4, strong, dt {
@@ -80,6 +83,9 @@
       padding: 6px 0;
       font-size: 1.2em;
     }
+
+    @keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
+    @-webkit-keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
 
     p {
       padding: 6px 0;
@@ -243,5 +249,9 @@
     <p class="signature">- Ultralight Team</p>
   </div>
 </body>
+
+<script>
+  
+</script>
 
 </html>

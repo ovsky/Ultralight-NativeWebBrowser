@@ -27,11 +27,12 @@
       font-family: arial, sans-serif;
       background-color: #202124;
       /* Google Dark Background */
-      color: #e8eaed;
+      color: #202124;
       display: flex;
       flex-direction: column;
       overflow-x: hidden;
-      /* Prevents horizontal scrolling */
+      /* Do NOT animate the document root's opacity; keep the page background
+        constant so we avoid a white flash. We'll fade only the main content. */
     }
 
     /* Main Content Area */
@@ -46,6 +47,10 @@
       padding-bottom: 120px;
       /* Visual balance */
       width: 100%;
+      /* Fade the visible content in while leaving the page background unchanged */
+      opacity: 0;
+      animation: ul_fade_in 0.2s ease-in forwards;
+      -webkit-animation: ul_fade_in 0.2s ease-in forwards;
     }
 
     /* Google Logo SVG Container */
@@ -173,6 +178,11 @@
       filter: drop-shadow(0 0 4px #a142f4);
     }
   </style>
+
+  <style>
+    @keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
+    @-webkit-keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
+  </style>
 </head>
 
 <body>
@@ -218,6 +228,8 @@
       Ultralight - Web Browser
     </a>
   </footer>
+
+  
 
 </body>
 
