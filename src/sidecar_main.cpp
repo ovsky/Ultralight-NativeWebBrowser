@@ -2,11 +2,10 @@
 // Minimal sidecar process entry point. This file is a mocked/stubbed CEF wrapper
 // that demonstrates how the child process would parse command-line arguments,
 // accept a parent window handle, and embed a renderer into that parent.
-
+// sidecar_main.cpp
 #include <iostream>
 #include <string>
 #include <vector>
-#include <cstring>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -50,19 +49,21 @@ int main(int argc, char **argv)
     // to the lightweight platform stubs that simulate an embedded renderer.
 #if defined(HAVE_CEF)
 
-    // Include CEF headers (CEF include directory must be on the compiler include path)
-    #include <cef_app.h>
-    #include <cef_client.h>
-    #include <cef_browser.h>
+// Include CEF headers (CEF include directory must be on the compiler include path)
+#include <cef_app.h>
+#include <cef_client.h>
+#include <cef_browser.h>
 
     // Minimal CefApp implementation for the browser process.
-    class SimpleCefApp : public CefApp, public CefBrowserProcessHandler {
+    class SimpleCefApp : public CefApp, public CefBrowserProcessHandler
+    {
     public:
         SimpleCefApp() {}
 
         CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override { return this; }
 
-        void OnContextInitialized() override {
+        void OnContextInitialized() override
+        {
             // Intentionally empty: browser creation is performed below in main()
         }
 
@@ -71,20 +72,23 @@ int main(int argc, char **argv)
     };
 
     // Minimal CefClient handling lifespan events and shutting down the loop.
-    class SimpleClient : public CefClient, public CefLifeSpanHandler {
+    class SimpleClient : public CefClient, public CefLifeSpanHandler
+    {
     public:
         SimpleClient() : browser_(nullptr) {}
 
         CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
 
-        void OnAfterCreated(CefRefPtr<CefBrowser> browser) override {
+        void OnAfterCreated(CefRefPtr<CefBrowser> browser) override
+        {
             CEF_REQUIRE_UI_THREAD();
             browser_ = browser;
         }
 
         bool DoClose(CefRefPtr<CefBrowser> browser) override { return false; }
 
-        void OnBeforeClose(CefRefPtr<CefBrowser> browser) override {
+        void OnBeforeClose(CefRefPtr<CefBrowser> browser) override
+        {
             CEF_REQUIRE_UI_THREAD();
             CefQuitMessageLoop();
         }
@@ -119,7 +123,7 @@ int main(int argc, char **argv)
     HWND parent = (HWND)(uintptr_t)parentId;
     window_info.SetAsChild(parent, CefRect(0, 0, width, height));
 #else
-    void* parent = reinterpret_cast<void*>(static_cast<uintptr_t>(parentId));
+    void *parent = reinterpret_cast<void *>(static_cast<uintptr_t>(parentId));
     window_info.SetAsChild(parent, CefRect(0, 0, width, height));
 #endif
 
@@ -218,3 +222,5 @@ int main(int argc, char **argv)
 
     return 0;
 }
+
+#endif

@@ -34,16 +34,19 @@ using namespace std::chrono_literals;
 namespace fs = std::filesystem;
 
 // Helper: run a command and capture its stdout (single string). Uses popen.
-static std::string RunCommandCapture(const std::string &cmd) {
+static std::string RunCommandCapture(const std::string &cmd)
+{
     std::string result;
 #ifdef _WIN32
-    FILE* pipe = _popen(cmd.c_str(), "r");
+    FILE *pipe = _popen(cmd.c_str(), "r");
 #else
-    FILE* pipe = popen(cmd.c_str(), "r");
+    FILE *pipe = popen(cmd.c_str(), "r");
 #endif
-    if (!pipe) return result;
+    if (!pipe)
+        return result;
     char buffer[256];
-    while (fgets(buffer, sizeof(buffer), pipe)) {
+    while (fgets(buffer, sizeof(buffer), pipe))
+    {
         result += buffer;
     }
 #ifdef _WIN32
@@ -56,17 +59,19 @@ static std::string RunCommandCapture(const std::string &cmd) {
 
 #ifdef HAVE_LIBCURL
 // Helper: download text into a string using libcurl
-static bool CurlDownloadToString(const std::string &url, std::string &out) {
+static bool CurlDownloadToString(const std::string &url, std::string &out)
+{
     CURL *curl = curl_easy_init();
-    if (!curl) return false;
+    if (!curl)
+        return false;
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, +[](char* ptr, size_t size, size_t nmemb, void* userdata) -> size_t {
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, +[](char *ptr, size_t size, size_t nmemb, void *userdata) -> size_t
+                     {
         std::string *s = (std::string*)userdata;
         s->append(ptr, size * nmemb);
-        return size * nmemb;
-    });
+        return size * nmemb; });
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &out);
     CURLcode res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
@@ -75,7 +80,8 @@ static bool CurlDownloadToString(const std::string &url, std::string &out) {
 #endif
 
 // Compute SHA256 of a file using platform tools (sha256sum or CertUtil)
-static std::string ComputeFileSha256(const std::string &path) {
+static std::string ComputeFileSha256(const std::string &path)
+{
     std::string cmd;
 #ifdef _WIN32
     // CertUtil prints hex groups with spaces; we'll parse it
@@ -84,19 +90,25 @@ static std::string ComputeFileSha256(const std::string &path) {
     // Find hex-like line
     std::istringstream iss(out);
     std::string line;
-    while (std::getline(iss, line)) {
+    while (std::getline(iss, line))
+    {
         // Remove spaces
         std::string t;
-        for (char c : line) if (isxdigit((unsigned char)c)) t.push_back(c);
-        if (t.size() == 64) return t;
+        for (char c : line)
+            if (isxdigit((unsigned char)c))
+                t.push_back(c);
+        if (t.size() == 64)
+            return t;
     }
     return std::string();
 #else
     cmd = "sha256sum '" + path + "' 2>/dev/null";
     std::string out = RunCommandCapture(cmd);
-    if (out.empty()) return std::string();
+    if (out.empty())
+        return std::string();
     std::istringstream iss(out);
-    std::string hash; iss >> hash;
+    std::string hash;
+    iss >> hash;
     return hash;
 #endif
 }
