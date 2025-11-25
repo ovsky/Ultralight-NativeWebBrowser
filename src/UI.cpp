@@ -6,6 +6,7 @@
 #include <chrono>
 #include <fstream>
 #include <sstream>
+#include <thread>
 #include <cctype>
 #include <algorithm>
 #include <unordered_set>
@@ -19,6 +20,7 @@
 #include <cstdlib>
 #include "DownloadManager.h"
 #include "AdBlocker.h"
+#include "DrmPlaybackSystem/DrmLogger.h"
 #ifdef _WIN32
 #include <direct.h> // _mkdir, _getcwd
 #ifndef NOMINMAX
@@ -872,6 +874,38 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
       active_tab()->view()->Focus();
     }
   }
+  // Debug-only: hover detection to show page title after 2 seconds
+#ifdef DEBUG_MODE
+  if (evt.type == MouseEvent::kType_MouseMoved)
+  {
+    // Track last move time and position when over the page content
+    bool over_page = evt.y > ui_height_;
+    long long now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    hover_last_move_ms_.store(now_ms);
+    hover_last_x_.store(evt.x);
+    hover_last_y_.store(evt.y);
+    if (over_page && !hover_worker_running_.exchange(true))
+    {
+      // spawn worker to wait 2s and then show dialog if mouse stayed
+      std::thread([this]()
+                  {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+        long long last = hover_last_move_ms_.load();
+        long long now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        if (now - last >= 2000) {
+          // show dialog with current active tab title
+          std::string title = "";
+          if (active_tab()) {
+            auto t = active_tab()->view()->title().utf8();
+            title = t.data() ? t.data() : "";
+          }
+          if (!title.empty()) ShowHoverTitleDialog(title);
+        }
+        hover_worker_running_.store(false); })
+          .detach();
+    }
+  }
+#endif
   if (active_tab() && active_tab()->IsInspectorShowing())
   {
     int x_px = static_cast<int>(std::lround(evt.x * window()->scale()));
@@ -1032,8 +1066,12 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnActiveTabChange"] = BindJSCallback(&UI::OnActiveTabChange);
   global["OnRequestChangeURL"] = BindJSCallback(&UI::OnRequestChangeURL);
   global["OnAddressBarNavigate"] = BindJSCallback(&UI::OnAddressBarNavigate);
+  global["OnStartDrmDependencyDownload"] = BindJSCallback(&UI::OnStartDrmDependencyDownload);
   global["OnOpenHistoryNewTab"] = BindJSCallback(&UI::OnOpenHistoryNewTab);
   global["OnOpenDownloadsNewTab"] = BindJSCallback(&UI::OnOpenDownloadsNewTab);
+  global["OnStartDrmDependencyDownload"] = BindJSCallback(&UI::OnStartDrmDependencyDownload);
+  global["GetDrmLog"] = BindJSCallbackWithRetval(&UI::OnGetDrmLog);
+  global["GetDrmDependencyInfo"] = BindJSCallbackWithRetval(&UI::OnGetDrmDependencyInfo);
   global["GetDownloadsSnapshot"] = BindJSCallbackWithRetval(&UI::OnDownloadsOverlayGet);
   global["ClearDownloadsSnapshot"] = BindJSCallback(&UI::OnDownloadsOverlayClear);
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
@@ -1179,10 +1217,18 @@ void UI::OnRequestChangeURL(const JSObject &obj, const JSArgs &args)
   {
     ultralight::String url = args[0];
 
-    if (!tabs_.empty())
+    std::string s = url.utf8().data() ? url.utf8().data() : "";
+    if (!s.empty())
     {
-      auto &tab = tabs_[active_tab_id_];
-      tab->view()->LoadURL(url);
+      // Try hybrid DRM handling first
+      if (!NavigateToUrl(s))
+      {
+        if (!tabs_.empty())
+        {
+          auto &tab = tabs_[active_tab_id_];
+          tab->view()->LoadURL(url);
+        }
+      }
     }
   }
 }
@@ -1194,10 +1240,17 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
     ultralight::String url = args[0];
     // Record immediately so History UI updates quickly (dedup inside RecordHistory)
     RecordHistory(url, String(""));
-    if (!tabs_.empty())
+    std::string s = url.utf8().data() ? url.utf8().data() : "";
+    if (!s.empty())
     {
-      auto &tab = tabs_[active_tab_id_];
-      tab->view()->LoadURL(url);
+      if (!NavigateToUrl(s))
+      {
+        if (!tabs_.empty())
+        {
+          auto &tab = tabs_[active_tab_id_];
+          tab->view()->LoadURL(url);
+        }
+      }
     }
   }
 }
@@ -1786,6 +1839,38 @@ ultralight::JSValue UI::OnGetSettings(const JSObject &, const JSArgs &)
   return ultralight::JSValue(ul_payload);
 }
 
+ultralight::JSValue UI::OnGetDrmLog(const JSObject &, const JSArgs &)
+{
+  // Prefer in-memory recent log from DrmLogger (more reliable than file path differences)
+  try
+  {
+    std::string recent = DrmLogger::Instance().GetRecentLog(8192);
+    if (!recent.empty())
+    {
+      ultralight::String ul_content(recent.c_str());
+      return ultralight::JSValue(ul_content);
+    }
+  }
+  catch (...)
+  {
+    // fall through to file fallback
+  }
+
+  // Fallback: read the log file (older behavior)
+  std::ifstream ifs("drm_system.log", std::ios::in);
+  std::string content;
+  if (ifs.good())
+  {
+    std::ostringstream ss;
+    ss << ifs.rdbuf();
+    content = ss.str();
+    if (content.size() > 8000)
+      content = content.substr(content.size() - 8000);
+  }
+  ultralight::String ul_content(content.c_str());
+  return ultralight::JSValue(ul_content);
+}
+
 void UI::OnUpdateSetting(const JSObject &, const JSArgs &args)
 {
   if (args.size() < 2 || !args[0].IsString())
@@ -2192,8 +2277,8 @@ bool UI::SaveSettingsToDisk()
     out.close();
     return ok;
   };
-
-  const std::filesystem::path primary_path = SettingsFilePath();
+  // Determine primary and fallback paths
+  std::filesystem::path primary_path = SettingsFilePath();
   const std::filesystem::path fallback_path = LegacySettingsFilePath();
   const std::string primary_path_str = primary_path.string();
   const std::string fallback_path_str = fallback_path.string();
@@ -2317,6 +2402,17 @@ std::string UI::BuildSettingsPayload(bool snapshot_is_baseline) const
     ss << "\"" << dirty_keys[i] << "\"";
   }
   ss << "],";
+
+  // Inject DRM config into meta so Settings UI can surface hybrid mode toggles
+  bool drm_enabled = false;
+  bool force_native = false;
+  // drm_manager_ is non-const; use const_cast to query config in this const method
+  drm_enabled = const_cast<UI *>(this)->drm_manager_.Config().IsGlobalDrmEnabled();
+  force_native = const_cast<UI *>(this)->drm_manager_.Config().GetForceNativeWebview();
+  ss << "\"drm\":{";
+  ss << "\"is_drm_globally_enabled\":" << (drm_enabled ? "true" : "false") << ",";
+  ss << "\"force_native_webview\":" << (force_native ? "true" : "false");
+  ss << "},";
   ss << "\"catalog\":[";
   bool first = true;
   for (const auto &desc : catalog)
@@ -2498,9 +2594,19 @@ void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
   if (action == "open_tab" && args.size() >= 2)
   {
     ultralight::String url = args[1];
-    RefPtr<View> child = CreateNewTabForChildView(url);
-    if (child)
-      child->LoadURL(url);
+    std::string s = url.utf8().data() ? url.utf8().data() : "";
+    // If opening in a new tab, prefer native DRM handling for external/protected URLs.
+    if (!s.empty())
+    {
+      // If DRM handled, still create a new blank tab for UI consistency, but do not navigate Ultralight to DRM URL
+      RefPtr<View> child = CreateNewTabForChildView(url);
+      if (child)
+      {
+        // If native handled, leave the new tab at about:blank or start page. Otherwise navigate it.
+        if (!NavigateToUrl(s))
+          child->LoadURL(url);
+      }
+    }
     HideContextMenuOverlay();
     return;
   }
@@ -3569,8 +3675,15 @@ void UI::OnSuggestionPick(const JSObject &obj, const JSArgs &args)
   }
   if (!tabs_.empty())
   {
-    auto &tab = tabs_[active_tab_id_];
-    tab->view()->LoadURL(s);
+    std::string url = s.utf8().data() ? s.utf8().data() : "";
+    if (!url.empty())
+    {
+      if (!NavigateToUrl(url))
+      {
+        auto &tab = tabs_[active_tab_id_];
+        tab->view()->LoadURL(s);
+      }
+    }
   }
 }
 
@@ -3588,6 +3701,147 @@ void UI::OnSuggestionPaste(const JSObject &obj, const JSArgs &args)
   }
   // keep focus on address bar for continued typing
   address_bar_is_focused_ = true;
+}
+
+bool UI::NavigateToUrl(const std::string &url)
+{
+  // Ask DRM manager to handle navigation. Returns true if native view opened.
+  DrmLogger::Instance().Info("UI", std::string("NavigateToUrl checking: ") + url);
+  bool handled = drm_manager_.TryHandleNavigation(url);
+  if (handled)
+    DrmLogger::Instance().Info("UI", std::string("Navigation handled by native DRM window: ") + url);
+  else
+    DrmLogger::Instance().Info("UI", std::string("Navigation NOT handled by DRM manager, letting Ultralight handle: ") + url);
+  // Update window title with debug mode info about current tab renderer when DEBUG_MODE enabled
+#ifdef DEBUG_MODE
+  try
+  {
+    std::string base = "Ultralight | Web Browser";
+    std::string tab_title = "";
+    if (active_tab())
+    {
+      auto t = active_tab()->view()->title().utf8();
+      tab_title = t.data() ? t.data() : "";
+    }
+    std::string mode = handled ? "Native" : (drm_manager_.Config().IsGlobalDrmEnabled() ? "Hybrid" : "Ultralight");
+    std::string new_title = base + (tab_title.empty() ? "" : std::string(" - ") + tab_title) + " [Mode: " + mode + "]";
+    if (window_)
+      window_->SetTitle(new_title.c_str());
+  }
+  catch (...)
+  {
+  }
+#endif
+  return handled;
+}
+
+void UI::OnStartDrmDependencyDownload(const JSObject &obj, const JSArgs &args)
+{
+  DrmLogger::Instance().Info("UI", "User requested DRM dependency download from settings UI.");
+  drm_manager_.Window().StartDependencyDownload();
+}
+
+ultralight::JSValue UI::OnGetDrmDependencyInfo(const JSObject &, const JSArgs &)
+{
+  try
+  {
+    std::string info = drm_manager_.Window().GetDependencyInfoJson();
+    ultralight::String ul_info(info.c_str());
+    return ultralight::JSValue(ul_info);
+  }
+  catch (const std::exception &ex)
+  {
+    DrmLogger::Instance().Error("UI", std::string("OnGetDrmDependencyInfo exception: ") + ex.what());
+    ultralight::String empty("{}");
+    return ultralight::JSValue(empty);
+  }
+}
+
+void UI::ShowHoverTitleDialog(const std::string &title)
+{
+  // Prefer in-app overlay when overlays are available
+  try
+  {
+    if (!hover_overlay_)
+    {
+      // Create a small overlay near the top-right of content area
+      int w = std::max<int>(320, static_cast<int>(window_->width() / 3));
+      int h = 64;
+      int x = std::max<int>(8, static_cast<int>(window_->width()) - w - 24);
+      int y = static_cast<int>(ui_height_) + 12;
+      hover_overlay_ = Overlay::Create(window_, w, h, x, y);
+    }
+    if (hover_overlay_)
+    {
+      // Build simple HTML snippet with inline CSS
+      std::ostringstream html;
+      html << "<html><body style=\"margin:0;padding:8px;font-family:system-ui,Segoe UI,Arial;background:rgba(0,0,0,0.75);color:#fff;border-radius:8px;\">";
+      html << "<div style=\"font-weight:600;font-size:14px;line-height:1.2;max-height:48px;overflow:hidden;text-overflow:ellipsis;\">";
+      // Escape basic characters
+      for (char c : title)
+      {
+        if (c == '<')
+          html << "&lt;";
+        else if (c == '>')
+          html << "&gt;";
+        else if (c == '&')
+          html << "&amp;";
+        else
+          html << c;
+      }
+      html << "</div>";
+      // Add inline script to auto-fade and clear the overlay from inside the webview
+      html << "<script>";
+      html << "(function(){document.body.style.transition='opacity 300ms ease';";
+      html << "setTimeout(function(){document.body.style.opacity='0';";
+      html << "setTimeout(function(){document.body.innerHTML='';},350);},3000);})();";
+      html << "</script></body></html>";
+      ultralight::String html_ul(html.str().c_str());
+      hover_overlay_->view()->LoadHTML(html_ul);
+      hover_overlay_->Show();
+      hover_overlay_->Focus();
+      // NOTE: Do not call overlay methods from background threads; auto-hide was
+      // previously implemented by a detached thread which could invoke UI APIs
+      // off the main thread and cause crashes. Keeping overlay visible until a
+      // subsequent hover or user action hides it avoids unsafe cross-thread UI
+      // calls. If you want auto-hide behavior, implement a main-thread timer
+      // or post a task to the UI thread instead.
+      return;
+    }
+  }
+  catch (...)
+  {
+    // Fallback to platform dialogs if overlay creation fails
+  }
+
+#ifdef _WIN32
+  MessageBoxA((HWND)window_->native_handle(), title.c_str(), "Page Title", MB_OK | MB_ICONINFORMATION);
+#elif defined(__APPLE__)
+  std::string cmd = "osascript -e 'display dialog \"";
+  for (char c : title)
+  {
+    if (c == '\\' || c == '"')
+      cmd += '\\';
+    cmd.push_back(c);
+  }
+  cmd += "\" buttons {\"OK\"} default button 1'";
+  std::system(cmd.c_str());
+#else
+  std::string cmd = "zenity --info --title=\"Page Title\" --text=\"";
+  for (char c : title)
+  {
+    if (c == '\\' || c == '"')
+      cmd += '\\';
+    cmd.push_back(c);
+  }
+  cmd += "\" --no-wrap";
+  int r = std::system(cmd.c_str());
+  if (r != 0)
+  {
+    std::string alt = std::string("notify-send \"Page Title\" \"") + title + "\"";
+    std::system(alt.c_str());
+  }
+#endif
 }
 
 void UI::OnNewDownloadStarted()

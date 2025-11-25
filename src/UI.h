@@ -1,6 +1,7 @@
 #pragma once
 #include <AppCore/AppCore.h>
 #include "Tab.h"
+#include "DrmPlaybackSystem/DrmManager.h"
 #include <map>
 #include <memory>
 #include <string>
@@ -200,6 +201,10 @@ protected:
   void OnSuggestionPick(const JSObject &obj, const JSArgs &args);
   // Paste a suggestion URL into the address bar without navigating
   void OnSuggestionPaste(const JSObject &obj, const JSArgs &args);
+  // Settings UI -> start dependency download for native DRM (webview/runtime)
+  void OnStartDrmDependencyDownload(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnGetDrmLog(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnGetDrmDependencyInfo(const JSObject &obj, const JSArgs &args);
   // Receive favicon image data (as data URL) from suggestions overlay and persist cache
   void OnFaviconReady(const JSObject &obj, const JSArgs &args);
 
@@ -218,6 +223,16 @@ protected:
   Tab *active_tab() { return tabs_.empty() ? nullptr : tabs_[active_tab_id_].get(); }
 
   RefPtr<View> view() { return overlay_->view(); }
+
+  // DRM manager for hybrid native fallback
+  DrmManager drm_manager_;
+
+  // Navigate helper which honors DRM hybrid mode. Returns true if navigation was
+  // handled by the native DRM window (Ultralight should not navigate in that case).
+  bool NavigateToUrl(const std::string &url);
+
+  // Hover dialog helpers (debug only)
+  void ShowHoverTitleDialog(const std::string &title);
 
   RefPtr<Window> window_;
   RefPtr<Overlay> overlay_;
@@ -255,6 +270,13 @@ protected:
   int inspector_resize_begin_height_;
   int inspector_resize_begin_mouse_y_;
   bool address_bar_is_focused_ = false;
+  // Hover tracking for debug hover-title dialog
+  std::atomic<long long> hover_last_move_ms_{0};
+  std::atomic<int> hover_last_x_{0};
+  std::atomic<int> hover_last_y_{0};
+  std::atomic<bool> hover_worker_running_{false};
+  // In-app hover overlay (used when available)
+  RefPtr<Overlay> hover_overlay_;
   bool adblock_enabled_cached_ = true;
   bool suggestions_enabled_ = true;
   bool show_download_badge_ = true;
