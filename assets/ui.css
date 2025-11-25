@@ -70,6 +70,12 @@ body {
      width: 18px;
 }
 
+/* Slightly smaller settings/toolbar tools icon (90% of 18px ~= 16px) */
+#toggle-tools svg {
+     width: 16px;
+     height: 16px;
+}
+
 /* Show hand cursor for clickable icons */
 .icon:not(.disabled) {
      cursor: pointer;
