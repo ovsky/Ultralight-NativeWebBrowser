@@ -1,0 +1,48 @@
+# Common analytics / tracking domains (suffix match)
+# Google Analytics / Tag Manager
+||google-analytics.com^
+||ssl.google-analytics.com^
+||www.google-analytics.com^
+||analytics.google.com^
+||tagmanager.google.com^
+
+# Facebook tracking
+||connect.facebook.net^
+||staticxx.facebook.com^
+||graph.facebook.com^
+
+# Twitter / X tracking
+||ads-twitter.com^
+||analytics.twitter.com^
+
+# LinkedIn
+||px.ads.linkedin.com^
+||snap.licdn.com^
+
+# Adobe / Omniture
+||omtrdc.net^
+||2o7.net^
+||adobedtm.com^
+||demdex.net^
+||everesttech.net^
+
+# ComScore / Quantcast / others
+||scorecardresearch.com^
+||quantserve.com^
+||quantcast.com^
+||mathtag.com^
+||agkn.com^
+||rfihub.com^
+||turn.com^
+||tynt.com^
+||bluekai.com^
+||krxd.net^
+||kaslk.com^
+||segment.io^
+||segment.com^
+||hotjar.com^
+||optimizely.com^
+||mixpanel.com^
+||newrelic.com^
+||fullstory.com^
+||bugsnag.com^

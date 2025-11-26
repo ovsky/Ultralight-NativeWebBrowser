@@ -17,5 +17,3 @@ LANGUAGE 9, 1
 IDI_MYICON              ICON                    "@APP_ICON_ICO@"
 
 #endif    // English (United States) resources
-
-pause;;

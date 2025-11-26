@@ -1,0 +1,8 @@
+{
+  "Ctrl+T": "new-tab",
+  "Ctrl+W": "close-tab",
+  "Ctrl+H": "open-history",
+  "Ctrl+J": "open-downloads",
+  "Ctrl+L": "focus-address",
+  "Ctrl+,": "open-settings"
+}

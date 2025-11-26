@@ -1,0 +1,162 @@
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" type="text/css" href="ui.css">
+    <style>
+        body {
+            margin: 0;
+            background: transparent;
+            opacity: 0;
+            animation: ul_fade_in 0.2s ease-in forwards;
+            -webkit-animation: ul_fade_in 0.2s ease-in forwards;
+        }
+
+        /* Ensure the dropdown is fixed relative to the window */
+        #menu-root {
+            position: fixed;
+            inset: 0;
+        }
+
+        #menu-dropdown {
+            position: fixed;
+            top: 40px;
+            right: 10px;
+        }
+
+        .menu-heading {
+            padding: 6px 12px;
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: rgba(226, 225, 234, 0.62);
+            cursor: default;
+        }
+
+        .menu-item.menu-toggle {
+            cursor: pointer;
+        }
+
+        .menu-item .menu-label {
+            flex: 1 1 auto;
+        }
+
+        .menu-item .menu-value {
+            flex: 0 0 auto;
+            font-size: 12px;
+            color: rgba(226, 225, 234, 0.7);
+        }
+    @keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
+    @-webkit-keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+
+<body>
+    <div id="menu-root">
+        <div id="menu-dropdown" class="menu-dropdown" role="menu" aria-hidden="false">
+            <div class="menu-item" data-action="new-tab">New tab [Ctrl+T]</div>
+            <div class="menu-item" data-action="new-window">New window [Ctrl+N]</div>
+            <div class="menu-separator"></div>
+            <div class="menu-heading">Quick Settings</div>
+            <div class="menu-item menu-toggle" data-action="toggle-dark-mode">
+                <span class="menu-label">Dark theme</span>
+                <span class="menu-value" id="dark-mode-value">OFF</span>
+            </div>
+            <div class="menu-item menu-toggle" data-action="toggle-adblock">
+                <span class="menu-label">Ad blocking</span>
+                <span class="menu-value" id="adblock-value">OFF</span>
+            </div>
+            <div class="menu-separator"></div>
+            <div class="menu-item" data-action="history">History [Ctrl+H]</div>
+            <div class="menu-item" data-action="downloads">Downloads [Ctrl+J]</div>
+            <div class="menu-item" data-action="settings">Settings [Ctrl+,]</div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const root = document.getElementById('menu-root');
+            const menu = document.getElementById('menu-dropdown');
+
+            function closeMenu() {
+                if (window.OnMenuClose) OnMenuClose();
+            }
+
+            // Refresh toggle values from native bridge
+            function refreshToggles() {
+                if (window.GetDarkModeEnabled) {
+                    const darkModeEnabled = GetDarkModeEnabled();
+                    const darkModeValue = document.getElementById('dark-mode-value');
+                    if (darkModeValue) {
+                        darkModeValue.textContent = darkModeEnabled ? 'ON' : 'OFF';
+                    }
+                }
+                if (window.GetAdblockEnabled) {
+                    const adblockEnabled = GetAdblockEnabled();
+                    const adblockValue = document.getElementById('adblock-value');
+                    if (adblockValue) {
+                        adblockValue.textContent = adblockEnabled ? 'ON' : 'OFF';
+                    }
+                }
+            }
+
+            // Refresh on load
+            setTimeout(refreshToggles, 0);
+
+            // Click outside closes
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#menu-dropdown')) {
+                    closeMenu();
+                }
+            });
+
+            // ESC closes
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeMenu();
+            });
+
+            // Item clicks
+            menu.addEventListener('click', (e) => {
+                const item = e.target.closest('.menu-item');
+                if (!item) return;
+                const action = item.getAttribute('data-action');
+                switch (action) {
+                    case 'new-tab':
+                        if (window.OnRequestNewTab) OnRequestNewTab();
+                        break;
+                    case 'new-window':
+                        // Placeholder: open a new tab as "new window" is not implemented
+                        if (window.OnRequestNewTab) OnRequestNewTab();
+                        break;
+                    case 'toggle-dark-mode':
+                        if (window.OnToggleDarkMode) {
+                            OnToggleDarkMode();
+                            setTimeout(refreshToggles, 50);
+                        }
+                        return; // Don't close menu on toggle
+                    case 'toggle-adblock':
+                        if (window.OnToggleAdblock) {
+                            OnToggleAdblock();
+                            setTimeout(refreshToggles, 50);
+                        }
+                        return; // Don't close menu on toggle
+                    case 'history':
+                        if (window.OnOpenHistoryNewTab) OnOpenHistoryNewTab();
+                        break;
+                    case 'downloads':
+                        if (window.OnOpenDownloadsNewTab) OnOpenDownloadsNewTab();
+                        break;
+                    case 'settings':
+                        if (window.OnOpenSettingsPanel) OnOpenSettingsPanel();
+                        break;
+                }
+                closeMenu();
+            });
+        })();
+    </script>
+    <script>
+        <!-- Fade-in handled by CSS animation; no JS needed -->
+    </script>
+</body>
+
+</html>

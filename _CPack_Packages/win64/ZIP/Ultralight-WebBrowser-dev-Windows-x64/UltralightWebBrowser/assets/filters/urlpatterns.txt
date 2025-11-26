@@ -1,0 +1,29 @@
+# URL patterns (simple substrings and globs) for ads/tracking
+# Substrings
+/ads/
+/adserver
+/advertising/
+/banner
+/banners/
+/adsense
+/doubleclick/
+/analytics.js
+/ga.js
+/gtm.js
+/collect?
+/pixel
+/tracker
+/track?
+/utm_
+/affiliate
+/adclick
+/clicktrack
+
+# Globs
+*://*/*ad*script*.js
+*://*/*ads*.js
+*://*/*advert*.js
+*://*/*analytics*.js
+*://*/*tagmanager*.js
+*://*/*doubleclick*/*
+*://*/*/banner*.*
