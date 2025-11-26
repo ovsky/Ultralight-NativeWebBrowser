@@ -1,0 +1,43 @@
+{
+  // Launch configurations to run the provided PowerShell compilation scripts
+  // These entries appear in VS Code Run and Debug -> Run and Debug.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Compile: complete",
+      "type": "PowerShell",
+      "request": "launch",
+      "script": "${workspaceFolder}\\compilation_complete.ps1",
+      "cwd": "${workspaceFolder}",
+      "args": [],
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Compile: fastbuild",
+      "type": "PowerShell",
+      "request": "launch",
+      "script": "${workspaceFolder}\\compilation_fastbuild.ps1",
+      "cwd": "${workspaceFolder}",
+      "args": [],
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Compile: justcompile",
+      "type": "PowerShell",
+      "request": "launch",
+      "script": "${workspaceFolder}\\compilation_justcompile.ps1",
+      "cwd": "${workspaceFolder}",
+      "args": [],
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Compile: run",
+      "type": "PowerShell",
+      "request": "launch",
+      "script": "${workspaceFolder}\\compilation_run.ps1",
+      "cwd": "${workspaceFolder}",
+      "args": [],
+      "internalConsoleOptions": "neverOpen"
+    }
+  ]
+}

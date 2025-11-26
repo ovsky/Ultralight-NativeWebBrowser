@@ -45,31 +45,78 @@ Set-Location $scriptRoot
 
 function Invoke-Tool([string]$Exe, [string[]]$Arguments) {
     Write-Host "Running: $Exe $($Arguments -join ' ')" -ForegroundColor Cyan
+    # Use the improved streaming runner to avoid long hangs and provide progress.
+    function Write-Log([string]$Level, [string]$Message) {
+        $ts = (Get-Date).ToString('HH:mm:ss')
+        switch ($Level) {
+            'INFO' { Write-Host "[$ts] $Message" -ForegroundColor Cyan }
+            'WARN' { Write-Warning "[$ts] $Message" }
+            'ERR'  { Write-Error "[$ts] $Message" }
+            default { Write-Host "[$ts] $Message" }
+        }
+    }
+
     $outFile = [System.IO.Path]::GetTempFileName()
     $errFile = [System.IO.Path]::GetTempFileName()
+    $proc = $null
     try {
-        $proc = Start-Process -FilePath $Exe -ArgumentList $Arguments -NoNewWindow -RedirectStandardOutput $outFile -RedirectStandardError $errFile -Wait -PassThru -ErrorAction Stop
-        $exit = $proc.ExitCode
+        $proc = Start-Process -FilePath $Exe -ArgumentList $Arguments -NoNewWindow -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru -ErrorAction Stop
     }
     catch {
-        Write-Warning "Start-Process failed or behaved unexpectedly: $_"
+        Write-Log WARN "Start-Process failed to start: $_. Falling back to direct invocation."
         $orig = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
         try {
-            $output = & $Exe @Arguments 2>&1 | Out-String
-            if ($output -and $output.Trim()) { Write-Host $output }
-            $exit = $LASTEXITCODE
+            & $Exe @Arguments 2>&1 | ForEach-Object { Write-Log INFO $_ }
+            return $LASTEXITCODE
         }
-        finally {
-            $ErrorActionPreference = $orig
-        }
-        return $exit
+        finally { $ErrorActionPreference = $orig }
     }
 
-    $stdout = Get-Content -Raw -LiteralPath $outFile -ErrorAction SilentlyContinue
-    $stderr = Get-Content -Raw -LiteralPath $errFile -ErrorAction SilentlyContinue
-    if ($stdout -and $stdout.Trim()) { Write-Host $stdout }
-    if ($stderr -and $stderr.Trim()) { Write-Host $stderr }
+    $lastSize = 0
+    $lastOutputTime = Get-Date
+    $start = Get-Date
+    $TimeoutSeconds = 3600
+    $StallTimeoutSeconds = 300
+    while (-not $proc.HasExited) {
+        Start-Sleep -Milliseconds 300
+        try {
+            $size = (Get-Item $outFile -ErrorAction SilentlyContinue).Length
+            if ($null -ne $size -and $size -ne $lastSize) {
+                $lastSize = $size
+                $lastOutputTime = Get-Date
+                Get-Content -LiteralPath $outFile -Tail 100 -ErrorAction SilentlyContinue | ForEach-Object { Write-Log INFO $_ }
+            }
+            else {
+                if ((Get-Date) -gt $lastOutputTime.AddSeconds(60)) {
+                    Get-Content -LiteralPath $outFile -Tail 20 -ErrorAction SilentlyContinue | ForEach-Object { Write-Log INFO $_ }
+                }
+            }
+        }
+        catch { }
+
+        if ((Get-Date) -gt $start.AddSeconds($TimeoutSeconds)) {
+            Write-Log ERR "Process timed out after $TimeoutSeconds seconds. Killing process..."
+            try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }
+            break
+        }
+
+        if ((Get-Date) -gt $lastOutputTime.AddSeconds($StallTimeoutSeconds)) {
+            Write-Log WARN "No output for $StallTimeoutSeconds seconds. Killing process to avoid hang..."
+            try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }
+            break
+        }
+    }
+
+    Start-Sleep -Milliseconds 200
+    try {
+        if (Test-Path $outFile) { Get-Content -LiteralPath $outFile -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ } }
+        if (Test-Path $errFile) { Get-Content -LiteralPath $errFile -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ } }
+    }
+    catch { }
+
+    $exit = 1
+    try { $exit = $proc.ExitCode } catch { }
     Remove-Item -LiteralPath $outFile, $errFile -ErrorAction SilentlyContinue
     return $exit
 }
@@ -136,7 +183,17 @@ Write-Host "CMake configure returned code: $code" -ForegroundColor Yellow
 if ($code -ne 0) { exit $code }
 
 Write-Host "Starting build step..." -ForegroundColor Yellow
-$code = Invoke-Tool 'cmake' @('--build', 'build', '--config', 'Release')
+# Build with parallelism by default; allow remaining args to override
+$buildArgs = @('--build', 'build', '--config', 'Release')
+$hasParallel = $false
+foreach ($a in $RemainingArgs) { if ($a -match '^-j' -or $a -match '^/m' -or $a -eq '--') { $hasParallel = $true; break } }
+$procs = [Environment]::ProcessorCount
+if (-not $hasParallel) {
+    if ($IsWindows) { $buildArgs += '--'; $buildArgs += ("/m:$procs") }
+    else { $buildArgs += '--'; $buildArgs += ("-j $procs") }
+}
+if ($RemainingArgs) { $buildArgs += $RemainingArgs }
+$code = Invoke-Tool 'cmake' $buildArgs
 Write-Host "CMake build returned code: $code" -ForegroundColor Yellow
 if ($code -ne 0) { exit $code }
 
