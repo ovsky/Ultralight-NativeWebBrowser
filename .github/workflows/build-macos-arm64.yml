@@ -227,7 +227,7 @@ jobs:
         run: |
           cmake --version
           echo "Configuring with ULTRALIGHT_SDK_ROOT=$ULTRALIGHT_SDK_ROOT"
-          cmake -S . -B build -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT" -DBUILD_TESTING=ON -DAUTO_INSTALL_CURL=ON -DWEBBROWSER_VERSION="$WEBBROWSER_VERSION"
+          cmake -S . -B build -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT" -DBUILD_TESTING=ON -DAUTO_INSTALL_CURL=ON -DWEBBROWSER_VERSION="$WEBBROWSER_VERSION" -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/build/install"
 
       - name: 6. Build Project (Release)
         if: steps.prep_sdk.outputs.present == 'true'
@@ -237,6 +237,10 @@ jobs:
         if: steps.prep_sdk.outputs.present == 'true'
         shell: bash
         run: |
+          echo "Running install target to stage files for packaging"
+          cmake --install build --config Release || true
+          echo "Listing staged install directory contents"
+          if [ -d "build/install" ]; then find build/install -maxdepth 4 -type f | sed -n '1,500p'; else echo "build/install not found"; fi
           set -euo pipefail
           outdir="${{ github.workspace }}/build"
           mkdir -p "$outdir"
