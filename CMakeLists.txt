@@ -76,17 +76,26 @@ set(SOURCES
 
 add_app(Ultralight-WebBrowser ${SOURCES})
 
-# Unit test for utils
-enable_testing()
-add_executable(UtilsTest tests/UtilsTest.cpp src/Utils.cpp)
-find_library(APP_CORE_LIB NAMES AppCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
-find_library(ULTRALIGHT_LIB NAMES Ultralight PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
-find_library(ULTRALIGHT_CORE_LIB NAMES UltralightCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
-find_library(WEB_CORE_LIB NAMES WebCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
-if(APP_CORE_LIB)
-	target_link_libraries(UtilsTest PRIVATE ${APP_CORE_LIB} ${ULTRALIGHT_LIB} ${ULTRALIGHT_CORE_LIB} ${WEB_CORE_LIB})
-endif()
-add_test(NAME UtilsTest COMMAND UtilsTest)
+ # Unit test for utils
+ enable_testing()
+
+ # Only build UtilsTest in environments where linking to the Ultralight
+ # libraries is supported. On Windows CI we sometimes use the MinGW toolchain
+ # (GNU) which cannot link MSVC-generated .lib import libraries. In that
+ # case skip adding the test to avoid linker errors.
+ if(NOT (WIN32 AND NOT MSVC))
+	 add_executable(UtilsTest tests/UtilsTest.cpp src/Utils.cpp)
+	 find_library(APP_CORE_LIB NAMES AppCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
+	 find_library(ULTRALIGHT_LIB NAMES Ultralight PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
+	 find_library(ULTRALIGHT_CORE_LIB NAMES UltralightCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
+	 find_library(WEB_CORE_LIB NAMES WebCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
+	 if(APP_CORE_LIB)
+		 target_link_libraries(UtilsTest PRIVATE ${APP_CORE_LIB} ${ULTRALIGHT_LIB} ${ULTRALIGHT_CORE_LIB} ${WEB_CORE_LIB})
+	 endif()
+	 add_test(NAME UtilsTest COMMAND UtilsTest)
+ else()
+	 message(STATUS "Skipping UtilsTest on Windows when not using MSVC (to avoid linking MSVC .lib with MinGW)")
+ endif()
 
 # Install/package settings
 set(INSTALL_DIR_NAME "UltralightWebBrowser")
