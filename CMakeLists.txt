@@ -143,6 +143,16 @@ set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set(CPACK_OUTPUT_FILE_PREFIX "${CMAKE_BINARY_DIR}")
 set(CPACK_STRIP_FILES ON)
 
+# Ensure a maintainer/contact is set for Debian packages (required by CPackDeb)
+# CI environments may not set these, so provide a sensible default that can
+# be overridden by callers (e.g. -DCPACK_PACKAGE_CONTACT=you@example.com).
+if(NOT DEFINED CPACK_PACKAGE_CONTACT)
+	set(CPACK_PACKAGE_CONTACT "maintainer@example.com" CACHE STRING "Contact for binary packages (email)")
+endif()
+if(NOT DEFINED CPACK_DEBIAN_PACKAGE_MAINTAINER)
+	set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${CPACK_PACKAGE_CONTACT}" CACHE STRING "Debian package maintainer")
+endif()
+
 set(APP_ICON_ICO "")
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/browser.ico")
 	set(APP_ICON_ICO "${CMAKE_CURRENT_SOURCE_DIR}/browser.ico")
