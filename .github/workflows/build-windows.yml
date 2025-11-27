@@ -314,7 +314,7 @@ jobs:
           # Prefer the 32-bit Program Files location where NSIS places makensis.exe,
           # but also check common alternate locations on runner images.
           $nsisDirs = @(
-            Join-Path $env:'ProgramFiles(x86)' 'NSIS',
+            Join-Path $env."ProgramFiles(x86)" 'NSIS',
             Join-Path $env:ProgramFiles 'NSIS',
             Join-Path $env:ProgramFiles 'NSIS (x86)'
           )
