@@ -62,7 +62,7 @@ Browser::Browser()
   adblock_->LoadBlocklist("assets/blocklist.txt", true);
   adblock_->LoadBlocklistsInDirectory("assets/filters");
 
-  ui_.reset(new UI(window_, adblock_.get(), adblock_.get()));
+  ui_ = std::make_unique<UI>(window_, adblock_.get(), adblock_.get());
   window_->set_listener(ui_.get());
 }
 
