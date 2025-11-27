@@ -68,11 +68,25 @@ set(SOURCES
 	"src/Tab.cpp"
 	"src/UI.h"
 	"src/UI.cpp"
+    "src/Utils.cpp"
+    "src/Settings.cpp"
 	"src/main.cpp"
 	"${CMAKE_CURRENT_BINARY_DIR}/browser.rc"
 )
 
 add_app(Ultralight-WebBrowser ${SOURCES})
+
+# Unit test for utils
+enable_testing()
+add_executable(UtilsTest tests/UtilsTest.cpp src/Utils.cpp)
+find_library(APP_CORE_LIB NAMES AppCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
+find_library(ULTRALIGHT_LIB NAMES Ultralight PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
+find_library(ULTRALIGHT_CORE_LIB NAMES UltralightCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
+find_library(WEB_CORE_LIB NAMES WebCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
+if(APP_CORE_LIB)
+	target_link_libraries(UtilsTest PRIVATE ${APP_CORE_LIB} ${ULTRALIGHT_LIB} ${ULTRALIGHT_CORE_LIB} ${WEB_CORE_LIB})
+endif()
+add_test(NAME UtilsTest COMMAND UtilsTest)
 
 # Install/package settings
 set(INSTALL_DIR_NAME "UltralightWebBrowser")
