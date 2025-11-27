@@ -155,6 +155,7 @@ set(CPACK_STRIP_FILES ON)
 # Ensure a maintainer/contact is set for Debian packages (required by CPackDeb)
 # CI environments may not set these, so provide a sensible default that can
 # be overridden by callers (e.g. -DCPACK_PACKAGE_CONTACT=you@example.com).
+# Updated for CI fixes.
 if(NOT DEFINED CPACK_PACKAGE_CONTACT)
 	set(CPACK_PACKAGE_CONTACT "maintainer@example.com" CACHE STRING "Contact for binary packages (email)")
 endif()
