@@ -6,7 +6,8 @@
 #>
 
 param(
-  [switch] $CheckOnly
+  [switch] $CheckOnly,
+  [switch] $AutoInstall
 )
 
 $root = Split-Path -Path $PSScriptRoot -Parent
@@ -32,7 +33,39 @@ if (-not $clangFormatCmd) {
   foreach ($c in $candidates) { if (Test-Path $c) { $clangFormatCmd = $c; break } }
 }
 if (-not $clangFormatCmd) {
-  Write-Error "clang-format not found. Please install clang-format and ensure it is on PATH. For Windows: 'choco install llvm' or 'choco install clang-format'; for Ubuntu: 'sudo apt install clang-format'"; exit 2
+  if ($IsWindows -and $AutoInstall) {
+    $chocoCmd = Get-Command choco -ErrorAction SilentlyContinue
+    if ($chocoCmd) {
+      Write-Host "Attempting to install clang-format via Chocolatey..."
+      try { & choco install -y llvm } catch { Write-Warning "choco install failed: $_" }
+      # Re-check
+      $cmd = Get-Command clang-format -ErrorAction SilentlyContinue
+      if ($cmd) { $clangFormatCmd = $cmd.Source }
+    }
+    if (-not $clangFormatCmd) {
+      # Try downloading a portable clang-format release to ./tools/clang-format
+      $version = '16.0.6'
+      $zipName = "clang+llvm-$version-win64.zip"
+      $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/$zipName"
+      $toolsDir = Join-Path $root 'tools/clang-format'
+      if (-not (Test-Path $toolsDir)) { New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null }
+      $zipPath = Join-Path $env:TEMP $zipName
+      Write-Host "Downloading clang-format portable binary from $url to $zipPath"
+      try {
+        Invoke-WebRequest -Uri $url -UseBasicParsing -OutFile $zipPath -ErrorAction Stop
+        Expand-Archive -LiteralPath $zipPath -DestinationPath $toolsDir -Force
+        Remove-Item $zipPath -ErrorAction SilentlyContinue
+        # Find clang-format.exe under extracted folder
+        $found = Get-ChildItem -Path $toolsDir -Recurse -Filter clang-format.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($found) { $clangFormatCmd = $found.FullName }
+      } catch {
+        Write-Warning "Failed to download/extract clang-format: $_"
+      }
+    }
+  }
+  if (-not $clangFormatCmd) {
+    Write-Error "clang-format not found. Please install clang-format and ensure it is on PATH. For Windows try 'choco install llvm' or use -AutoInstall to auto-download a portable binary; for Ubuntu: 'sudo apt install clang-format'"; exit 2
+  }
 }
 foreach ($f in $files) {
   Write-Host "Formatting: $f"
