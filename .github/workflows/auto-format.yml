@@ -1,0 +1,39 @@
+name: Auto Format + PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: 'Target branch for formatting PR'
+        default: 'chore/formatting'
+        required: true
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        persist-credentials: true
+
+    - name: Install clang-format
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y clang-format
+
+    - name: Run auto-format
+      run: |
+        ./scripts/format-all.sh
+
+    - name: Create formatting commit and Pull Request
+      uses: peter-evans/create-pull-request@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: 'chore: apply clang-format formatting across repository'
+        title: 'chore: formatting (clang-format)'
+        body: |
+          This PR formats the C/C++ codebase according to the project's clang-format rules.
+        base: ${{ github.event.inputs.target_branch }}
+        branch: formatting/clang-format
+        labels: formatting
