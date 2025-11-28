@@ -1,0 +1,712 @@
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Quick Inspector</title>
+    <style>
+        :root {
+            --bg: #1a1b26;
+            --panel: #16161e;
+            --fg: #c0caf5;
+            --muted: #787c99;
+            --border: #414868;
+            --acc: #7aa2f7;
+            --acc-hover: #89b4fa;
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+            background: var(--bg);
+            color: var(--fg);
+            pointer-events: auto;
+        }
+
+        .toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            display: flex;
+            gap: 8px;
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+            background: #1f2335;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            background: linear-gradient(180deg, #24283b, #1a1b26);
+            border-radius: 4px;
+            cursor: pointer;
+            user-select: none;
+            transition: all .12s ease;
+            font-size: 13px;
+        }
+
+        .tab:hover {
+            border-color: var(--acc);
+            background: #24283b;
+        }
+
+        .tab.active {
+            background: var(--acc);
+            border-color: var(--acc);
+            color: #1a1b26;
+            font-weight: 500;
+        }
+
+        .grow {
+            flex: 1
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: linear-gradient(180deg, #24283b, #1a1b26);
+            color: var(--fg);
+            cursor: pointer;
+            transition: all .12s ease;
+            font-size: 13px;
+        }
+
+        .btn:hover {
+            background: var(--acc);
+            border-color: var(--acc);
+            color: #1a1b26;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn:disabled:hover {
+            background: linear-gradient(180deg, #24283b, #1a1b26);
+            border-color: var(--border);
+            color: var(--fg);
+        }
+
+        .content {
+            display: flex;
+            height: 100vh;
+        }
+
+        .panel {
+            flex: 1;
+            display: none;
+            padding: 12px;
+            overflow: auto;
+            border-radius: 4px;
+            background: var(--panel);
+        }
+
+        .panel.active {
+            display: block;
+        }
+
+        .key {
+            color: var(--muted)
+        }
+
+        input[type=text],
+        textarea {
+            width: 100%;
+            padding: 8px;
+            background: #1f2335;
+            color: var(--fg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        input[type=text]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: var(--acc);
+        }
+
+        textarea {
+            min-height: 120px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            line-height: 1.5;
+        }
+
+        ul.tree {
+            list-style: none;
+            padding-left: 14px;
+        }
+
+        ul.tree li {
+            margin: 2px 0;
+        }
+
+        .node {
+            cursor: pointer;
+            color: var(--acc);
+        }
+
+        .node:hover {
+            color: var(--acc-hover);
+            text-decoration: underline;
+        }
+
+        .muted {
+            color: var(--muted)
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0;
+        }
+
+        th,
+        td {
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            text-align: left
+        }
+
+        th {
+            background: #1f2335;
+            font-weight: 600;
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin: 8px 0;
+        }
+
+        .pill {
+            padding: 4px 10px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 500;
+            background: #1f2335;
+        }
+
+        .summary {
+            display: grid;
+            gap: 6px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            padding: 10px;
+            background: #1f2335;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+    </style>
+    <script>
+        // Global event sinks from native C++
+        window.__qi = {
+            onConsole: (e) => { try { addConsoleRow(e); } catch (_) { } },
+            onNetwork: (e) => { try { addNetworkRow(e); } catch (_) { } },
+            onPickHover: (e) => { try { const o = typeof e === 'string' ? JSON.parse(e) : e; selOut.textContent = o.selector || ''; } catch (_) { } },
+            onPickSelect: (e) => { try { const o = typeof e === 'string' ? JSON.parse(e) : e; stopPicker(); selectBySelector(o.selector || ''); } catch (_) { } }
+        };
+
+        // Info
+        async function refreshInfo() {
+            try {
+                if (window.NativeQuickGetInfo) {
+                    const j = NativeQuickGetInfo();
+                    const info = JSON.parse(j || '{}');
+                    document.getElementById('info-title').value = info.title || '';
+                    document.getElementById('info-url').value = info.url || '';
+                    document.getElementById('info-state').textContent = info.loading ? 'Loading…' : 'Idle';
+                }
+            } catch (e) { }
+        }
+
+        // Elements
+        function startPicker() {
+            try {
+                if (window.NativeQuickStartPicker) NativeQuickStartPicker();
+                pickBtn.disabled = true;
+                stopPickBtn.disabled = false;
+                pickBtn.style.opacity = '0.5';
+                stopPickBtn.style.opacity = '1';
+            } catch (e) { }
+        }
+        function stopPicker() {
+            try {
+                if (window.NativeQuickStopPicker) NativeQuickStopPicker();
+                pickBtn.disabled = false;
+                stopPickBtn.disabled = true;
+                pickBtn.style.opacity = '1';
+                stopPickBtn.style.opacity = '0.5';
+            } catch (e) { }
+        }
+        function selectBySelector(sel) {
+            if (!sel) return;
+            try {
+                selOut.textContent = sel;
+                if (window.NativeQuickHighlightSelector) NativeQuickHighlightSelector(sel);
+
+                // Refresh outerHTML for the selected element
+                refreshOuterHTML();
+
+                // Try direct native computed-style call first
+                let styles = null;
+                try {
+                    if (window.NativeQuickGetComputedStyle) {
+                        const j = NativeQuickGetComputedStyle(sel);
+                        const o = JSON.parse(j || '{}');
+                        if (o && Object.keys(o).length) {
+                            styles = o;
+                        }
+                    }
+                } catch (e) { }
+
+                // Fallback: evaluate in page context to enumerate getComputedStyle (more robust)
+                if (!styles && window.NativeQuickEval) {
+                    try {
+                        const js = `(function(sel){ var el=document.querySelector(sel); if(!el) return '{}'; var cs=getComputedStyle(el); var out={}; for(var i=0;i<cs.length;i++){ var k=cs.item(i); out[k]=cs.getPropertyValue(k); } return JSON.stringify(out); })(${JSON.stringify(sel)})`;
+                        const r = NativeQuickEval(js);
+                        const o2 = JSON.parse(r || '{}');
+                        if (o2 && Object.keys(o2).length) {
+                            styles = o2;
+                        }
+                    } catch (e) { }
+                }
+
+                // Format styles nicely with grouping
+                if (styles) {
+                    const important = ['display', 'position', 'width', 'height', 'margin', 'padding', 'color', 'background-color', 'font-size', 'font-family', 'border'];
+                    const sorted = Object.keys(styles).sort((a, b) => {
+                        const aImp = important.some(i => a.startsWith(i));
+                        const bImp = important.some(i => b.startsWith(i));
+                        if (aImp && !bImp) return -1;
+                        if (!aImp && bImp) return 1;
+                        return a.localeCompare(b);
+                    });
+                    stylesOut.textContent = sorted.map(k => `${k}: ${styles[k]};`).join('\n');
+                } else {
+                    stylesOut.textContent = '— no computed styles available —';
+                }
+            } catch (e) {
+                console.error('selectBySelector error:', e);
+            }
+        }
+        function loadDOM() {
+            try {
+                const depth = 3, maxChildren = 30; const j = NativeQuickGetDOMTree ? NativeQuickGetDOMTree(depth, maxChildren) : '{}';
+                const t = JSON.parse(j || '{}');
+                domTree.innerHTML = '';
+                function render(n, ul) { if (!n) return; const li = document.createElement('li'); const link = document.createElement('span'); link.className = 'node'; link.textContent = n.tag + (n.id ? ('#' + n.id) : '') + (n.cls ? ('.' + n.cls.toString().replace(/\s+/g, '.')) : ''); link.onclick = () => selectBySelector(toSelector(n)); li.appendChild(link); ul.appendChild(li); if (n.children && n.children.length) { const u = document.createElement('ul'); u.className = 'tree'; li.appendChild(u); n.children.forEach(c => render(c, u)); } }
+                function toSelector(n) { if (!n) return ''; let s = n.tag; if (n.id) return s + '#' + n.id; if (n.cls) { s += '.' + String(n.cls).trim().split(/\s+/).filter(Boolean).join('.'); } return s; }
+                const root = document.createElement('ul'); root.className = 'tree'; render(t, root); domTree.appendChild(root);
+            } catch (e) { }
+        }
+
+        // Console
+        function addConsoleRow(e) { const row = document.createElement('div'); row.textContent = (e && e.message) || ''; consoleList.appendChild(row); consoleList.scrollTop = consoleList.scrollHeight; }
+        function runEval() { const expr = evalIn.value; try { const r = NativeQuickEval ? NativeQuickEval(expr) : ''; evalOut.textContent = r; } catch (err) { evalOut.textContent = String(err); } }
+
+        // Network
+        function addNetworkRow(e) {
+            const o = typeof e === 'string' ? JSON.parse(e) : e; const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${(o.type || '').toUpperCase()}</td><td>${o.status || ''}</td><td>${escapeHtml(o.url || '')}</td><td>${o.time || ''} ms</td>`; netTbody.appendChild(tr);
+        }
+
+        // Storage
+        function refreshStorage() {
+            let data = {};
+            try {
+                const j = NativeQuickGetStorage ? NativeQuickGetStorage() : '{}';
+                data = JSON.parse(j || '{}') || {};
+            } catch (e) { data = {}; }
+
+            if ((!data.localStorage && !data.sessionStorage) && window.NativeQuickEval) {
+                try {
+                    const js = "(function(){ function dump(ls){ var o={}; try{ for(var i=0;i<ls.length;i++){ var k=ls.key(i); o[k]=ls.getItem(k); } }catch(e){} return o; } return JSON.stringify({ localStorage: dump(window.localStorage||{}), sessionStorage: dump(window.sessionStorage||{}), cookies: document.cookie||'' }); })();";
+                    const r = NativeQuickEval(js);
+                    const fallback = JSON.parse(r || '{}');
+                    if (fallback) data = fallback;
+                } catch (e) { }
+            }
+
+            populateKVTable(lsBody, entriesFromObject(data.localStorage));
+            populateKVTable(ssBody, entriesFromObject(data.sessionStorage));
+            populateKVTable(cookiesBody, entriesFromCookies(data.cookies), { valueClass: 'muted' });
+        }
+
+        // Performance
+        function refreshPerf() {
+            let data = {};
+            try {
+                const j = NativeQuickGetPerformance ? NativeQuickGetPerformance() : '{}';
+                data = JSON.parse(j || '{}') || {};
+            } catch (e) { data = {}; }
+
+            if ((!data || Object.keys(data).length === 0) && window.NativeQuickEval) {
+                try {
+                    const js = "(function(){ function rel(t, key){ if(!t||t.navigationStart==null||t[key]==null) return null; return Math.max(0, t[key]-t.navigationStart); } var navEntries=(performance.getEntriesByType && performance.getEntriesByType('navigation'))||[]; var nav = navEntries.length? navEntries[0]:{}; var resources=(performance.getEntriesByType && performance.getEntriesByType('resource'))||[]; var paintEntries=(performance.getEntriesByType && performance.getEntriesByType('paint'))||[]; var paints={}; for(var i=0;i<paintEntries.length;i++){ paints[paintEntries[i].name]=paintEntries[i].startTime; } var timing=performance.timing||{}; var summary={ domInteractive: nav.domInteractive||rel(timing,'domInteractive'), domContentLoadedEventEnd: nav.domContentLoadedEventEnd||rel(timing,'domContentLoadedEventEnd'), loadEventEnd: nav.loadEventEnd||rel(timing,'loadEventEnd'), domComplete: nav.domComplete||rel(timing,'domComplete') }; return JSON.stringify({ navigation: nav, resourceCount: resources.length, timing: timing, paints: paints, summary: summary, memory: performance.memory||{} }); })();";
+                    const r = NativeQuickEval(js);
+                    const fallback = JSON.parse(r || '{}');
+                    if (fallback) data = fallback;
+                } catch (e) { }
+            }
+
+            renderPerformance(data);
+        }
+
+        // Native readiness helper
+        function waitForNative(names = [], timeoutMs = 2000) {
+            return new Promise(resolve => {
+                const start = Date.now();
+                const tick = () => {
+                    const ok = names.every(n => typeof window[n] === 'function');
+                    if (ok || (Date.now() - start) > timeoutMs) return resolve();
+                    setTimeout(tick, 50);
+                };
+                tick();
+            });
+        }
+
+        // UI
+        let perfTimer = 0;
+        function setTab(id) {
+            // clear any polling timers
+            if (perfTimer) { clearInterval(perfTimer); perfTimer = 0; }
+
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelector(`.tab[data-id="${id}"]`).classList.add('active');
+            document.getElementById(id).classList.add('active');
+
+            if (id === 'elements') {
+                loadDOM();
+                // If no current selection, default to <html> to mimic DevTools having something to show
+                if (!selOut.textContent) {
+                    selectBySelector('html');
+                }
+            }
+            if (id === 'storage') { refreshStorage(); }
+            if (id === 'performance') {
+                refreshPerf();
+                // Auto-refresh while viewing performance to keep it live-ish
+                perfTimer = setInterval(refreshPerf, 1000);
+            }
+            if (id === 'info') { refreshInfo(); }
+        }
+
+        function escapeHtml(s) { return String(s).replace(/[&<>\"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m])); }
+
+        function entriesFromObject(obj) {
+            if (!obj) return [];
+            if (Array.isArray(obj)) return obj;
+            return Object.keys(obj).map(key => [key, obj[key]]);
+        }
+
+        function entriesFromCookies(cookieStr = '') {
+            if (!cookieStr) return [];
+            return cookieStr.split(/;\s*/).filter(Boolean).map(pair => {
+                const idx = pair.indexOf('=');
+                if (idx === -1) return [pair, ''];
+                const name = pair.slice(0, idx);
+                const value = pair.slice(idx + 1);
+                let decoded = value;
+                try { decoded = decodeURIComponent(value); } catch (e) { }
+                return [name, decoded];
+            });
+        }
+
+        function populateKVTable(tbody, entries, opts = {}) {
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            const list = entries && entries.length ? entries : [];
+            if (!list.length) {
+                const tr = document.createElement('tr');
+                const td = document.createElement('td');
+                td.colSpan = opts.colspan || 2;
+                td.className = 'muted';
+                td.textContent = opts.emptyText || 'No data';
+                tr.appendChild(td);
+                tbody.appendChild(tr);
+                return;
+            }
+            list.forEach(([key, value]) => {
+                const tr = document.createElement('tr');
+                const keyTd = document.createElement('td');
+                keyTd.textContent = key;
+                tr.appendChild(keyTd);
+                const valTd = document.createElement('td');
+                const normalized = (typeof value === 'object' && value !== null)
+                    ? JSON.stringify(value)
+                    : (value == null ? '' : String(value));
+                valTd.textContent = normalized;
+                if (opts.valueClass) valTd.classList.add(opts.valueClass);
+                tr.appendChild(valTd);
+                tbody.appendChild(tr);
+            });
+        }
+
+        function metricFromTiming(nav, timing, key) {
+            if (nav && typeof nav[key] === 'number' && nav[key] >= 0)
+                return nav[key];
+            if (timing && typeof timing.navigationStart === 'number' && typeof timing[key] === 'number')
+                return Math.max(0, timing[key] - timing.navigationStart);
+            return null;
+        }
+
+        function formatMs(val) {
+            if (typeof val !== 'number' || !isFinite(val) || val < 0)
+                return '—';
+            return `${Math.round(val)} ms`;
+        }
+
+        function formatBytes(bytes) {
+            if (typeof bytes !== 'number' || !isFinite(bytes) || bytes < 0)
+                return '—';
+            const mb = bytes / (1024 * 1024);
+            if (mb < 1) return `${bytes.toFixed(0)} B`;
+            return `${mb.toFixed(1)} MB`;
+        }
+
+        function renderPerformance(data = {}) {
+            if (!perfSummaryEl || !perfTimingBody || !perfPaintBody) return;
+
+            const navigation = data.navigation || {};
+            const timing = data.timing || {};
+            const summarySrc = data.summary || {};
+            const memory = data.memory || {};
+
+            const domInteractive = summarySrc.domInteractive ?? metricFromTiming(navigation, timing, 'domInteractive');
+            const domContentLoaded = summarySrc.domContentLoadedEventEnd ?? metricFromTiming(navigation, timing, 'domContentLoadedEventEnd');
+            const loadEventEnd = summarySrc.loadEventEnd ?? metricFromTiming(navigation, timing, 'loadEventEnd');
+            const domComplete = summarySrc.domComplete ?? metricFromTiming(navigation, timing, 'domComplete');
+
+            const summaryHtml = [
+                `<div><span class="muted">Resource Count</span> ${data.resourceCount ?? 0}</div>`,
+                `<div><span class="muted">DOM Interactive</span> ${formatMs(domInteractive)}</div>`,
+                `<div><span class="muted">DOMContentLoaded</span> ${formatMs(domContentLoaded)}</div>`,
+                `<div><span class="muted">Load Event</span> ${formatMs(loadEventEnd)}</div>`,
+                `<div><span class="muted">DOM Complete</span> ${formatMs(domComplete)}</div>`,
+                memory.usedJSHeapSize ? `<div><span class="muted">JS Heap Used</span> ${formatBytes(memory.usedJSHeapSize)}</div>` : ''
+            ].filter(Boolean).join('');
+            perfSummaryEl.innerHTML = summaryHtml || '<div class="muted">No performance data</div>';
+
+            const timelineEntries = [
+                ['Fetch Start', metricFromTiming(navigation, timing, 'fetchStart')],
+                ['DNS Lookup End', metricFromTiming(navigation, timing, 'domainLookupEnd')],
+                ['Connect End', metricFromTiming(navigation, timing, 'connectEnd')],
+                ['Request Start', metricFromTiming(navigation, timing, 'requestStart')],
+                ['Response Start', metricFromTiming(navigation, timing, 'responseStart')],
+                ['Response End', metricFromTiming(navigation, timing, 'responseEnd')],
+                ['DOM Interactive', domInteractive],
+                ['DOMContentLoaded', domContentLoaded],
+                ['DOM Complete', domComplete],
+                ['Load Event End', loadEventEnd]
+            ].map(([label, value]) => [label, formatMs(value)]);
+            populateKVTable(perfTimingBody, timelineEntries, { emptyText: 'No timing data' });
+
+            const paintEntries = entriesFromObject(data.paints).map(([name, value]) => [name, formatMs(value)]);
+            populateKVTable(perfPaintBody, paintEntries, { emptyText: 'No paint entries' });
+        }
+
+        let pickBtn, stopPickBtn, selOut, stylesOut, domTree, consoleList, evalIn, evalOut, netTbody;
+        let lsBody, ssBody, cookiesBody, outerHTMLOut, attrNameIn, attrValueIn;
+        let perfSummaryEl, perfTimingBody, perfPaintBody;
+        document.addEventListener('DOMContentLoaded', async () => {
+            pickBtn = document.getElementById('pick');
+            stopPickBtn = document.getElementById('stopPick');
+            selOut = document.getElementById('selector');
+            stylesOut = document.getElementById('styles');
+            outerHTMLOut = document.getElementById('outerHTML');
+            attrNameIn = document.getElementById('attrName');
+            attrValueIn = document.getElementById('attrValue');
+            domTree = document.getElementById('domTree');
+            consoleList = document.getElementById('consoleList');
+            evalIn = document.getElementById('evalIn');
+            evalOut = document.getElementById('evalOut');
+            netTbody = document.getElementById('netTbody');
+            lsBody = document.getElementById('lsBody');
+            ssBody = document.getElementById('ssBody');
+            cookiesBody = document.getElementById('cookiesBody');
+            perfSummaryEl = document.getElementById('perfSummary');
+            perfTimingBody = document.getElementById('perfTimingBody');
+            perfPaintBody = document.getElementById('perfPaintBody');
+            // Wait briefly for native bindings so first refreshes work reliably
+            await waitForNative([
+                'NativeQuickGetInfo', 'NativeQuickGetDOMTree', 'NativeQuickGetComputedStyle',
+                'NativeQuickGetStorage', 'NativeQuickGetPerformance', 'NativeQuickEval'
+            ]);
+            setTab('elements');
+            refreshInfo();
+            setInterval(refreshInfo, 1000);
+        });
+        function refreshOuterHTML() { try { const sel = selOut.textContent || ''; if (!sel) return; const j = NativeQuickGetOuterHTML ? NativeQuickGetOuterHTML(sel) : ''; if (outerHTMLOut) outerHTMLOut.value = j || ''; } catch (e) { } }
+        function applyAttr() { try { const sel = selOut.textContent || ''; const n = attrNameIn.value || ''; const v = attrValueIn.value || ''; if (!sel || !n) return; if (NativeQuickSetAttribute) NativeQuickSetAttribute(sel, n, v); refreshOuterHTML(); } catch (e) { } }
+        function removeAttr() { try { const sel = selOut.textContent || ''; const n = attrNameIn.value || ''; if (!sel || !n) return; if (NativeQuickRemoveAttribute) NativeQuickRemoveAttribute(sel, n); refreshOuterHTML(); } catch (e) { } }
+    </script>
+</head>
+
+<body>
+    <div class="toolbar">
+        <div class="tabs">
+            <div class="tab active" data-id="elements" onclick="setTab('elements')">Elements</div>
+            <div class="tab" data-id="console" onclick="setTab('console')">Console</div>
+            <div class="tab" data-id="network" onclick="setTab('network')">Network</div>
+            <div class="tab" data-id="storage" onclick="setTab('storage')">Storage</div>
+            <div class="tab" data-id="performance" onclick="setTab('performance')">Performance</div>
+            <div class="tab" data-id="info" onclick="setTab('info')">Info</div>
+        </div>
+        <div class="grow"></div>
+        <button class="btn" onclick="try{NativeQuickOpenDevtools&&NativeQuickOpenDevtools()}catch(e){}">Open
+            DevTools</button>
+        <button class="btn" onclick="try{NativeQuickClose&&NativeQuickClose()}catch(e){}">Close</button>
+    </div>
+    <div class="content">
+        <div id="elements" class="panel active">
+            <div class="row">
+                <button id="pick" class="btn" onclick="startPicker()">Pick Element</button>
+                <button id="stopPick" class="btn" onclick="stopPicker()" disabled>Stop</button>
+                <span class="pill muted">Selector:</span> <span id="selector" class="muted"></span>
+            </div>
+            <div class="row">
+                <div class="pill">Styles</div>
+            </div>
+            <textarea id="styles" readonly></textarea>
+            <div class="row">
+                <div class="pill">Outer HTML</div>
+                <div class="grow"></div><button class="btn" onclick="refreshOuterHTML()">Refresh</button>
+            </div>
+            <textarea id="outerHTML" readonly></textarea>
+            <div class="row">
+                <div class="pill">Attributes</div>
+            </div>
+            <div class="row">
+                <input id="attrName" type="text" placeholder="name" style="max-width:220px" />
+                <input id="attrValue" type="text" placeholder="value" />
+                <button class="btn" onclick="applyAttr()">Set</button>
+                <button class="btn" onclick="removeAttr()">Remove</button>
+            </div>
+            <div class="row">
+                <div class="pill">DOM</div>
+            </div>
+            <div id="domTree"></div>
+        </div>
+        <div id="console" class="panel">
+            <div class="row"><input id="evalIn" type="text" placeholder="Enter JS to evaluate in page context" /><button
+                    class="btn" onclick="runEval()">Run</button></div>
+            <div class="row">
+                <div class="pill">Result</div>
+            </div>
+            <textarea id="evalOut" readonly></textarea>
+            <div class="row">
+                <div class="pill">Messages</div>
+            </div>
+            <div id="consoleList" style="height:240px; overflow:auto; border:1px solid var(--border); padding:6px;">
+            </div>
+        </div>
+        <div id="network" class="panel">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>URL</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody id="netTbody"></tbody>
+            </table>
+        </div>
+        <div id="storage" class="panel">
+            <div class="row">
+                <div class="pill">localStorage</div>
+                <div class="grow"></div><button class="btn" onclick="refreshStorage()">Refresh</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Key</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody id="lsBody"></tbody>
+            </table>
+            <div class="row">
+                <div class="pill">sessionStorage</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Key</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody id="ssBody"></tbody>
+            </table>
+            <div class="row">
+                <div class="pill">Cookies</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody id="cookiesBody"></tbody>
+            </table>
+        </div>
+        <div id="performance" class="panel">
+            <div class="row">
+                <div class="pill">Metrics</div>
+                <div class="grow"></div><button class="btn" onclick="refreshPerf()">Refresh</button>
+            </div>
+            <div id="perfSummary" class="summary"></div>
+            <div class="row">
+                <div class="pill">Timeline</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Event</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody id="perfTimingBody"></tbody>
+            </table>
+            <div class="row">
+                <div class="pill">Paints</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Entry</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody id="perfPaintBody"></tbody>
+            </table>
+        </div>
+        <div id="info" class="panel">
+            <div class="row"><span class="pill key">Title</span><input id="info-title" type="text" readonly></div>
+            <div class="row"><span class="pill key">URL</span><input id="info-url" type="text" readonly></div>
+            <div class="row"><span class="pill key">State</span><span id="info-state">-</span></div>
+        </div>
+    </div>
+</body>
+
+</html>

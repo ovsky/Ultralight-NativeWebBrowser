@@ -1,0 +1,129 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Suggestions</title>
+  <style>
+    html, body { background: transparent; margin: 0; padding: 0; font-family: "Segoe UI", -apple-system, Ubuntu, Arial, sans-serif; font-size: 14px; color: #e2e1ea; }
+    #root { position: fixed; inset: 0; pointer-events: none; }
+    #panel {
+      position: absolute;
+      background: #2b2b38;
+      color: #e2e1ea;
+      border: 1px solid #313146;
+      border-radius: 8px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+      min-width: 160px;
+      max-height: 320px;
+      overflow-y: auto;
+      padding: 4px 0;
+      pointer-events: auto; /* accept mouse */
+    }
+  .row { display:flex; align-items:center; gap:8px; padding: 8px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; line-height: 1.4; }
+    .row:hover, .row.active { background: #343446; }
+    .icon { width:16px; height:16px; flex:0 0 16px; border-radius:3px; background:#1f1f2b; display:inline-block; }
+    .url { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+  </style>
+</head>
+<body>
+  <div id="root"><div id="panel" role="listbox" aria-hidden="false"></div></div>
+  <script>
+    let activeIndex = -1;
+    function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+    function setActive(idx){
+      const panel = document.getElementById('panel');
+      const rows = panel ? panel.querySelectorAll('.row') : [];
+      for (let i=0;i<rows.length;i++){ rows[i].classList.toggle('active', i===idx); }
+      activeIndex = (rows.length? Math.max(-1, Math.min(idx, rows.length-1)) : -1);
+      if (activeIndex>=0 && rows[activeIndex]){
+        // Ensure visibility
+        const r = rows[activeIndex];
+        const pr = panel.getBoundingClientRect();
+        const rr = r.getBoundingClientRect();
+        if (rr.top < pr.top) panel.scrollTop -= (pr.top - rr.top);
+        if (rr.bottom > pr.bottom) panel.scrollTop += (rr.bottom - pr.bottom);
+      }
+    }
+    function commitActive(openMode){
+      const panel = document.getElementById('panel');
+      const rows = panel ? panel.querySelectorAll('.row') : [];
+      if (activeIndex>=0 && activeIndex < rows.length){
+        const val = rows[activeIndex].getAttribute('data-val') || rows[activeIndex].getAttribute('data-text') || rows[activeIndex].textContent;
+        if (window.OnSuggestionPick) {
+          if (openMode === 'newtab') OnSuggestionPick(String(val||''), 'newtab');
+          else OnSuggestionPick(String(val||''));
+        }
+      }
+    }
+    function setupSuggestions(x, y, w, itemsJson){
+      const panel = document.getElementById('panel');
+      panel.innerHTML = '';
+      let items = [];
+      try { const s = String(itemsJson||'[]'); items = JSON.parse(s); } catch(_) {}
+      items = Array.isArray(items) ? items : [];
+      items.forEach((it, idx) => {
+        const div = document.createElement('div');
+        div.className = 'row';
+        let url = '', favicon = '';
+        if (typeof it === 'string') { url = it; }
+        else if (it && typeof it === 'object') { url = String(it.url||''); favicon = String(it.favicon||''); }
+        // icon
+        if (favicon) {
+          const img = document.createElement('img'); img.className='icon'; img.src=favicon; img.alt='';
+          try { img.crossOrigin = 'anonymous'; } catch(_) {}
+          img.addEventListener('load', ()=>{
+            try{
+              // persist to disk via dataURL (may fail for cross-origin without CORS)
+              const c = document.createElement('canvas'); c.width = 16; c.height = 16; const g = c.getContext('2d');
+              g.imageSmoothingEnabled = true; g.clearRect(0,0,16,16); g.drawImage(img,0,0,16,16);
+              const dataUrl = c.toDataURL('image/png');
+              if (window.OnFaviconReady) OnFaviconReady(String(url||''), String(dataUrl||''));
+            }catch(e){ /* ignore tainted canvas */ }
+          });
+          img.referrerPolicy = 'no-referrer';
+          div.appendChild(img);
+        } else {
+          const span = document.createElement('span'); span.className='icon'; div.appendChild(span);
+        }
+        const label = document.createElement('span'); label.className='url'; label.textContent = url || String(it||''); div.appendChild(label);
+        div.setAttribute('data-val', url || String(it||''));
+        div.setAttribute('data-text', url || String(it||''));
+        div.addEventListener('mousedown', (e)=>{ e.preventDefault(); e.stopPropagation(); });
+        div.addEventListener('mousemove', ()=>{ setActive(idx); });
+        div.addEventListener('click', ()=>{ const v = div.getAttribute('data-val')||''; if (window.OnSuggestionPick) OnSuggestionPick(String(v)); });
+        panel.appendChild(div);
+      });
+      setActive(items.length ? 0 : -1);
+      const vw = window.innerWidth, vh = window.innerHeight;
+      panel.style.left = clamp(x, 0, Math.max(0, vw - Math.max(160,w))) + 'px';
+      panel.style.top  = clamp(y, 0, Math.max(0, vh - 20)) + 'px';
+      panel.style.width = Math.max(160, Math.min(800, w|0)) + 'px';
+    }
+    window.setupSuggestions = setupSuggestions;
+    // Close on outside click
+    window.addEventListener('mousedown', (e)=>{
+      if (!e.target.closest('#panel')) {
+        if (window.CloseSuggestionsOverlay) CloseSuggestionsOverlay();
+      }
+    }, true);
+    // Keyboard navigation (Up/Down/Enter/Escape/Tab) forwarded by native
+    window.addEventListener('keydown', (e)=>{
+      const k = e.key;
+      if (k === 'ArrowDown') { e.preventDefault(); setActive(activeIndex+1); }
+      else if (k === 'ArrowUp') { e.preventDefault(); setActive(activeIndex-1); }
+      else if (k === 'Enter') { e.preventDefault(); commitActive(e.ctrlKey ? 'newtab' : undefined); }
+      else if (k === 'Tab') { e.preventDefault();
+        const panel = document.getElementById('panel');
+        const rows = panel ? panel.querySelectorAll('.row') : [];
+        const idx = (activeIndex>=0 ? activeIndex : 0);
+        const row = rows[idx];
+        if (row) {
+          const val = row.getAttribute('data-val') || row.getAttribute('data-text') || row.textContent;
+          if (window.OnSuggestionPaste) OnSuggestionPaste(String(val||''));
+        }
+      }
+      else if (k === 'Escape') { e.preventDefault(); if (window.CloseSuggestionsOverlay) CloseSuggestionsOverlay(); }
+    }, true);
+  </script>
+</body>
+</html>

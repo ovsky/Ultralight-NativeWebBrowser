@@ -1,0 +1,286 @@
+* {
+     overflow: hidden;
+     user-select: none;
+     -webkit-user-select: none;
+     transition: all 0.2s ease-in-out;
+}
+
+body {
+     margin: 0;
+     padding: 0;
+     font-family: "Segoe UI", -apple-system, Ubuntu, Arial, sans-serif;
+     font-size: 14px;
+     background: #16151d;
+     color: #c4c2d0;
+}
+
+#bar {
+     background: #232330;
+     background: linear-gradient(0deg, #232330, #282836);
+     height: 32px;
+     padding: 4px 9px;
+     border-bottom: 0.8px solid #252532;
+     cursor: default;
+     display: flex;
+}
+
+#address {
+     /* Pill shape and no default outline */
+     border-radius: 9999px;
+     border: none;
+     height: 32px;
+     flex: 1;
+     font-size: 14px;
+     color: #c4c2d0;
+     background-color: #16151d;
+     display: inline-block;
+     padding: 2px 16px 2px 16px;
+     margin-top: 0px;
+     margin-left: 9px;
+     margin-right: 9px;
+     user-select: auto !important;
+     -webkit-user-select: text !important;
+     outline: none;
+}
+
+#address:focus {
+     background-color: #16151d;
+     color: #FFF;
+     /* Rounded focus ring */
+     box-shadow: 0 0 0 2px #343446 inset;
+}
+
+.icon {
+     fill: rgba(200, 200, 200, 1.0);
+     vertical-align: middle;
+     /* margin-top: -1px; */
+     padding: 5px;
+     height: 18px;
+     width: 18px;
+}
+
+/* Show hand cursor for clickable icons */
+.icon:not(.disabled) {
+     cursor: pointer;
+}
+
+#back {
+     margin-left: 0px;
+}
+
+.icon.disabled {
+     cursor: default;
+     fill: rgb(99 96 116);
+}
+
+svg#icon_defs path {
+     fill: inherit;
+}
+
+.icon:not(.disabled):hover {
+     background-color: #343446;
+     border-radius: 100%;
+}
+
+#toggle-downloads {
+     position: relative;
+}
+
+#toggle-downloads .downloads-badge {
+     position: absolute;
+     top: 2px;
+     right: 2px;
+     min-width: 12px;
+     height: 12px;
+     line-height: 12px;
+     font-size: 9px;
+     font-weight: 600;
+     border-radius: 999px;
+     background: #ff6b6b;
+     color: #fff;
+     text-align: center;
+     padding: 0 3px;
+     display: none;
+     pointer-events: none;
+     overflow: visible !important;
+}
+
+#toggle-downloads.badge-visible .downloads-badge {
+     display: inline-block;
+}
+
+/* AdBlock toggle coloring: highlight when protection is active */
+#toggle-adblock {
+     color: #b6b3c9;
+     fill: #b6b3c9;
+     transition: color 0.075s ease, fill 0.075s ease;
+}
+
+#toggle-adblock:hover {
+     color: #cbc9d8;
+     fill: #cbc9d8;
+}
+
+#toggle-adblock.active {
+     color: #6C63FF;
+     fill: #6C63FF;
+}
+
+#toggle-adblock.active:hover {
+     color: #8a83ff;
+     fill: #8a83ff;
+}
+
+/* Dropdown menu styles */
+.menu-dropdown {
+     position: absolute;
+     top: 40px;
+     /* below top bar */
+     right: 10px;
+     width: 240px;
+     background: #2b2b38;
+     border: 1px solid #313146;
+     border-radius: 8px;
+     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+     padding: 6px 0;
+     z-index: 1000;
+}
+
+.menu-dropdown.hidden {
+     display: none;
+}
+
+.menu-item {
+     padding: 8px 12px;
+     line-height: 1.6;
+     display: flex;
+     align-items: center;
+     justify-content: space-between;
+     color: #e2e1ea;
+     cursor: default;
+}
+
+.menu-item:hover {
+     background: #343446;
+     cursor: pointer;
+}
+
+.menu-separator {
+     height: 1px;
+     background: #3a3a4e;
+     margin: 6px 0;
+}
+
+/* Address suggestions panel */
+.suggestions-panel {
+     position: fixed;
+     background: #2b2b38;
+     border: 1px solid #313146;
+     border-radius: 8px;
+     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+     padding: 4px 0;
+     z-index: 2000;
+     color: #e2e1ea;
+     max-height: 320px;
+     overflow-y: auto;
+     display: none;
+}
+
+.suggestions-item {
+     padding: 8px 12px;
+     cursor: pointer;
+     white-space: nowrap;
+     overflow: hidden;
+     text-overflow: ellipsis;
+}
+
+.suggestions-item:hover,
+.suggestions-item.active {
+     background: #343446;
+}
+
+/* Floating tooltip for toolbar icons */
+.toolbar-tooltip {
+     position: fixed;
+     padding: 4px 10px;
+     background: rgba(43, 43, 56, 0.95);
+     color: #f0f0ff;
+     border-radius: 4px;
+     font-size: 12px;
+     line-height: 1.4;
+     pointer-events: none;
+     opacity: 0;
+     transform: translate(-50%, -6px);
+     transition: opacity 0.12s ease, transform 0.12s ease;
+     z-index: 12000;
+     white-space: nowrap;
+     overflow: visible !important;
+     box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+.toolbar-tooltip.visible {
+     opacity: 1;
+     transform: translate(-50%, -2px);
+}
+
+.toolbar-tooltip::after {
+     content: "";
+     position: absolute;
+     left: 50%;
+     bottom: -5px;
+     margin-left: -5px;
+     width: 0;
+     height: 0;
+     border-width: 5px 5px 0 5px;
+     border-style: solid;
+     border-color: rgba(43, 43, 56, 0.95) transparent transparent transparent;
+}
+
+.toolbar-tooltip.below {
+     transform: translate(-50%, 6px);
+}
+
+.toolbar-tooltip.below.visible {
+     transform: translate(-50%, 2px);
+}
+
+.toolbar-tooltip.below::after {
+     top: -5px;
+     bottom: auto;
+     border-width: 0 5px 5px 5px;
+     border-color: transparent transparent rgba(43, 43, 56, 0.95) transparent;
+}
+
+body.transparent-toolbar #bar {
+     background: rgba(35, 35, 48, 0.55);
+     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+     backdrop-filter: blur(16px);
+}
+
+body.transparent-toolbar {
+     background: radial-gradient(circle at top, rgba(26, 26, 38, 0.85), #16151d 68%);
+}
+
+body.transparent-toolbar .chrome-tabs {
+     background: rgba(24, 24, 32, 0.38);
+     backdrop-filter: blur(16px);
+}
+
+body.compact-tabs #bar {
+     height: 28px;
+     padding: 2px 8px;
+}
+
+body.compact-tabs #address {
+     height: 28px;
+     font-size: 13px;
+     padding: 1px 14px 1px 14px;
+}
+
+body.compact-tabs .icon {
+     padding: 4px;
+}
+
+body.compact-tabs #toggle-downloads .downloads-badge {
+     top: 0;
+}
