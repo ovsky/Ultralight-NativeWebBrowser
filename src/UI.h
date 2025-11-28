@@ -14,7 +14,6 @@ using namespace ultralight;
 
 class Console;
 class AdBlocker; // forward declaration, optional dependency
-class SettingsManager; // forward-declare the helper to make it a friend
 class DownloadManager;
 
 /**
@@ -325,21 +324,4 @@ protected:
   std::string settings_storage_path_;
 
   friend class Tab;
-  friend class SettingsManager;
 };
-
-// Datatype used at runtime to represent a settings catalog entry.
-struct RuntimeSettingDescriptor
-{
-  std::string key;
-  std::string name;
-  std::string description;
-  std::string category;
-  std::string note;
-  bool UI::BrowserSettings::*member = nullptr;
-  bool default_value = false;
-};
-
-// Accessors for the runtime settings catalog. Implemented in UI.cpp.
-const std::vector<RuntimeSettingDescriptor> &GetSettingsCatalog();
-const RuntimeSettingDescriptor *FindSettingDescriptor(const std::string &key);

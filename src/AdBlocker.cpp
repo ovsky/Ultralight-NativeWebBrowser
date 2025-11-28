@@ -1,5 +1,5 @@
 #include "AdBlocker.h"
-#include "Utils.h"
+
 #include <Ultralight/Ultralight.h>
 #include <fstream>
 #include <sstream>
@@ -43,7 +43,7 @@ bool AdBlocker::LoadBlocklist(const std::string &path, bool append)
     std::string line;
     while (std::getline(in, line))
     {
-        line = util::Trim(line);
+        line = Trim(line);
         if (line.empty())
             continue;
         if (line[0] == '#')
@@ -57,7 +57,7 @@ bool AdBlocker::LoadBlocklist(const std::string &path, bool append)
             auto hat = dom.find('^');
             if (hat != std::string::npos)
                 dom = dom.substr(0, hat);
-            dom = util::Trim(dom);
+            dom = Trim(dom);
             if (!dom.empty())
                 AddBlockedHost(dom);
             continue;
@@ -145,8 +145,8 @@ bool AdBlocker::OnNetworkRequest(View * /*caller*/, NetworkRequest &request)
 
     auto host_ul = request.urlHost();
     auto url_ul = request.url();
-    auto host = util::ToLower(std::string(host_ul.utf8().data()));
-    auto url = util::ToLower(std::string(url_ul.utf8().data()));
+    auto host = ToLower(std::string(host_ul.utf8().data()));
+    auto url = ToLower(std::string(url_ul.utf8().data()));
 
     {
         std::lock_guard<std::mutex> lock(mtx_);
@@ -169,7 +169,7 @@ bool AdBlocker::OnNetworkRequest(View * /*caller*/, NetworkRequest &request)
 
 void AdBlocker::AddBlockedHost(const std::string &host_raw)
 {
-    std::string h = util::ToLower(util::Trim(host_raw));
+    std::string h = ToLower(Trim(host_raw));
     if (h.empty())
         return;
     // strip leading dots
@@ -180,7 +180,7 @@ void AdBlocker::AddBlockedHost(const std::string &host_raw)
 
 void AdBlocker::AddURLSubstring(const std::string &needle_raw)
 {
-    std::string n = util::ToLower(util::Trim(needle_raw));
+    std::string n = ToLower(Trim(needle_raw));
     if (n.empty())
         return;
     url_substrings_.push_back(n);
@@ -188,7 +188,7 @@ void AdBlocker::AddURLSubstring(const std::string &needle_raw)
 
 void AdBlocker::AddURLGlob(const std::string &pattern_raw)
 {
-    std::string p = util::ToLower(util::Trim(pattern_raw));
+    std::string p = ToLower(Trim(pattern_raw));
     if (p.empty())
         return;
     url_globs_.push_back(p);
@@ -219,7 +219,21 @@ bool AdBlocker::IsBlockedURL(const std::string &url) const
     return false;
 }
 
-// Use util::ToLower and util::Trim from Utils.h
+std::string AdBlocker::ToLower(std::string s)
+{
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c)
+                   { return (char)std::tolower(c); });
+    return s;
+}
+
+std::string AdBlocker::Trim(const std::string &s)
+{
+    size_t start = s.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos)
+        return "";
+    size_t end = s.find_last_not_of(" \t\r\n");
+    return s.substr(start, end - start + 1);
+}
 
 // Very simple glob matcher supporting '*' and '?'
 bool AdBlocker::GlobMatch(const char *text, const char *pattern)

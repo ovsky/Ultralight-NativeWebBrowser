@@ -1,7 +1,6 @@
 #include "DownloadManager.h"
 
 #include <Ultralight/platform/Platform.h>
-#include "Utils.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -56,7 +55,12 @@ namespace
         return true;
     }
 
-    // Use util::ToStdString from Utils.h
+    std::string ToStdString(const ultralight::String &str)
+    {
+        auto utf8 = str.utf8();
+        const char *data = utf8.data();
+        return data ? std::string(data) : std::string();
+    }
 
     std::wstring ToWide(const std::string &input)
     {
@@ -145,7 +149,7 @@ DownloadManager::DownloadId DownloadManager::NextDownloadId(ultralight::View *ca
 
 bool DownloadManager::OnRequestDownload(ultralight::View *caller, DownloadId id, const ultralight::String &url)
 {
-    std::string url_str = util::ToStdString(url);
+    std::string url_str = ToStdString(url);
     if (ShouldIgnoreDownloadURL(url_str))
         return false;
 
@@ -175,7 +179,7 @@ bool DownloadManager::OnRequestDownload(ultralight::View *caller, DownloadId id,
 void DownloadManager::OnBeginDownload(ultralight::View *caller, DownloadId id, const ultralight::String &url,
                                       const ultralight::String &filename, int64_t expected_content_length)
 {
-    std::string url_str = util::ToStdString(url);
+    std::string url_str = ToStdString(url);
     if (ShouldIgnoreDownloadURL(url_str))
         return;
 
@@ -198,7 +202,7 @@ void DownloadManager::OnBeginDownload(ultralight::View *caller, DownloadId id, c
 
     EnsureDirectoryExists();
 
-    std::string suggested = util::ToStdString(filename);
+    std::string suggested = ToStdString(filename);
     std::string derived = DeriveFilename(record.url, suggested);
     std::string sanitized = TrimTrailingDigitsAfterExtension(SanitizeFilename(derived));
     std::string base_name = sanitized;
@@ -315,17 +319,17 @@ std::string DownloadManager::GetDownloadsJSON()
         first = false;
 
         json += "{\"id\":" + std::to_string(rec.id);
-        json += ",\"url\":\"" + util::EscapeJsonString(rec.url) + "\"";
-        json += ",\"filename\":\"" + util::EscapeJsonString(rec.display_name) + "\"";
-        json += ",\"path\":\"" + util::EscapeJsonString(rec.path.u8string()) + "\"";
-        json += ",\"status\":\"" + util::EscapeJsonString(StatusToString(rec.status)) + "\"";
+        json += ",\"url\":\"" + JsonEscape(rec.url) + "\"";
+        json += ",\"filename\":\"" + JsonEscape(rec.display_name) + "\"";
+        json += ",\"path\":\"" + JsonEscape(rec.path.u8string()) + "\"";
+        json += ",\"status\":\"" + JsonEscape(StatusToString(rec.status)) + "\"";
         json += ",\"received\":" + std::to_string(rec.received_bytes);
         json += ",\"total\":" + std::to_string(rec.expected_bytes);
         json += ",\"canOpen\":" + std::string((rec.status == Status::Completed && !rec.path.empty()) ? "true" : "false");
         json += ",\"canReveal\":" + std::string((rec.status == Status::Completed && !rec.path.empty()) ? "true" : "false");
         json += ",\"startedAt\":" + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(rec.started_at.time_since_epoch()).count());
         json += ",\"finishedAt\":" + std::to_string(rec.finished_at.time_since_epoch().count() ? std::chrono::duration_cast<std::chrono::milliseconds>(rec.finished_at.time_since_epoch()).count() : 0);
-        json += ",\"error\":\"" + util::EscapeJsonString(rec.error) + "\"";
+        json += ",\"error\":\"" + JsonEscape(rec.error) + "\"";
         json += "}";
     }
     json += "]}";
@@ -503,8 +507,8 @@ std::filesystem::path DownloadManager::DetermineDefaultDirectory()
 #ifdef _WIN32
     base = std::filesystem::current_path();
 #else
-    auto home = util::GetEnvVar("HOME");
-     if (!home.empty())
+    const char *home = std::getenv("HOME");
+    if (home && *home)
         base = std::filesystem::path(home);
     else
         base = std::filesystem::current_path();
@@ -578,7 +582,42 @@ std::string DownloadManager::StatusToString(Status status) const
     return "unknown";
 }
 
-// use util::EscapeJsonString
+std::string DownloadManager::JsonEscape(const std::string &input)
+{
+    std::string out;
+    out.reserve(input.size() + 16);
+    for (char c : input)
+    {
+        switch (c)
+        {
+        case '"':
+            out += "\\\"";
+            break;
+        case '\\':
+            out += "\\\\";
+            break;
+        case '\b':
+            out += "\\b";
+            break;
+        case '\f':
+            out += "\\f";
+            break;
+        case '\n':
+            out += "\\n";
+            break;
+        case '\r':
+            out += "\\r";
+            break;
+        case '\t':
+            out += "\\t";
+            break;
+        default:
+            out += c;
+            break;
+        }
+    }
+    return out;
+}
 
 void DownloadManager::EnsureDirectoryExists()
 {
