@@ -1,0 +1,57 @@
+# Common ad serving domains (suffix match)
+# Google / DoubleClick
+||doubleclick.net^
+||g.doubleclick.net^
+||googleadservices.com^
+||googlesyndication.com^
+||googletagservices.com^
+||googletagmanager.com^
+
+# Amazon Ads
+||aaxads.com^
+||aaxdetect.com^
+||ads.amazon.com^
+||adserver.amazon.com^
+||advertising.amazon.com^
+||amazon-adsystem.com^
+
+# Microsoft Ads
+||advertising.microsoft.com^
+||ads.msn.com^
+||ads.microsoft.com^
+
+# AppNexus / Xandr
+||adnxs.com^
+||appnexus.com^
+
+# PubMatic
+||pubmatic.com^
+||ads.pubmatic.com^
+
+# Index Exchange
+||indexww.com^
+
+# Rubicon Project / Magnite
+||rubiconproject.com^
+
+# OpenX
+||openx.net^
+
+# Criteo
+||criteo.com^
+||criteo.net^
+
+# Taboola / Outbrain
+||taboola.com^
+||outbrain.com^
+
+# Others
+||adform.net^
+||teads.tv^
+||zemanta.com^
+||yahoo.com/ads^
+||yimg.com/ads^
+||moatads.com^
+||adsafeprotected.com^
+||revcontent.com^
+||betweendigital.com^

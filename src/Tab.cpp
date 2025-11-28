@@ -1,5 +1,6 @@
 #include "Tab.h"
 #include "UI.h"
+#include "Utils.h"
 #include "DownloadManager.h"
 #include <iostream>
 #include <string>
@@ -192,9 +193,7 @@ void Tab::OnAddConsoleMessage(View *caller, const ConsoleMessage &msg)
       auto u = smsg.utf8();
       std::string m = u.data() ? u.data() : "";
       // Minimal escaping for safe JS string literal
-      auto escape = [](const std::string &in)
-      { std::string out; out.reserve(in.size()+16); for(char c: in){ switch(c){ case '\\': out += "\\\\"; break; case '"': out += "\\\""; break; case '\n': out += "\\n"; break; case '\r': out += "\\r"; break; case '\t': out += "\\t"; break; default: out += c; }} return out; };
-      std::string js = std::string("(function(m){ if(window.__qi && __qi.onConsole){ __qi.onConsole({message:m}); } })(\"") + escape(m) + "\")";
+      std::string js = std::string("(function(m){ if(window.__qi && __qi.onConsole){ __qi.onConsole({message:m}); } })(\"") + util::EscapeJsStringLiteral(m) + "\")";
       iv->EvaluateScript(String(js.c_str()), nullptr);
     }
   }
@@ -287,7 +286,7 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
       global["OnUpdateSetting"] = BindJSCallback(&Tab::JS_UpdateSetting);
       global["OnSaveSettings"] = BindJSCallback(&Tab::JS_SaveSettings);
       global["OnRestoreSettingsDefaults"] = BindJSCallbackWithRetval(&Tab::JS_RestoreSettingsDefaults);
-      std::cout << "[Tab::OnDOMReady] Settings page detected, bridge functions bound" << std::endl;
+      // settings page detected with bridge functions bound
     }
 
     // Expose a unified native bridge on window.__ul using global function proxies
@@ -635,27 +634,9 @@ JSValue Tab::QI_GetComputedStyle(const JSObject &obj, const JSArgs &args)
   String sel = args[0];
   auto u = sel.utf8();
   std::string raw = u.data() ? u.data() : "";
-  auto esc = [](const std::string &in)
-  {
-    std::string out;
-    out.reserve(in.size() + 8);
-    for (char c : in)
-    {
-      if (c == '\\')
-        out += "\\\\";
-      else if (c == '"')
-        out += "\\\"";
-      else if (c == '\n')
-        out += "\\n";
-      else if (c == '\r')
-        out += "\\r";
-      else
-        out += c;
-    }
-    return out;
-  };
+  // Use util::EscapeJsStringLiteral
   std::ostringstream ss;
-  ss << "(function(){ var el=document.querySelector(\"" << esc(raw) << "\"); if(!el) return '{}'; var cs=getComputedStyle(el); var out={}; try{ for(var i=0;i<cs.length;i++){ var k=cs.item(i); out[k]=cs.getPropertyValue(k); } }catch(e){} return JSON.stringify(out); })()";
+  ss << "(function(){ var el=document.querySelector(\"" << util::EscapeJsStringLiteral(raw) << "\"); if(!el) return '{}'; var cs=getComputedStyle(el); var out={}; try{ for(var i=0;i<cs.length;i++){ var k=cs.item(i); out[k]=cs.getPropertyValue(k); } }catch(e){} return JSON.stringify(out); })()";
   String res;
   std::string js = ss.str();
   view()->EvaluateScript(String(js.c_str()), &res);
@@ -698,26 +679,7 @@ JSValue Tab::QI_GetOuterHTML(const JSObject &obj, const JSArgs &args)
   String sSel = args[0];
   auto us = sSel.utf8();
   std::string sel = us.data() ? us.data() : "";
-  auto esc = [](const std::string &in)
-  {
-    std::string out;
-    out.reserve(in.size() + 8);
-    for (char c : in)
-    {
-      if (c == '\\')
-        out += "\\\\";
-      else if (c == '"')
-        out += "\\\"";
-      else if (c == '\n')
-        out += "\\n";
-      else if (c == '\r')
-        out += "\\r";
-      else
-        out += c;
-    }
-    return out;
-  };
-  std::string js = std::string("(function(){ var el=document.querySelector(\"") + esc(sel) + "\"); if(!el) return ''; return el.outerHTML; })()";
+  std::string js = std::string("(function(){ var el=document.querySelector(\"") + util::EscapeJsStringLiteral(sel) + "\"); if(!el) return ''; return el.outerHTML; })()";
   String res;
   view()->EvaluateScript(String(js.c_str()), &res);
   return JSValue(res);
@@ -736,27 +698,8 @@ void Tab::QI_SetAttribute(const JSObject &obj, const JSArgs &args)
   std::string sel = us.data() ? us.data() : "";
   std::string name = un.data() ? un.data() : "";
   std::string val = uv.data() ? uv.data() : "";
-  auto esc = [](const std::string &in)
-  {
-    std::string out;
-    out.reserve(in.size() + 8);
-    for (char c : in)
-    {
-      if (c == '\\')
-        out += "\\\\";
-      else if (c == '"')
-        out += "\\\"";
-      else if (c == '\n')
-        out += "\\n";
-      else if (c == '\r')
-        out += "\\r";
-      else
-        out += c;
-    }
-    return out;
-  };
   std::ostringstream ss;
-  ss << "(function(){ var el=document.querySelector(\"" << esc(sel) << "\"); if(!el) return; el.setAttribute(\"" << esc(name) << "\",\"" << esc(val) << "\"); })()";
+  ss << "(function(){ var el=document.querySelector(\"" << util::EscapeJsStringLiteral(sel) << "\"); if(!el) return; el.setAttribute(\"" << util::EscapeJsStringLiteral(name) << "\",\"" << util::EscapeJsStringLiteral(val) << "\"); })()";
   std::string js = ss.str();
   view()->EvaluateScript(String(js.c_str()), nullptr);
 }
@@ -771,27 +714,8 @@ void Tab::QI_RemoveAttribute(const JSObject &obj, const JSArgs &args)
   auto un = sName.utf8();
   std::string sel = us.data() ? us.data() : "";
   std::string name = un.data() ? un.data() : "";
-  auto esc = [](const std::string &in)
-  {
-    std::string out;
-    out.reserve(in.size() + 8);
-    for (char c : in)
-    {
-      if (c == '\\')
-        out += "\\\\";
-      else if (c == '"')
-        out += "\\\"";
-      else if (c == '\n')
-        out += "\\n";
-      else if (c == '\r')
-        out += "\\r";
-      else
-        out += c;
-    }
-    return out;
-  };
   std::ostringstream ss;
-  ss << "(function(){ var el=document.querySelector(\"" << esc(sel) << "\"); if(!el) return; el.removeAttribute(\"" << esc(name) << "\"); })()";
+  ss << "(function(){ var el=document.querySelector(\"" << util::EscapeJsStringLiteral(sel) << "\"); if(!el) return; el.removeAttribute(\"" << util::EscapeJsStringLiteral(name) << "\"); })()";
   std::string js = ss.str();
   view()->EvaluateScript(String(js.c_str()), nullptr);
 }

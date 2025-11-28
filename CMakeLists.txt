@@ -68,11 +68,34 @@ set(SOURCES
 	"src/Tab.cpp"
 	"src/UI.h"
 	"src/UI.cpp"
+  "src/Utils.cpp"
+  "src/Settings.cpp"
 	"src/main.cpp"
 	"${CMAKE_CURRENT_BINARY_DIR}/browser.rc"
 )
 
 add_app(Ultralight-WebBrowser ${SOURCES})
+
+ # Unit test for utils
+ enable_testing()
+
+ # Only build UtilsTest in environments where linking to the Ultralight
+ # libraries is supported. On Windows CI we sometimes use the MinGW toolchain
+ # (GNU) which cannot link MSVC-generated .lib import libraries. In that
+ # case skip adding the test to avoid linker errors.
+ if(NOT (WIN32 AND NOT MSVC))
+	 add_executable(UtilsTest tests/UtilsTest.cpp src/Utils.cpp)
+	 find_library(APP_CORE_LIB NAMES AppCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
+	 find_library(ULTRALIGHT_LIB NAMES Ultralight PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
+	 find_library(ULTRALIGHT_CORE_LIB NAMES UltralightCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
+	 find_library(WEB_CORE_LIB NAMES WebCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
+	 if(APP_CORE_LIB)
+		 target_link_libraries(UtilsTest PRIVATE ${APP_CORE_LIB} ${ULTRALIGHT_LIB} ${ULTRALIGHT_CORE_LIB} ${WEB_CORE_LIB})
+	 endif()
+	 add_test(NAME UtilsTest COMMAND UtilsTest)
+ else()
+	 message(STATUS "Skipping UtilsTest on Windows when not using MSVC (to avoid linking MSVC .lib with MinGW)")
+ endif()
 
 # Install/package settings
 set(INSTALL_DIR_NAME "UltralightWebBrowser")
@@ -128,6 +151,17 @@ set(CPACK_PACKAGE_VERSION "${WEBBROWSER_VERSION}")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set(CPACK_OUTPUT_FILE_PREFIX "${CMAKE_BINARY_DIR}")
 set(CPACK_STRIP_FILES ON)
+
+# Ensure a maintainer/contact is set for Debian packages (required by CPackDeb)
+# CI environments may not set these, so provide a sensible default that can
+# be overridden by callers (e.g. -DCPACK_PACKAGE_CONTACT=you@example.com).
+# Updated for CI fixes.
+if(NOT DEFINED CPACK_PACKAGE_CONTACT)
+	set(CPACK_PACKAGE_CONTACT "maintainer@example.com" CACHE STRING "Contact for binary packages (email)")
+endif()
+if(NOT DEFINED CPACK_DEBIAN_PACKAGE_MAINTAINER)
+	set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${CPACK_PACKAGE_CONTACT}" CACHE STRING "Debian package maintainer")
+endif()
 
 set(APP_ICON_ICO "")
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/browser.ico")
