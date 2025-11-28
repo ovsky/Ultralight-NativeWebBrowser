@@ -54,7 +54,6 @@ if (-not $clangFormatCmd) {
       )
       $toolsDir = Join-Path $root 'tools/clang-format'
       if (-not (Test-Path $toolsDir)) { New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null }
-      $zipPath = Join-Path $env:TEMP $zipName
       Write-Host "Downloading clang-format portable binary from $url to $zipPath"
       $downloaded = $false
       foreach ($ver in $versions) {
@@ -63,6 +62,7 @@ if (-not $clangFormatCmd) {
           $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/$zipName"
           Write-Host "Trying URL: $url"
           try {
+            $zipPath = Join-Path $env:TEMP $zipName
             Invoke-WebRequest -Uri $url -UseBasicParsing -OutFile $zipPath -ErrorAction Stop
             Expand-Archive -LiteralPath $zipPath -DestinationPath $toolsDir -Force
             Remove-Item $zipPath -ErrorAction SilentlyContinue
