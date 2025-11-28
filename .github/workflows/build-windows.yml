@@ -316,7 +316,7 @@ jobs:
           # construct paths when the env var is present. Also include standard
           # Chocolatey install locations as a fallback.
           $nsisDirs = @()
-          if ($env:"ProgramFiles(x86)" -and $env:"ProgramFiles(x86)" -ne '') { $nsisDirs += Join-Path $env."ProgramFiles(x86)" 'NSIS' }
+          if (${env:ProgramFiles(x86)} -and ${env:ProgramFiles(x86)} -ne '') { $nsisDirs += Join-Path ${env:ProgramFiles(x86)} 'NSIS' }
           if ($env:ProgramFiles -and $env:ProgramFiles -ne '') { $nsisDirs += Join-Path $env:ProgramFiles 'NSIS' }
           if ($env:ProgramFiles -and $env:ProgramFiles -ne '') { $nsisDirs += Join-Path $env:ProgramFiles 'NSIS (x86)' }
           # Chocolatey typically installs to ProgramData
