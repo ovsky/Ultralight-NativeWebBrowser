@@ -1,12 +1,13 @@
 #include "Utils.h"
+#include <cstdlib>
 #include <ctime>
 #include <iomanip>
 #include <sstream>
-#include <cstdlib>
 
-namespace util {
+namespace util
+{
 
-std::string EscapeJsonString(const std::string &input)
+std::string EscapeJsonString(const std::string& input)
 {
   std::string out;
   out.reserve(input.size() + 8);
@@ -37,13 +38,13 @@ std::string EscapeJsonString(const std::string &input)
   return out;
 }
 
-std::string EscapeJsStringLiteral(const std::string &input)
+std::string EscapeJsStringLiteral(const std::string& input)
 {
   // For simplicity reuse same escaping as JSON for string literals
   return EscapeJsonString(input);
 }
 
-std::string ToIso8601UTC(const std::chrono::system_clock::time_point &tp)
+std::string ToIso8601UTC(const std::chrono::system_clock::time_point& tp)
 {
   std::time_t raw = std::chrono::system_clock::to_time_t(tp);
   std::tm utc_tm{};
@@ -57,14 +58,14 @@ std::string ToIso8601UTC(const std::chrono::system_clock::time_point &tp)
   return oss.str();
 }
 
-std::string ToStdString(const ultralight::String &str)
+std::string ToStdString(const ultralight::String& str)
 {
   auto u = str.utf8();
-  const char *data = u.data();
+  const char* data = u.data();
   return data ? std::string(data) : std::string();
 }
 
-std::string Trim(const std::string &s)
+std::string Trim(const std::string& s)
 {
   size_t start = s.find_first_not_of(" \t\r\n");
   if (start == std::string::npos)
@@ -75,15 +76,15 @@ std::string Trim(const std::string &s)
 
 std::string ToLower(std::string s)
 {
-  std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c)
-                 { return static_cast<char>(std::tolower(c)); });
+  std::transform(s.begin(), s.end(), s.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
   return s;
 }
 
-std::string GetEnvVar(const char *name)
+std::string GetEnvVar(const char* name)
 {
 #if defined(_WIN32)
-  char *buf = nullptr;
+  char* buf = nullptr;
   size_t len = 0;
   if (_dupenv_s(&buf, &len, name) == 0 && buf && len > 0)
   {
@@ -95,7 +96,7 @@ std::string GetEnvVar(const char *name)
     free(buf);
   return std::string();
 #else
-  const char *v = std::getenv(name);
+  const char* v = std::getenv(name);
   return v ? std::string(v) : std::string();
 #endif
 }
