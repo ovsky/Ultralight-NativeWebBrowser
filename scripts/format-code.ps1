@@ -43,23 +43,46 @@ if (-not $clangFormatCmd) {
       if ($cmd) { $clangFormatCmd = $cmd.Source }
     }
     if (-not $clangFormatCmd) {
-      # Try downloading a portable clang-format release to ./tools/clang-format
-      $version = '16.0.6'
-      $zipName = "clang+llvm-$version-win64.zip"
-      $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$version/$zipName"
+      # Try downloading a portable clang-format release to ./tools/clang-format.
+      # Try multiple versions and filename patterns to increase success rate.
+      $versions = @('18.0.0','17.0.6','16.0.6','15.0.7','14.0.6')
+      $patterns = @(
+        'clang+llvm-{version}-win64.zip',
+        'clang+llvm-{version}-x86_64-windows-msvc.zip',
+        'clang+llvm-{version}-x86_64-windows.zip',
+        'clang+llvm-{version}-windows-msvc.zip'
+      )
       $toolsDir = Join-Path $root 'tools/clang-format'
       if (-not (Test-Path $toolsDir)) { New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null }
       $zipPath = Join-Path $env:TEMP $zipName
       Write-Host "Downloading clang-format portable binary from $url to $zipPath"
-      try {
-        Invoke-WebRequest -Uri $url -UseBasicParsing -OutFile $zipPath -ErrorAction Stop
-        Expand-Archive -LiteralPath $zipPath -DestinationPath $toolsDir -Force
-        Remove-Item $zipPath -ErrorAction SilentlyContinue
-        # Find clang-format.exe under extracted folder
+      $downloaded = $false
+      foreach ($ver in $versions) {
+        foreach ($pat in $patterns) {
+          $zipName = $pat -replace '\{version\}',$ver
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/$zipName"
+          Write-Host "Trying URL: $url"
+          try {
+            Invoke-WebRequest -Uri $url -UseBasicParsing -OutFile $zipPath -ErrorAction Stop
+            Expand-Archive -LiteralPath $zipPath -DestinationPath $toolsDir -Force
+            Remove-Item $zipPath -ErrorAction SilentlyContinue
+            $found = Get-ChildItem -Path $toolsDir -Recurse -Filter clang-format.exe -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+            if ($found) { $clangFormatCmd = $found.FullName; $downloaded = $true; break }
+          } catch {
+            # ignore and try next candidate
+            Write-Verbose "Candidate $url failed: $_"
+          }
+        }
+        if ($downloaded) { break }
+      }
+      if (-not $downloaded) {
+        Write-Warning "All download attempts failed for clang-format portable binaries."
+      }
+      # Find clang-format.exe under extracted folder (if not already set)
+      if (-not $clangFormatCmd) {
         $found = Get-ChildItem -Path $toolsDir -Recurse -Filter clang-format.exe -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($found) { $clangFormatCmd = $found.FullName }
-      } catch {
-        Write-Warning "Failed to download/extract clang-format: $_"
       }
     }
   }
