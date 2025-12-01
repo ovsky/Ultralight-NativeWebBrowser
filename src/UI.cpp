@@ -52,7 +52,7 @@ namespace
     bool default_value;
   };
 
-  constexpr std::array<SettingDescriptor, 26> kFallbackSettingsCatalog = {
+  constexpr std::array<SettingDescriptor, 27> kFallbackSettingsCatalog = {
       // Appearance
       SettingDescriptor{"launch_dark_theme", "Launch in dark theme",
                         "Start Ultralight with dark chrome, toolbars, and tabs by default.",
@@ -141,6 +141,11 @@ namespace
       SettingDescriptor{"show_performance_overlay", "Show performance overlay",
                         "Display FPS counter and rendering statistics on screen.",
                         "developer", nullptr, &UI::BrowserSettings::show_performance_overlay, false},
+
+      // General behavior
+      SettingDescriptor{"auto_save_settings", "Auto save settings",
+            "Automatically save changes to settings as soon as you toggle options.",
+            "general", nullptr, &UI::BrowserSettings::auto_save_settings, true},
 
       // Networking / User Agent
       SettingDescriptor{"use_custom_user_agent", "Use custom user agent",

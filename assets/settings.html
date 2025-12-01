@@ -362,6 +362,15 @@
         }
 
         const settingsDefinitions = {
+            general: {
+                title: 'General', settings: [
+                    {
+                        key: 'auto_save_settings',
+                        name: 'Auto Save Settings',
+                        description: 'Automatically save settings changes without requiring the Save button'
+                    }
+                ]
+            },
             appearance: {
                 title: 'Appearance', settings: [
                     { key: 'launch_dark_theme', name: 'Dark Theme', description: 'Use dark theme on startup' },
@@ -505,8 +514,8 @@
                             window.OnUpdateSetting(setting.key, newValue);
                         }
                         updateDirtyState();
-                        // Auto-save any toggle change so it persists immediately.
-                        if (typeof window.OnSaveSettings === 'function') {
+                        const autoSave = !!currentSettings.auto_save_settings;
+                        if (autoSave && typeof window.OnSaveSettings === 'function') {
                             window.OnSaveSettings();
                         }
                         // Re-hydrate from latest snapshot so UA input instantly
@@ -588,8 +597,8 @@
                     window.OnUpdateSetting('target_user_agent', newVal);
                 }
                 updateDirtyState();
-                // Auto-save UA text so it takes effect without manual Save.
-                if (typeof window.OnSaveSettings === 'function') {
+                const autoSave = !!currentSettings.auto_save_settings;
+                if (autoSave && typeof window.OnSaveSettings === 'function') {
                     window.OnSaveSettings();
                 }
             };

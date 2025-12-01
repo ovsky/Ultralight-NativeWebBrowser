@@ -78,6 +78,11 @@ public:
     // User-defined override string (used when use_custom_user_agent == true).
     std::string custom_user_agent;
 
+    // General behavior
+    // When true, settings changes are written to disk immediately.
+    // When false, user must press "Save Changes" in the Settings UI.
+    bool auto_save_settings = true;
+
     bool operator==(const BrowserSettings &other) const;
     bool operator!=(const BrowserSettings &other) const { return !(*this == other); }
   };

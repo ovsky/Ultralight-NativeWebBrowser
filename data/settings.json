@@ -25,7 +25,8 @@
     "enable_caret_browsing": false,
     "enable_remote_inspector": false,
     "show_performance_overlay": false,
-    "use_custom_user_agent": false
+    "use_custom_user_agent": false,
+    "auto_save_settings": true
   },
   "meta": {
     "updated_at": "2025-11-09T20:21:22Z",
@@ -233,6 +234,14 @@
         "category": "developer",
         "value": false,
         "default": false
+      },
+      {
+        "key": "auto_save_settings",
+        "name": "Auto save settings",
+        "description": "Automatically save changes to settings as soon as you toggle options.",
+        "category": "general",
+        "value": true,
+        "default": true
       }
     ]
   }
