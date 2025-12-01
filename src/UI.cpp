@@ -589,6 +589,15 @@ void UI::HideDrmTab(uint64_t id)
   }
   drm_tab_titles_.erase(id);
   drm_tab_urls_.erase(id);
+  UpdateDrmBadge(id, false);
+}
+
+void UI::UpdateDrmBadge(uint64_t id, bool is_drm)
+{
+  if (!setTabDrmState)
+    return;
+  RefPtr<JSContext> lock(view()->LockJSContext());
+  setTabDrmState({static_cast<double>(id), is_drm ? 1.0 : 0.0});
 }
 
 void UI::EnsureDrmManager()
@@ -659,6 +668,7 @@ bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_init
   if (ultra_tab)
     ultra_tab->Hide();
   drm_it->second->Show();
+  UpdateDrmBadge(tab_id, true);
   drm_it->second->LoadURL(url);
   return true;
 }
@@ -1151,6 +1161,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     focusAddressBar = global["focusAddressBar"];
     isAddressBarFocused = global["isAddressBarFocused"];
     updateAdblockEnabled = global["updateAdblockEnabled"];
+    setTabDrmState = global["setTabDrmState"];
     applySettings = global["applySettings"];
   }
 
@@ -1272,6 +1283,14 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
           continue;
         // addTab expects: id, title, favicon, is_loading
         addTab({entry.first, entry.second->view()->title(), GetFaviconURL(entry.second->view()->url()), entry.second->view()->is_loading()});
+        if (setTabDrmState)
+        {
+          bool is_drm = false;
+          auto drm_it = drm_tabs_.find(entry.first);
+          if (drm_it != drm_tabs_.end() && drm_it->second)
+            is_drm = true;
+          setTabDrmState({entry.first, is_drm ? 1.0 : 0.0});
+        }
       }
 
       // Ensure the active tab state is reflected in the chrome UI
@@ -1525,8 +1544,11 @@ void UI::CreateNewTab()
   const char *kStartPage = "file:///static-sties/google-static.html";
   tabs_[id]->view()->LoadURL(kStartPage);
 
-  RefPtr<JSContext> lock(view()->LockJSContext());
-  addTab({id, "New Tab", GetFaviconURL(kStartPage), tabs_[id]->view()->is_loading()});
+  {
+    RefPtr<JSContext> lock(view()->LockJSContext());
+    addTab({id, "New Tab", GetFaviconURL(kStartPage), tabs_[id]->view()->is_loading()});
+  }
+  UpdateDrmBadge(id, false);
 }
 
 RefPtr<View> UI::CreateNewTabForChildView(const String &url)
@@ -1538,8 +1560,11 @@ RefPtr<View> UI::CreateNewTabForChildView(const String &url)
     tab_height = 1;
   tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_);
 
-  RefPtr<JSContext> lock(view()->LockJSContext());
-  addTab({id, "", GetFaviconURL(url), tabs_[id]->view()->is_loading()});
+  {
+    RefPtr<JSContext> lock(view()->LockJSContext());
+    addTab({id, "", GetFaviconURL(url), tabs_[id]->view()->is_loading()});
+  }
+  UpdateDrmBadge(id, false);
 
   return tabs_[id]->view();
 }

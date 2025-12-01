@@ -10,7 +10,10 @@
       </div>
       <div class="chrome-tab-favicon"></div>
       <div class="chrome-tab-spinner"></div>
-      <div class="chrome-tab-title"></div>
+      <div class="chrome-tab-title">
+        <span class="chrome-tab-title-text"></span>
+        <span class="chrome-tab-badge" aria-hidden="true"></span>
+      </div>
       <div class="chrome-tab-close"></div>
     </div>
   `
@@ -258,7 +261,8 @@
     }
 
     updateTab(tabEl, tabProperties) {
-      tabEl.querySelector('.chrome-tab-title').textContent = tabProperties.title
+      const titleEl = tabEl.querySelector('.chrome-tab-title-text') || tabEl.querySelector('.chrome-tab-title')
+      if (titleEl) titleEl.textContent = tabProperties.title
       tabEl.querySelector('.chrome-tab-favicon').style.backgroundImage = `url(${tabProperties.favicon})`
       tabEl.querySelector('.chrome-tab-favicon').style.display = tabProperties.loading ? 'none' : 'inline-block'
       tabEl.querySelector('.chrome-tab-spinner').style.display = tabProperties.loading ? 'inline-block' : 'none'

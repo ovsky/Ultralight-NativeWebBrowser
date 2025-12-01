@@ -322,6 +322,7 @@ protected:
   JSFunction focusAddressBar;
   JSFunction isAddressBarFocused;
   JSFunction updateAdblockEnabled;
+  JSFunction setTabDrmState;
   JSFunction applySettings;
   JSFunction applySettingsPanel;
   // Context menu setup function in overlay view
@@ -391,6 +392,7 @@ protected:
   Tab *GetUltralightTab(uint64_t id);
   drm::DRMWebViewTab *GetDrmTab(uint64_t id);
   void HideDrmTab(uint64_t id);
+  void UpdateDrmBadge(uint64_t id, bool is_drm);
 
   friend class Tab;
   friend class SettingsManager;
