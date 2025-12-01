@@ -466,9 +466,17 @@
                         originalTargetUserAgent = '';
                     }
                     if (data.meta && data.meta.storage_path) {
-                        document.getElementById('storage-path').textContent = 'Storage: ' + data.meta.storage_path;
-                    }
-                    renderSettings();
+                            document.getElementById('storage-path').textContent = 'Storage: ' + data.meta.storage_path;
+                        }
+                        // Build a quick lookup map for metadata by key (includes reload_page)
+                        window.__settingMeta = {};
+                        if (data.meta && Array.isArray(data.meta.settings)) {
+                            data.meta.settings.forEach(function(entry) {
+                                if (entry && entry.key)
+                                    window.__settingMeta[entry.key] = entry;
+                            });
+                        }
+                        renderSettings();
                     hydrateUserAgentEditor();
                     updateDirtyState();
                 }
@@ -515,6 +523,20 @@
                         const autoSave = !!currentSettings.auto_save_settings;
                         if (autoSave && typeof window.OnSaveSettings === 'function') {
                             window.OnSaveSettings();
+                        }
+                        // When a setting that indicates the page should be reloaded
+                        // changes, instruct native side to reload the active browsing tab.
+                        if (typeof window.OnReloadChromeUI === 'function') {
+                            // If metadata marks reload_page true, refresh chrome overlay and reload active tab
+                            if (window.__settingMeta && window.__settingMeta[setting.key] && window.__settingMeta[setting.key].reload_page === true) {
+                                window.OnReloadChromeUI();
+                                if (typeof window.OnReloadActiveNonSettingsTab === 'function')
+                                    window.OnReloadActiveNonSettingsTab();
+                            } else {
+                                // For other settings, still refresh chrome overlay when compact tabs toggled
+                                if (setting.key === 'experimental_compact_tabs')
+                                    window.OnReloadChromeUI();
+                            }
                         }
                         // Re-hydrate from latest snapshot so UA input instantly
                         // reflects the updated Custom UA toggle state.

@@ -65,7 +65,8 @@
         "category": "appearance",
         "value": false,
         "default": false,
-        "note": "Experimental"
+        "note": "Experimental",
+        "reload_page": true
       },
       {
         "key": "enable_adblock",
