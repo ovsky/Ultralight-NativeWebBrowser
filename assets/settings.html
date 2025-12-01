@@ -266,6 +266,45 @@
             line-height: 1.5;
         }
 
+        .ua-row {
+            margin-top: 16px;
+            padding: 14px 18px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .ua-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-secondary);
+        }
+
+        .ua-help {
+            font-size: 11px;
+            color: var(--text-tertiary);
+        }
+
+        .ua-input {
+            width: 100%;
+            padding: 8px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-soft);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 12px;
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+
+        .ua-input:disabled {
+            opacity: 0.6;
+            cursor: default;
+        }
+
         /* Scrollbar styling */
         ::-webkit-scrollbar {
             width: 8px;
@@ -296,6 +335,14 @@
         </header>
         <div id="settings-container">
             <div class="loading">Loading settings...</div>
+        </div>
+        <!-- Custom User Agent section lives at the very bottom of settings -->
+        <div id="ua-section" class="ua-row">
+            <div class="ua-label">Target User Agent String</div>
+            <input id="ua-input" class="ua-input" type="text" spellcheck="false" autocomplete="off" />
+            <div class="ua-help">Shows the user agent that will be sent to websites. When "Use Custom User Agent" is
+                off, this reflects the latest Chromium UA and is read-only. When enabled, you can type a custom UA here.
+            </div>
         </div>
         <div class="actions">
             <button id="btn-restore" class="btn-secondary">Restore Defaults</button>
@@ -367,10 +414,20 @@
                     { key: 'enable_remote_inspector', name: 'Remote Inspector', description: 'Enable Chrome DevTools Protocol' },
                     { key: 'show_performance_overlay', name: 'Performance Overlay', description: 'Show FPS counter' }
                 ]
+            },
+            userAgent: {
+                title: 'User Agent Settings', settings: [
+                    {
+                        key: 'use_custom_user_agent',
+                        name: 'Use Custom User Agent',
+                        description: 'Use the custom UA string below instead of the Chromium default'
+                    }
+                ]
             }
         };
 
         let currentSettings = {}, originalSettings = {}, isDirty = false;
+        let targetUserAgent = '', originalTargetUserAgent = '';
 
         document.addEventListener('DOMContentLoaded', () => {
             log('Page loaded');
@@ -393,10 +450,20 @@
                     currentSettings = { ...data.values };
                     originalSettings = { ...data.values };
                     log('Loaded ' + Object.keys(currentSettings).length + ' settings');
+                    // Hydrate target UA from payload; fall back to empty string if missing.
+                    if (typeof data.target_user_agent === 'string') {
+                        targetUserAgent = data.target_user_agent;
+                        originalTargetUserAgent = data.target_user_agent;
+                    } else {
+                        targetUserAgent = '';
+                        originalTargetUserAgent = '';
+                    }
                     if (data.meta && data.meta.storage_path) {
                         document.getElementById('storage-path').textContent = 'Storage: ' + data.meta.storage_path;
                     }
                     renderSettings();
+                    hydrateUserAgentEditor();
+                    updateDirtyState();
                 }
             } catch (error) {
                 log('ERROR: ' + error.message);
@@ -438,6 +505,13 @@
                             window.OnUpdateSetting(setting.key, newValue);
                         }
                         updateDirtyState();
+                        // Auto-save any toggle change so it persists immediately.
+                        if (typeof window.OnSaveSettings === 'function') {
+                            window.OnSaveSettings();
+                        }
+                        // Re-hydrate from latest snapshot so UA input instantly
+                        // reflects the updated Custom UA toggle state.
+                        setTimeout(loadSettings, 50);
                     });
                     itemDiv.appendChild(infoDiv);
                     itemDiv.appendChild(toggleDiv);
@@ -455,6 +529,9 @@
                     isDirty = true;
                     break;
                 }
+            }
+            if (!isDirty && targetUserAgent !== originalTargetUserAgent) {
+                isDirty = true;
             }
             document.getElementById('btn-save').disabled = !isDirty;
         }
@@ -479,7 +556,15 @@
                     if (data && data.values) {
                         currentSettings = { ...data.values };
                         originalSettings = { ...data.values };
+                        if (typeof data.target_user_agent === 'string') {
+                            targetUserAgent = data.target_user_agent;
+                            originalTargetUserAgent = data.target_user_agent;
+                        } else {
+                            targetUserAgent = '';
+                            originalTargetUserAgent = '';
+                        }
                         renderSettings();
+                        hydrateUserAgentEditor();
                         updateDirtyState();
                         log('Restored');
                     }
@@ -487,6 +572,27 @@
                     log('ERROR: ' + error.message);
                 }
             }
+        }
+        function hydrateUserAgentEditor() {
+            const uaInput = document.getElementById('ua-input');
+            if (!uaInput) return;
+            uaInput.value = targetUserAgent || '';
+            const customOn = !!currentSettings.use_custom_user_agent;
+            uaInput.disabled = !customOn;
+            // Ensure we don't attach multiple listeners on re-render.
+            uaInput.oninput = null;
+            uaInput.oninput = () => {
+                const newVal = uaInput.value || '';
+                targetUserAgent = newVal;
+                if (typeof window.OnUpdateSetting === 'function') {
+                    window.OnUpdateSetting('target_user_agent', newVal);
+                }
+                updateDirtyState();
+                // Auto-save UA text so it takes effect without manual Save.
+                if (typeof window.OnSaveSettings === 'function') {
+                    window.OnSaveSettings();
+                }
+            };
         }
     </script>
 </body>
