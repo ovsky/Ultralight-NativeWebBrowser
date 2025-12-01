@@ -21,6 +21,8 @@
 #include "Settings.h"
 #include "Utils.h"
 #include "AdBlocker.h"
+#include "drm/DRMWebViewManager.h"
+#include "drm/DRMWebViewTab.h"
 #ifdef _WIN32
 #include <direct.h> // _mkdir, _getcwd
 #ifndef NOMINMAX
@@ -53,7 +55,7 @@ namespace
     bool default_value;
   };
 
-  constexpr std::array<SettingDescriptor, 27> kFallbackSettingsCatalog = {
+  constexpr std::array<SettingDescriptor, 28> kFallbackSettingsCatalog = {
       // Appearance
       SettingDescriptor{"launch_dark_theme", "Launch in dark theme",
             "Start Ultralight with dark chrome, toolbars, and tabs by default.",
@@ -147,6 +149,11 @@ namespace
       SettingDescriptor{"auto_save_settings", "Auto save settings",
         "Automatically save changes to settings as soon as you toggle options.",
         "general", nullptr, false, &UI::BrowserSettings::auto_save_settings, true},
+
+      // DRM subsystem
+      SettingDescriptor{"enable_drm_webview", "Enable DRM WebView",
+            "Automatically switch Widevine-protected sites to a native DRM-capable WebView.",
+        "drm", "Requires native runtime", false, &UI::BrowserSettings::enable_drm_webview, true},
 
       // Networking / User Agent
       SettingDescriptor{"use_custom_user_agent", "Use custom user agent",
@@ -440,8 +447,10 @@ const RuntimeSettingDescriptor *FindSettingDescriptor(const std::string &key)
   return &g_settings_catalog[it->second];
 }
 
-UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
-                                is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false)
+UI::UI(RefPtr<Window> window)
+    : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
+      is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false),
+      drm_settings_(SettingsDirectory() / "drm_settings.json")
 {
   uint32_t window_width = window_->width();
   ui_height_ = (uint32_t)std::round(UI_HEIGHT * window_->scale());
@@ -486,7 +495,8 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
 UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
     : window_(window), cur_cursor_(Cursor::kCursor_Pointer),
       is_resizing_inspector_(false), is_over_inspector_resize_drag_handle_(false),
-      adblock_(adblock), trackerblock_(tracker)
+      adblock_(adblock), trackerblock_(tracker),
+      drm_settings_(SettingsDirectory() / "drm_settings.json")
 {
   uint32_t window_width = window_->width();
   ui_height_ = (uint32_t)std::round(UI_HEIGHT * window_->scale());
@@ -523,6 +533,186 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
   LoadHistoryFromDisk();
 
   adblock_enabled_cached_ = adblock_ ? adblock_->enabled() : adblock_enabled_cached_;
+}
+
+Tab *UI::active_tab()
+{
+  auto it = tabs_.find(active_tab_id_);
+  if (it == tabs_.end())
+    return nullptr;
+  return it->second.get();
+}
+
+drm::DRMWebViewTab *UI::active_drm_tab()
+{
+  auto it = drm_tabs_.find(active_tab_id_);
+  if (it == drm_tabs_.end())
+    return nullptr;
+  return it->second.get();
+}
+
+bool UI::ActiveTabIsDRM() const
+{
+  auto it = drm_tabs_.find(active_tab_id_);
+  if (it == drm_tabs_.end())
+    return false;
+  return it->second != nullptr;
+}
+
+Tab *UI::GetUltralightTab(uint64_t id)
+{
+  auto it = tabs_.find(id);
+  if (it == tabs_.end())
+    return nullptr;
+  return it->second.get();
+}
+
+drm::DRMWebViewTab *UI::GetDrmTab(uint64_t id)
+{
+  auto it = drm_tabs_.find(id);
+  if (it == drm_tabs_.end())
+    return nullptr;
+  return it->second.get();
+}
+
+void UI::HideDrmTab(uint64_t id)
+{
+  auto it = drm_tabs_.find(id);
+  if (it == drm_tabs_.end() || !it->second)
+    return;
+  it->second->Hide();
+  if (id == active_tab_id_)
+  {
+    auto tab_it = tabs_.find(id);
+    if (tab_it != tabs_.end() && tab_it->second)
+      tab_it->second->Show();
+  }
+  drm_tab_titles_.erase(id);
+  drm_tab_urls_.erase(id);
+}
+
+void UI::EnsureDrmManager()
+{
+  if (drm_manager_)
+    return;
+  void *native = window_ ? window_->native_handle() : nullptr;
+  drm_manager_ = std::make_unique<drm::DRMWebViewManager>(native);
+}
+
+bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_initiated)
+{
+  if (!settings_.enable_drm_webview)
+    return false;
+  if (!drm_settings_.IsDRMRequired(url))
+    return false;
+  EnsureDrmManager();
+  if (!drm_manager_)
+    return false;
+
+  auto *dependency_manager = drm_manager_->dependency_manager();
+  if (dependency_manager && !dependency_manager->IsInstalled())
+  {
+    AppendDrmLog("Cannot open DRM tab because " + dependency_manager->GetName() + " is not installed.");
+    return false;
+  }
+
+  auto it = tabs_.find(tab_id);
+  if (it == tabs_.end())
+    return false;
+  auto *ultra_tab = it->second.get();
+
+  drm::DRMWebViewConfig config;
+  config.parent_window = window_ ? window_->native_handle() : nullptr;
+  config.width = window_ ? window_->width() : 0;
+  uint32_t height = window_ ? window_->height() : 0;
+  uint32_t ui_height = ui_height_ > 0 ? static_cast<uint32_t>(ui_height_) : 0;
+  config.height = height > ui_height ? height - ui_height : height;
+  config.offset_x = 0;
+  config.offset_y = ui_height;
+
+  drm::DRMWebViewCallbacks callbacks;
+  callbacks.on_title_changed = [this](uint64_t id, const std::string &title) { HandleDrmTitleChanged(id, title); };
+  callbacks.on_url_changed = [this](uint64_t id, const std::string &new_url) { HandleDrmUrlChanged(id, new_url); };
+  callbacks.on_loading_state = [this](uint64_t id, bool loading) { HandleDrmLoading(id, loading); };
+  callbacks.on_navigation_state = [this](uint64_t id, bool can_back, bool can_forward) {
+    HandleDrmNavigationState(id, can_back, can_forward);
+  };
+
+  auto drm_it = drm_tabs_.find(tab_id);
+  if (drm_it == drm_tabs_.end() || !drm_it->second)
+  {
+    drm_tabs_[tab_id] = drm_manager_->CreateTab(tab_id, config, callbacks);
+    drm_it = drm_tabs_.find(tab_id);
+  }
+  else
+  {
+    drm_it->second->Resize(config.width, config.height, config.offset_x, config.offset_y);
+  }
+
+  if (drm_it == drm_tabs_.end() || !drm_it->second)
+        {
+          AppendDrmLog("Failed to create DRM WebView tab. Verify the native DRM runtime is installed (WebView2 on Windows).");
+          return false;
+        }
+
+  drm_tab_urls_[tab_id] = url;
+  if (ultra_tab)
+    ultra_tab->Hide();
+  drm_it->second->Show();
+  drm_it->second->LoadURL(url);
+  return true;
+}
+
+void UI::HandleDrmTitleChanged(uint64_t tab_id, const std::string &title)
+{
+  drm_tab_titles_[tab_id] = title;
+  RefPtr<JSContext> lock(view()->LockJSContext());
+  if (updateTab)
+  {
+    ultralight::String title_str(title.c_str());
+    const auto &url_ref = drm_tab_urls_[tab_id];
+    ultralight::String url = url_ref.empty() ? ultralight::String("") : ultralight::String(url_ref.c_str());
+    updateTab({tab_id, title_str, GetFaviconURL(url), false});
+  }
+  if (tab_id == active_tab_id_)
+  {
+    ultralight::String title_str(title.c_str());
+    updateURL({title_str});
+  }
+}
+
+void UI::HandleDrmUrlChanged(uint64_t tab_id, const std::string &url)
+{
+  drm_tab_urls_[tab_id] = url;
+  ultralight::String url_string(url.c_str());
+  if (tab_id == active_tab_id_)
+  {
+    SetURL(url_string);
+  }
+}
+
+void UI::HandleDrmLoading(uint64_t tab_id, bool is_loading)
+{
+  if (tab_id == active_tab_id_)
+    SetLoading(is_loading);
+}
+
+void UI::HandleDrmNavigationState(uint64_t tab_id, bool can_back, bool can_forward)
+{
+  if (tab_id == active_tab_id_)
+  {
+    SetCanGoBack(can_back);
+    SetCanGoForward(can_forward);
+  }
+  RefPtr<JSContext> lock(view()->LockJSContext());
+  if (updateTab)
+  {
+    const auto &title_ref = drm_tab_titles_[tab_id];
+    const auto &url_ref = drm_tab_urls_[tab_id];
+    ultralight::String title = title_ref.empty() ? ultralight::String("DRM Tab") : ultralight::String(title_ref.c_str());
+    ultralight::String url = url_ref.empty() ? ultralight::String("") : ultralight::String(url_ref.c_str());
+    updateTab({tab_id, title, GetFaviconURL(url), false});
+  }
 }
 
 UI::~UI()
@@ -922,10 +1112,15 @@ void UI::OnResize(ultralight::Window *window, uint32_t width, uint32_t height)
   if (downloads_overlay_)
     LayoutDownloadsOverlay();
 
-  for (auto &tab : tabs_)
+  for (auto &entry : tabs_)
   {
-    if (tab.second)
-      tab.second->Resize(window->width(), (uint32_t)tab_height);
+    if (entry.second)
+      entry.second->Resize(window->width(), (uint32_t)tab_height);
+  }
+  for (auto &entry : drm_tabs_)
+  {
+    if (entry.second)
+      entry.second->Resize(window->width(), (uint32_t)tab_height, 0, ui_height_);
   }
 }
 
@@ -1042,6 +1237,8 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   {
     // Settings page is loaded - hydrate it with current settings immediately
     applySettingsPanel = global["applySettingsState"];
+    global["GetDrmStatus"] = BindJSCallbackWithRetval(&UI::OnGetDrmStatus);
+    global["InstallDrmDependencies"] = BindJSCallbackWithRetval(&UI::OnInstallDrmDependencies);
     if (applySettingsPanel)
     {
       std::string payload = BuildSettingsPayload(true);
@@ -1092,30 +1289,56 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
 
 void UI::OnBack(const JSObject &obj, const JSArgs &args)
 {
+  if (ActiveTabIsDRM())
+  {
+    if (auto tab = active_drm_tab())
+      tab->GoBack();
+    return;
+  }
   if (active_tab())
     active_tab()->view()->GoBack();
 }
 
 void UI::OnForward(const JSObject &obj, const JSArgs &args)
 {
+  if (ActiveTabIsDRM())
+  {
+    if (auto tab = active_drm_tab())
+      tab->GoForward();
+    return;
+  }
   if (active_tab())
     active_tab()->view()->GoForward();
 }
 
 void UI::OnRefresh(const JSObject &obj, const JSArgs &args)
 {
+  if (ActiveTabIsDRM())
+  {
+    if (auto tab = active_drm_tab())
+      tab->Reload();
+    return;
+  }
   if (active_tab())
     active_tab()->view()->Reload();
 }
 
 void UI::OnStop(const JSObject &obj, const JSArgs &args)
 {
+  if (ActiveTabIsDRM())
+  {
+    if (auto tab = active_drm_tab())
+      tab->Stop();
+    return;
+  }
   if (active_tab())
     active_tab()->view()->Stop();
 }
 
 void UI::OnToggleTools(const JSObject &obj, const JSArgs &args)
 {
+  if (ActiveTabIsDRM())
+    return;
   if (active_tab())
     active_tab()->ToggleInspector();
 }
@@ -1137,6 +1360,14 @@ void UI::OnRequestTabClose(const JSObject &obj, const JSArgs &args)
 
     if (tabs_.size() == 1 && App::instance())
       App::instance()->Quit();
+
+    if (drm_tabs_.count(id))
+    {
+      drm_tabs_[id]->Close();
+      drm_tabs_.erase(id);
+      drm_tab_titles_.erase(id);
+      drm_tab_urls_.erase(id);
+    }
 
     if (id != active_tab_id_)
     {
@@ -1166,7 +1397,11 @@ void UI::OnActiveTabChange(const JSObject &obj, const JSArgs &args)
     if (!tab)
       return;
 
-    tabs_[active_tab_id_]->Hide();
+    bool previous_was_drm = ActiveTabIsDRM();
+    if (previous_was_drm)
+      HideDrmTab(active_tab_id_);
+    else if (tabs_.count(active_tab_id_) && tabs_[active_tab_id_])
+      tabs_[active_tab_id_]->Hide();
 
     if (tabs_[active_tab_id_]->ready_to_close())
     {
@@ -1186,13 +1421,27 @@ void UI::OnActiveTabChange(const JSObject &obj, const JSArgs &args)
       if (std::strstr(tab_u, "settings.html") == nullptr)
         last_non_settings_tab_id_ = active_tab_id_;
     }
-    tabs_[active_tab_id_]->Show();
-
-    auto tab_view = tabs_[active_tab_id_]->view();
-    SetLoading(tab_view->is_loading());
-    SetCanGoBack(tab_view->CanGoBack());
-    SetCanGoForward(tab_view->CanGoBack());
-    SetURL(tab_view->url());
+    auto drm_tab = GetDrmTab(active_tab_id_);
+    if (drm_tab)
+    {
+      drm_tab->Show();
+      auto title_it = drm_tab_titles_.find(active_tab_id_);
+      auto url_it = drm_tab_urls_.find(active_tab_id_);
+      if (url_it != drm_tab_urls_.end())
+        SetURL(ultralight::String(url_it->second.c_str()));
+      SetLoading(false);
+      SetCanGoBack(drm_tab->CanGoBack());
+      SetCanGoForward(drm_tab->CanGoForward());
+    }
+    else
+    {
+      tabs_[active_tab_id_]->Show();
+      auto tab_view = tabs_[active_tab_id_]->view();
+      SetLoading(tab_view->is_loading());
+      SetCanGoBack(tab_view->CanGoBack());
+      SetCanGoForward(tab_view->CanGoBack());
+      SetURL(tab_view->url());
+    }
   }
 }
 
@@ -1201,11 +1450,23 @@ void UI::OnRequestChangeURL(const JSObject &obj, const JSArgs &args)
   if (args.size() == 1)
   {
     ultralight::String url = args[0];
+    std::string url_utf8;
+    auto url_data = url.utf8();
+    if (url_data.data())
+      url_utf8 = url_data.data();
 
+    if (MaybeOpenDrmTab(active_tab_id_, url_utf8, true))
+      return;
+
+    HideDrmTab(active_tab_id_);
     if (!tabs_.empty())
     {
       auto &tab = tabs_[active_tab_id_];
-      tab->view()->LoadURL(url);
+      if (tab)
+      {
+        tab->Show();
+        tab->view()->LoadURL(url);
+      }
     }
   }
 }
@@ -1215,12 +1476,25 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
   if (args.size() == 1)
   {
     ultralight::String url = args[0];
+    std::string url_utf8;
+    auto url_data = url.utf8();
+    if (url_data.data())
+      url_utf8 = url_data.data();
     // Record immediately so History UI updates quickly (dedup inside RecordHistory)
     RecordHistory(url, String(""));
+
+    if (MaybeOpenDrmTab(active_tab_id_, url_utf8, true))
+      return;
+
+    HideDrmTab(active_tab_id_);
     if (!tabs_.empty())
     {
       auto &tab = tabs_[active_tab_id_];
-      tab->view()->LoadURL(url);
+      if (tab)
+      {
+        tab->Show();
+        tab->view()->LoadURL(url);
+      }
     }
   }
 }
@@ -1290,6 +1564,18 @@ void UI::UpdateTabTitle(uint64_t id, const ultralight::String &title)
 
 void UI::UpdateTabURL(uint64_t id, const ultralight::String &url)
 {
+  std::string url_utf8;
+  auto utf8 = url.utf8();
+  if (utf8.data())
+    url_utf8 = utf8.data();
+
+  if (!url_utf8.empty())
+  {
+    if (MaybeOpenDrmTab(id, url_utf8, false))
+      return;
+    HideDrmTab(id);
+  }
+
   if (id == active_tab_id_ && !tabs_.empty())
     SetURL(url);
 }
@@ -2029,6 +2315,102 @@ void UI::OnSaveSettings(const JSObject &, const JSArgs &)
   updateAdblockEnabled({adblock_enabled_cached_ ? 1.0 : 0.0});
 }
 
+ultralight::JSValue UI::OnGetDrmStatus(const JSObject &, const JSArgs &)
+{
+  std::string payload = BuildDrmStatusPayload();
+  return ultralight::JSValue(String(payload.c_str()));
+}
+
+ultralight::JSValue UI::OnInstallDrmDependencies(const JSObject &, const JSArgs &)
+{
+  EnsureDrmManager();
+  auto *dependency_manager = drm_manager_ ? drm_manager_->dependency_manager() : nullptr;
+  if (!dependency_manager)
+  {
+    AppendDrmLog("No DRM dependency manager is available for this platform.");
+    return ultralight::JSValue(0.0);
+  }
+  if (drm_install_running_)
+  {
+    AppendDrmLog("An installation is already in progress.");
+    return ultralight::JSValue(0.0);
+  }
+
+  drm_install_running_ = true;
+  AppendDrmLog("Starting installation for " + dependency_manager->GetName() + "...");
+  auto sink = [this](const std::string &line) {
+    AppendDrmLog(line);
+  };
+  bool success = dependency_manager->Install(sink);
+  drm_install_running_ = false;
+  drm_last_install_result_ = success;
+  if (success)
+    AppendDrmLog("Installation completed successfully.");
+  else
+    AppendDrmLog("Installation failed. Review the log above for details.");
+  drm_dependencies_installed_cached_ = dependency_manager->IsInstalled();
+  return ultralight::JSValue(success ? 1.0 : 0.0);
+}
+
+std::string UI::BuildDrmStatusPayload()
+{
+  EnsureDrmManager();
+  auto *dependency_manager = drm_manager_ ? drm_manager_->dependency_manager() : nullptr;
+  std::string dependency_name = dependency_manager ? dependency_manager->GetName() : "Unavailable";
+  bool installed = dependency_manager ? dependency_manager->IsInstalled() : false;
+  drm_dependencies_installed_cached_ = installed;
+
+  if (drm_log_lines_.empty())
+  {
+    AppendDrmLog("DRM subsystem ready. Dependency: " + dependency_name + ".");
+  }
+
+  std::ostringstream ss;
+  ss << "{";
+  ss << "\"enabled\": " << (settings_.enable_drm_webview ? "true" : "false") << ",";
+  ss << "\"dependency_name\": \"" << util::EscapeJsonString(dependency_name) << "\",";
+  ss << "\"installed\": " << (installed ? "true" : "false") << ",";
+  ss << "\"installing\": " << (drm_install_running_ ? "true" : "false") << ",";
+  if (drm_last_install_result_.has_value())
+    ss << "\"last_install_success\": " << (*drm_last_install_result_ ? "true" : "false") << ",";
+  else
+    ss << "\"last_install_success\": null,";
+  std::string settings_path = drm_settings_.storage_path().empty() ? (SettingsDirectory() / "drm_settings.json").string() : drm_settings_.storage_path().string();
+  ss << "\"settings_file\": \"" << util::EscapeJsonString(settings_path) << "\",";
+  ss << "\"site_rules\": [";
+  bool first = true;
+  for (const auto &entry : drm_settings_.site_rules())
+  {
+    if (!first)
+      ss << ",";
+    ss << "{\"host\": \"" << util::EscapeJsonString(entry.first) << "\",";
+    ss << "\"force\": " << (entry.second.force ? "true" : "false") << "}";
+    first = false;
+  }
+  ss << "],";
+  ss << "\"log\": [";
+  first = true;
+  for (const auto &line : drm_log_lines_)
+  {
+    if (!first)
+      ss << ",";
+    ss << "\"" << util::EscapeJsonString(line) << "\"";
+    first = false;
+  }
+  ss << "]";
+  ss << "}";
+  return ss.str();
+}
+
+void UI::AppendDrmLog(const std::string &line)
+{
+  constexpr size_t kMaxDrmLogLines = 200;
+  std::string timestamp = util::ToIso8601UTC(std::chrono::system_clock::now());
+  drm_log_lines_.emplace_back(timestamp + "  " + line);
+  if (drm_log_lines_.size() > kMaxDrmLogLines)
+    drm_log_lines_.pop_front();
+}
+
 void UI::SyncSettingsStateToUI(bool snapshot_is_baseline)
 {
   UpdateSettingsDirtyFlag();
@@ -2333,6 +2715,12 @@ void UI::HandleSettingMutation(const std::string &key, bool value)
   UpdateSettingsDirtyFlag();
   ApplySettings(false, false);
   UpdateSettingsDirtyFlag();
+
+  if (key == "enable_drm_webview")
+  {
+    drm_settings_.SetEnabled(value);
+    drm_settings_.Save();
+  }
 
   // If compact tabs changed, ensure the chrome UI and browsing tab update
   // immediately regardless of whether the settings page's JS requested it.
