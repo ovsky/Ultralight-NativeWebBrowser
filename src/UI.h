@@ -13,7 +13,7 @@ using ultralight::JSObject;
 using namespace ultralight;
 
 class Console;
-class AdBlocker; // forward declaration, optional dependency
+class AdBlocker;       // forward declaration, optional dependency
 class SettingsManager; // forward-declare the helper to make it a friend
 class DownloadManager;
 
@@ -70,6 +70,13 @@ public:
     // Developer
     bool enable_remote_inspector = false;
     bool show_performance_overlay = false;
+
+    // Networking / User Agent
+    // When true, always send the value from custom_user_agent.
+    // When false, send a best-effort Chromium-like user agent string.
+    bool use_custom_user_agent = false;
+    // User-defined override string (used when use_custom_user_agent == true).
+    std::string custom_user_agent;
 
     bool operator==(const BrowserSettings &other) const;
     bool operator!=(const BrowserSettings &other) const { return !(*this == other); }
@@ -312,6 +319,11 @@ protected:
   bool dark_mode_enabled_ = false;
   void ApplyDarkModeToView(RefPtr<View> v);
   void RemoveDarkModeFromView(RefPtr<View> v);
+
+  // Cached user agent string currently applied to outgoing requests.
+  std::string active_user_agent_;
+  // Compute a Chromium-like user agent string approximating the host platform.
+  std::string BuildDefaultChromiumUserAgent() const;
 
   // Shortcuts mapping (eg, "Ctrl+T" -> "new-tab") loaded from assets/shortcuts.json
   std::map<std::string, std::string> shortcuts_;

@@ -140,7 +140,12 @@ namespace
                         "developer", nullptr, &UI::BrowserSettings::enable_remote_inspector, false},
       SettingDescriptor{"show_performance_overlay", "Show performance overlay",
                         "Display FPS counter and rendering statistics on screen.",
-                        "developer", nullptr, &UI::BrowserSettings::show_performance_overlay, false}};
+                        "developer", nullptr, &UI::BrowserSettings::show_performance_overlay, false},
+
+      // Networking / User Agent
+      SettingDescriptor{"use_custom_user_agent", "Use custom user agent",
+                        "When enabled, send a user agent string that you specify instead of the automatic Chromium-like default.",
+                        "privacy", nullptr, &UI::BrowserSettings::use_custom_user_agent, false}};
 
   struct ParsedCatalogEntry
   {
@@ -433,6 +438,9 @@ UI::UI(RefPtr<Window> window) : window_(window), cur_cursor_(Cursor::kCursor_Poi
   settings_storage_path_ = SettingsFilePath().string();
   LoadSettingsFromDisk();
 
+  // No adblock-specific hooks here; UA overrides are applied in Tab
+  // when new views are created.
+
   // Hook listeners and then load UI document
   view()->set_load_listener(this);
   view()->set_view_listener(this);
@@ -473,6 +481,7 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
   EnsureDataDirectoryExists();
   settings_storage_path_ = SettingsFilePath().string();
   LoadSettingsFromDisk();
+  // UA overrides are applied in Tab when views are created.
 
   view()->set_load_listener(this);
   view()->set_view_listener(this);
@@ -1757,6 +1766,23 @@ void UI::OnUpdateSetting(const JSObject &, const JSArgs &args)
   if (key.empty())
     return;
 
+  // Special-case: target_user_agent is a string value that maps to
+  // settings_.custom_user_agent. It is always accepted, even when
+  // use_custom_user_agent is currently false, so the user can prefill
+  // a custom UA before turning the toggle on.
+  if (key == "target_user_agent")
+  {
+    if (!args[1].IsString())
+      return;
+    ultralight::String ua_ul = args[1].ToString();
+    auto ua_str = ua_ul.utf8();
+    std::string ua = ua_str.data() ? ua_str.data() : "";
+    settings_.custom_user_agent = ua;
+    UpdateSettingsDirtyFlag();
+    ApplySettings(false, false);
+    UpdateSettingsDirtyFlag();
+    return;
+  }
   bool value = false;
   if (args[1].IsBoolean())
   {
@@ -1911,9 +1937,48 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
   // enable_remote_inspector, show_performance_overlay
   // These would require additional implementation
 
+  // Networking / User Agent
+  // Compute the active user agent string whenever settings change.
+  if (settings_.use_custom_user_agent)
+  {
+    // If user toggles custom UA on but custom_user_agent is empty, fall back to default.
+    if (settings_.custom_user_agent.empty())
+    {
+      active_user_agent_ = BuildDefaultChromiumUserAgent();
+    }
+    else
+    {
+      active_user_agent_ = settings_.custom_user_agent;
+    }
+  }
+  else
+  {
+    active_user_agent_ = BuildDefaultChromiumUserAgent();
+  }
+
   SyncAdblockStateToUI();
   UpdateSettingsDirtyFlag();
   SyncSettingsStateToUI(snapshot_is_baseline);
+}
+
+std::string UI::BuildDefaultChromiumUserAgent() const
+{
+  // Best-effort modern Chromium UA approximation. We avoid querying the
+  // actual OS version in detail to keep this simple and deterministic.
+#if defined(_WIN64) || defined(_WIN32)
+  const char *platform = "Windows NT 10.0; Win64; x64";
+#elif defined(__APPLE__)
+  const char *platform = "Macintosh; Intel Mac OS X 10_15_7";
+#else
+  const char *platform = "X11; Linux x86_64";
+#endif
+
+  // Pretend to be the latest stable Chromium build; this string should
+  // be bumped periodically as Chromium versions advance.
+  std::string ua = "Mozilla/5.0 (";
+  ua += platform;
+  ua += ") AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36";
+  return ua;
 }
 
 void UI::SetDarkModeEnabled(bool enabled)
@@ -2010,7 +2075,11 @@ std::string UI::BuildSettingsPayload(bool snapshot_is_baseline) const
   const auto &catalog = GetSettingsCatalog();
   std::ostringstream ss;
   ss << "{";
+  // Base boolean settings map.
   ss << "\"values\": " << BuildSettingsJSON() << ",";
+  // Expose the effective user agent string as a separate field so the
+  // Settings page can always display the UA that will actually be used.
+  ss << "\"target_user_agent\": \"" << util::EscapeJsonString(active_user_agent_) << "\",";
   ss << "\"meta\": {";
   ss << "\"updated_at\": \"" << util::ToIso8601UTC(std::chrono::system_clock::now()) << "\",";
   ss << "\"dirty\": " << (settings_dirty_ ? "true" : "false") << ",";
