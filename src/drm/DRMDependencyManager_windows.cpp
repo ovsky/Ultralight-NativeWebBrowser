@@ -4,6 +4,7 @@
 
 #include <windows.h>
 #include <shlobj.h>
+#include <shellapi.h>
 #include <filesystem>
 #include <sstream>
 #include <string>
@@ -27,11 +28,45 @@ namespace
     return L"C:/Program Files";
   }
 
-  std::wstring BuildCommand(const std::wstring &command)
+  std::wstring BuildPowerShellArgs(const std::wstring &command)
   {
     std::wstringstream ss;
-    ss << L"powershell -NoProfile -ExecutionPolicy Bypass -Command \"" << command << L"\"";
+    ss << L"-NoProfile -ExecutionPolicy Bypass -Command \"" << command << L"\"";
     return ss.str();
+  }
+
+  bool RunElevatedProcess(const std::wstring &file,
+                          const std::wstring &arguments,
+                          DWORD &exit_code,
+                          DWORD &last_error)
+  {
+    SHELLEXECUTEINFOW info{};
+    info.cbSize = sizeof(info);
+    info.fMask = SEE_MASK_NOCLOSEPROCESS;
+    info.lpVerb = L"runas";
+    info.lpFile = file.c_str();
+    info.lpParameters = arguments.empty() ? nullptr : arguments.c_str();
+    info.nShow = SW_HIDE;
+
+    if (!ShellExecuteExW(&info))
+    {
+      last_error = GetLastError();
+      exit_code = static_cast<DWORD>(-1);
+      return false;
+    }
+
+    WaitForSingleObject(info.hProcess, INFINITE);
+    if (!GetExitCodeProcess(info.hProcess, &exit_code))
+    {
+      last_error = GetLastError();
+      CloseHandle(info.hProcess);
+      exit_code = static_cast<DWORD>(-1);
+      return false;
+    }
+
+    CloseHandle(info.hProcess);
+    last_error = ERROR_SUCCESS;
+    return true;
   }
 }
 
@@ -60,7 +95,20 @@ public:
 
     std::wstringstream download_cmd;
     download_cmd << L"Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/?linkid=2124703' -OutFile '" << bootstrapper.wstring() << L"'";
-    int download_code = _wsystem(BuildCommand(download_cmd.str()).c_str());
+    DWORD download_code = 0;
+    DWORD launch_error = 0;
+    if (!RunElevatedProcess(L"powershell.exe", BuildPowerShellArgs(download_cmd.str()), download_code, launch_error))
+    {
+      if (log)
+      {
+        if (launch_error == ERROR_CANCELLED)
+          log("Download cancelled — administrator approval was denied.");
+        else
+          log("Failed to launch elevated PowerShell for download (error " + std::to_string(static_cast<int>(launch_error)) + ")");
+      }
+      return false;
+    }
+
     if (download_code != 0)
     {
       if (log)
@@ -69,10 +117,24 @@ public:
     }
 
     if (log)
-      log("Running WebView2 installer...");
+      log("Running WebView2 installer with administrator privileges...");
 
-    std::wstring install_cmd = L"\"" + bootstrapper.wstring() + L"\" /silent /install";
-    int install_code = _wsystem(install_cmd.c_str());
+    DWORD install_code = 0;
+    launch_error = 0;
+    std::wstring bootstrapper_path = bootstrapper.wstring();
+    std::wstring installer_args = L"/silent /install";
+    if (!RunElevatedProcess(bootstrapper_path, installer_args, install_code, launch_error))
+    {
+      if (log)
+      {
+        if (launch_error == ERROR_CANCELLED)
+          log("WebView2 installation cancelled by the user.");
+        else
+          log("Failed to launch elevated installer (error " + std::to_string(static_cast<int>(launch_error)) + ")");
+      }
+      return false;
+    }
+
     if (install_code != 0)
     {
       if (log)
