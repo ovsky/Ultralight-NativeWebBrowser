@@ -19,6 +19,7 @@ endif()
 
 include_directories(
 	"${CMAKE_CURRENT_SOURCE_DIR}"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src"
 	"${ULTRALIGHT_SDK_ROOT}/include"
 )
 
@@ -70,9 +71,31 @@ set(SOURCES
 	"src/UI.cpp"
   "src/Utils.cpp"
   "src/Settings.cpp"
+	"src/drm/DRMSettings.h"
+	"src/drm/DRMSettings.cpp"
+	"src/drm/DRMDependencyManager.h"
+	"src/drm/DRMDependencyManager.cpp"
+	"src/drm/DRMWebViewTab.h"
+	"src/drm/DRMWebViewTab.cpp"
+	"src/drm/DRMWebViewManager.h"
+	"src/drm/DRMWebViewManager.cpp"
 	"src/main.cpp"
 	"${CMAKE_CURRENT_BINARY_DIR}/browser.rc"
 )
+
+if(WIN32)
+	list(APPEND SOURCES
+		"src/drm/DRMDependencyManager_windows.cpp"
+		"src/drm/DRMWebViewTab_windows.cpp")
+elseif(APPLE)
+	list(APPEND SOURCES
+		"src/drm/DRMDependencyManager_mac.cpp"
+		"src/drm/DRMWebViewTab_mac.mm")
+elseif(UNIX)
+	list(APPEND SOURCES
+		"src/drm/DRMDependencyManager_linux.cpp"
+		"src/drm/DRMWebViewTab_linux.cpp")
+endif()
 
 add_app(Ultralight-WebBrowser ${SOURCES})
 
@@ -84,6 +107,15 @@ add_app(Ultralight-WebBrowser ${SOURCES})
  # (GNU) which cannot link MSVC-generated .lib import libraries. In that
  # case skip adding the test to avoid linker errors.
  if(NOT (WIN32 AND NOT MSVC))
+	 include(FetchContent)
+	 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+	 FetchContent_Declare(
+	 	 googletest
+	 	 GIT_REPOSITORY https://github.com/google/googletest.git
+	 	 GIT_TAG v1.14.0
+	 )
+	 FetchContent_MakeAvailable(googletest)
+
 	 add_executable(UtilsTest tests/UtilsTest.cpp src/Utils.cpp)
 	 find_library(APP_CORE_LIB NAMES AppCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
 	 find_library(ULTRALIGHT_LIB NAMES Ultralight PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
@@ -93,6 +125,12 @@ add_app(Ultralight-WebBrowser ${SOURCES})
 		 target_link_libraries(UtilsTest PRIVATE ${APP_CORE_LIB} ${ULTRALIGHT_LIB} ${ULTRALIGHT_CORE_LIB} ${WEB_CORE_LIB})
 	 endif()
 	 add_test(NAME UtilsTest COMMAND UtilsTest)
+
+	 add_executable(DRMSettingsTest
+	 	tests/DRMSettingsTest.cpp
+	 	src/drm/DRMSettings.cpp)
+	 target_link_libraries(DRMSettingsTest PRIVATE GTest::gtest_main)
+	 add_test(NAME DRMSettingsTest COMMAND DRMSettingsTest)
  else()
 	 message(STATUS "Skipping UtilsTest on Windows when not using MSVC (to avoid linking MSVC .lib with MinGW)")
  endif()
