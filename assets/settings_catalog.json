@@ -104,6 +104,14 @@
     "default": false
   },
   {
+    "key": "enable_drm_webview",
+    "name": "Enable DRM WebView",
+    "description": "Automatically switch DRM-protected sites to a native OS WebView with Widevine support.",
+    "category": "drm",
+    "note": "Requires native runtime",
+    "default": true
+  },
+  {
     "key": "use_custom_user_agent",
     "name": "Use custom user agent",
     "description": "When enabled, send a user agent string that you specify instead of the automatic Chromium-like default.",
