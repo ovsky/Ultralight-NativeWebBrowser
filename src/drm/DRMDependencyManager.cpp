@@ -5,24 +5,24 @@
 namespace drm
 {
 #if defined(_WIN32)
-  std::unique_ptr<DRMDependencyManager> CreateWindowsDependencyManager();
+    std::unique_ptr<DRMDependencyManager> CreateWindowsDependencyManager();
 #elif defined(__APPLE__)
-  std::unique_ptr<DRMDependencyManager> CreateMacDependencyManager();
+    std::unique_ptr<DRMDependencyManager> CreateMacDependencyManager();
 #elif defined(__linux__)
-  std::unique_ptr<DRMDependencyManager> CreateLinuxDependencyManager();
+    std::unique_ptr<DRMDependencyManager> CreateLinuxDependencyManager();
 #endif
 
-std::unique_ptr<DRMDependencyManager> CreateDependencyManager()
-{
+    std::unique_ptr<DRMDependencyManager> CreateDependencyManager()
+    {
 #if defined(_WIN32)
-  return CreateWindowsDependencyManager();
+        return CreateWindowsDependencyManager();
 #elif defined(__APPLE__)
-  return CreateMacDependencyManager();
+        return CreateMacDependencyManager();
 #elif defined(__linux__)
-  return CreateLinuxDependencyManager();
+        return CreateLinuxDependencyManager();
 #else
-  return nullptr;
+        return nullptr;
 #endif
-}
+    }
 
 } // namespace drm

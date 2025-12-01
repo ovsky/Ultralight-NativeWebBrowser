@@ -58,107 +58,107 @@ namespace
   constexpr std::array<SettingDescriptor, 28> kFallbackSettingsCatalog = {
       // Appearance
       SettingDescriptor{"launch_dark_theme", "Launch in dark theme",
-            "Start Ultralight with dark chrome, toolbars, and tabs by default.",
-            "appearance", nullptr, false, &UI::BrowserSettings::launch_dark_theme, false},
+                        "Start Ultralight with dark chrome, toolbars, and tabs by default.",
+                        "appearance", nullptr, false, &UI::BrowserSettings::launch_dark_theme, false},
       SettingDescriptor{"vibrant_window_theme", "Vibrant window theme",
-            "Apply a subtle color wash to the window frame for a livelier finish.",
-            "appearance", nullptr, false, &UI::BrowserSettings::vibrant_window_theme, false},
+                        "Apply a subtle color wash to the window frame for a livelier finish.",
+                        "appearance", nullptr, false, &UI::BrowserSettings::vibrant_window_theme, false},
       SettingDescriptor{"experimental_transparent_toolbar", "Transparent toolbar",
-            "Blend the toolbar into page content with a translucent, glass-like surface.",
-            "appearance", "Experimental", false, &UI::BrowserSettings::experimental_transparent_toolbar, false},
+                        "Blend the toolbar into page content with a translucent, glass-like surface.",
+                        "appearance", "Experimental", false, &UI::BrowserSettings::experimental_transparent_toolbar, false},
       SettingDescriptor{"experimental_compact_tabs", "Compact tabs",
-            "Reduce tab height and spacing so more tabs stay visible without scrolling.",
-            "appearance", "Experimental", true, &UI::BrowserSettings::experimental_compact_tabs, false},
+                        "Reduce tab height and spacing so more tabs stay visible without scrolling.",
+                        "appearance", "Experimental", true, &UI::BrowserSettings::experimental_compact_tabs, false},
 
       // Privacy & Security
       SettingDescriptor{"enable_adblock", "Enable ad blocking",
-            "Filter network requests using bundled block lists to hide intrusive ads.",
-            "privacy", nullptr, false, &UI::BrowserSettings::enable_adblock, true},
+                        "Filter network requests using bundled block lists to hide intrusive ads.",
+                        "privacy", nullptr, false, &UI::BrowserSettings::enable_adblock, true},
       SettingDescriptor{"log_blocked_requests", "Log blocked requests",
-            "Write each blocked network request to the console for debugging rules.",
-            "privacy", nullptr, false, &UI::BrowserSettings::log_blocked_requests, false},
+                        "Write each blocked network request to the console for debugging rules.",
+                        "privacy", nullptr, false, &UI::BrowserSettings::log_blocked_requests, false},
       SettingDescriptor{"clear_history_on_exit", "Clear history on exit",
-            "Remove browsing history when Ultralight closes and skip saving new visits.",
-            "privacy", nullptr, false, &UI::BrowserSettings::clear_history_on_exit, true},
+                        "Remove browsing history when Ultralight closes and skip saving new visits.",
+                        "privacy", nullptr, false, &UI::BrowserSettings::clear_history_on_exit, true},
       SettingDescriptor{"enable_javascript", "Enable JavaScript",
-            "Allow websites to run JavaScript code for interactive features and dynamic content.",
-            "privacy", nullptr, false, &UI::BrowserSettings::enable_javascript, true},
+                        "Allow websites to run JavaScript code for interactive features and dynamic content.",
+                        "privacy", nullptr, false, &UI::BrowserSettings::enable_javascript, true},
       SettingDescriptor{"enable_web_security", "Enable web security",
-            "Enforce same-origin policy and other web security restrictions.",
-            "privacy", nullptr, false, &UI::BrowserSettings::enable_web_security, true},
+                        "Enforce same-origin policy and other web security restrictions.",
+                        "privacy", nullptr, false, &UI::BrowserSettings::enable_web_security, true},
       SettingDescriptor{"block_third_party_cookies", "Block third-party cookies",
-            "Prevent websites from setting cookies that track you across different sites.",
-            "privacy", nullptr, false, &UI::BrowserSettings::block_third_party_cookies, false},
+                        "Prevent websites from setting cookies that track you across different sites.",
+                        "privacy", nullptr, false, &UI::BrowserSettings::block_third_party_cookies, false},
       SettingDescriptor{"do_not_track", "Send Do Not Track header",
-            "Request that websites not track your browsing activity.",
-            "privacy", nullptr, false, &UI::BrowserSettings::do_not_track, true},
+                        "Request that websites not track your browsing activity.",
+                        "privacy", nullptr, false, &UI::BrowserSettings::do_not_track, true},
 
       // Address Bar & Suggestions
       SettingDescriptor{"enable_suggestions", "Show address bar suggestions",
-            "Surface history matches and popular sites while typing in the address bar.",
-            "suggestions", nullptr, false, &UI::BrowserSettings::enable_suggestions, true},
+                        "Surface history matches and popular sites while typing in the address bar.",
+                        "suggestions", nullptr, false, &UI::BrowserSettings::enable_suggestions, true},
       SettingDescriptor{"enable_suggestion_favicons", "Show favicons in suggestions",
-            "Display site icons next to suggestion rows whenever an icon is available.",
-            "suggestions", nullptr, false, &UI::BrowserSettings::enable_suggestion_favicons, true},
+                        "Display site icons next to suggestion rows whenever an icon is available.",
+                        "suggestions", nullptr, false, &UI::BrowserSettings::enable_suggestion_favicons, true},
 
       // Downloads
       SettingDescriptor{"show_download_badge", "Show download badge",
-            "Highlight the toolbar downloads button whenever transfers are active.",
-            "downloads", nullptr, false, &UI::BrowserSettings::show_download_badge, true},
+                        "Highlight the toolbar downloads button whenever transfers are active.",
+                        "downloads", nullptr, false, &UI::BrowserSettings::show_download_badge, true},
       SettingDescriptor{"auto_open_download_panel", "Open downloads panel automatically",
-            "Pop open the quick downloads overlay as soon as a new download begins.",
-            "downloads", nullptr, false, &UI::BrowserSettings::auto_open_download_panel, true},
+                        "Pop open the quick downloads overlay as soon as a new download begins.",
+                        "downloads", nullptr, false, &UI::BrowserSettings::auto_open_download_panel, true},
       SettingDescriptor{"ask_download_location", "Ask where to save downloads",
-            "Show a file picker dialog for each download instead of using default location.",
-            "downloads", nullptr, false, &UI::BrowserSettings::ask_download_location, false},
+                        "Show a file picker dialog for each download instead of using default location.",
+                        "downloads", nullptr, false, &UI::BrowserSettings::ask_download_location, false},
 
       // Performance
       SettingDescriptor{"smooth_scrolling", "Smooth scrolling",
-            "Enable smooth animated scrolling for a more fluid browsing experience.",
-            "performance", nullptr, false, &UI::BrowserSettings::smooth_scrolling, true},
+                        "Enable smooth animated scrolling for a more fluid browsing experience.",
+                        "performance", nullptr, false, &UI::BrowserSettings::smooth_scrolling, true},
       SettingDescriptor{"hardware_acceleration", "Hardware acceleration",
-            "Use GPU to accelerate graphics rendering for better performance.",
-            "performance", nullptr, false, &UI::BrowserSettings::hardware_acceleration, true},
+                        "Use GPU to accelerate graphics rendering for better performance.",
+                        "performance", nullptr, false, &UI::BrowserSettings::hardware_acceleration, true},
       SettingDescriptor{"enable_local_storage", "Enable local storage",
-            "Allow websites to store data locally for offline functionality.",
-            "performance", nullptr, false, &UI::BrowserSettings::enable_local_storage, true},
+                        "Allow websites to store data locally for offline functionality.",
+                        "performance", nullptr, false, &UI::BrowserSettings::enable_local_storage, true},
       SettingDescriptor{"enable_database", "Enable database storage",
-            "Allow websites to use IndexedDB and Web SQL for data storage.",
-            "performance", nullptr, false, &UI::BrowserSettings::enable_database, true},
+                        "Allow websites to use IndexedDB and Web SQL for data storage.",
+                        "performance", nullptr, false, &UI::BrowserSettings::enable_database, true},
 
       // Accessibility
       SettingDescriptor{"reduce_motion", "Reduce motion effects",
-            "Limit animated transitions and parallax flourishes for a calmer experience.",
-            "accessibility", nullptr, false, &UI::BrowserSettings::reduce_motion, false},
+                        "Limit animated transitions and parallax flourishes for a calmer experience.",
+                        "accessibility", nullptr, false, &UI::BrowserSettings::reduce_motion, false},
       SettingDescriptor{"high_contrast_ui", "High contrast UI",
-            "Boost contrast for overlays, menus, and dialogs to improve readability.",
-            "accessibility", nullptr, false, &UI::BrowserSettings::high_contrast_ui, false},
+                        "Boost contrast for overlays, menus, and dialogs to improve readability.",
+                        "accessibility", nullptr, false, &UI::BrowserSettings::high_contrast_ui, false},
       SettingDescriptor{"enable_caret_browsing", "Enable caret browsing",
-            "Navigate web pages using keyboard cursor like in a text editor.",
-            "accessibility", nullptr, false, &UI::BrowserSettings::enable_caret_browsing, false},
+                        "Navigate web pages using keyboard cursor like in a text editor.",
+                        "accessibility", nullptr, false, &UI::BrowserSettings::enable_caret_browsing, false},
 
       // Developer
       SettingDescriptor{"enable_remote_inspector", "Enable remote inspector",
-            "Allow remote debugging via Chrome DevTools Protocol.",
-            "developer", nullptr, false, &UI::BrowserSettings::enable_remote_inspector, false},
+                        "Allow remote debugging via Chrome DevTools Protocol.",
+                        "developer", nullptr, false, &UI::BrowserSettings::enable_remote_inspector, false},
       SettingDescriptor{"show_performance_overlay", "Show performance overlay",
-            "Display FPS counter and rendering statistics on screen.",
-            "developer", nullptr, false, &UI::BrowserSettings::show_performance_overlay, false},
+                        "Display FPS counter and rendering statistics on screen.",
+                        "developer", nullptr, false, &UI::BrowserSettings::show_performance_overlay, false},
 
       // General behavior
       SettingDescriptor{"auto_save_settings", "Auto save settings",
-        "Automatically save changes to settings as soon as you toggle options.",
-        "general", nullptr, false, &UI::BrowserSettings::auto_save_settings, true},
+                        "Automatically save changes to settings as soon as you toggle options.",
+                        "general", nullptr, false, &UI::BrowserSettings::auto_save_settings, true},
 
       // DRM subsystem
       SettingDescriptor{"enable_drm_webview", "Enable DRM WebView",
-            "Automatically switch Widevine-protected sites to a native DRM-capable WebView.",
-        "drm", "Requires native runtime", false, &UI::BrowserSettings::enable_drm_webview, true},
+                        "Automatically switch Widevine-protected sites to a native DRM-capable WebView.",
+                        "drm", "Requires native runtime", false, &UI::BrowserSettings::enable_drm_webview, true},
 
       // Networking / User Agent
       SettingDescriptor{"use_custom_user_agent", "Use custom user agent",
-            "When enabled, send a user agent string that you specify instead of the automatic Chromium-like default.",
-            "privacy", nullptr, false, &UI::BrowserSettings::use_custom_user_agent, false}};
+                        "When enabled, send a user agent string that you specify instead of the automatic Chromium-like default.",
+                        "privacy", nullptr, false, &UI::BrowserSettings::use_custom_user_agent, false}};
 
   struct ParsedCatalogEntry
   {
@@ -640,10 +640,14 @@ bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_init
   config.offset_y = ui_height;
 
   drm::DRMWebViewCallbacks callbacks;
-  callbacks.on_title_changed = [this](uint64_t id, const std::string &title) { HandleDrmTitleChanged(id, title); };
-  callbacks.on_url_changed = [this](uint64_t id, const std::string &new_url) { HandleDrmUrlChanged(id, new_url); };
-  callbacks.on_loading_state = [this](uint64_t id, bool loading) { HandleDrmLoading(id, loading); };
-  callbacks.on_navigation_state = [this](uint64_t id, bool can_back, bool can_forward) {
+  callbacks.on_title_changed = [this](uint64_t id, const std::string &title)
+  { HandleDrmTitleChanged(id, title); };
+  callbacks.on_url_changed = [this](uint64_t id, const std::string &new_url)
+  { HandleDrmUrlChanged(id, new_url); };
+  callbacks.on_loading_state = [this](uint64_t id, bool loading)
+  { HandleDrmLoading(id, loading); };
+  callbacks.on_navigation_state = [this](uint64_t id, bool can_back, bool can_forward)
+  {
     HandleDrmNavigationState(id, can_back, can_forward);
   };
 
@@ -659,10 +663,10 @@ bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_init
   }
 
   if (drm_it == drm_tabs_.end() || !drm_it->second)
-        {
-          AppendDrmLog("Failed to create DRM WebView tab. Verify the native DRM runtime is installed (WebView2 on Windows).");
-          return false;
-        }
+  {
+    AppendDrmLog("Failed to create DRM WebView tab. Verify the native DRM runtime is installed (WebView2 on Windows).");
+    return false;
+  }
 
   drm_tab_urls_[tab_id] = url;
   if (ultra_tab)
@@ -2141,7 +2145,7 @@ void UI::ReloadActiveNonSettingsTab()
         RefPtr<View> newView = CreateNewTabForChildView(String(urlstr.c_str()));
         if (newView)
         {
-            std::fprintf(stderr, "[UI] Recreated tab for last_non_settings_tab_id=%llu, new view created\n", (unsigned long long)last_non_settings_tab_id_);
+          std::fprintf(stderr, "[UI] Recreated tab for last_non_settings_tab_id=%llu, new view created\n", (unsigned long long)last_non_settings_tab_id_);
           newView->LoadURL(String(urlstr.c_str()));
           uint64_t new_id = 0;
           for (auto &e : tabs_)
@@ -2228,7 +2232,7 @@ void UI::ReloadActiveNonSettingsTab()
         }
         if (tabs_.count(old_id))
         {
-            std::fprintf(stderr, "[UI] Closing old tab id=%llu (replaced by id=%llu)\n", (unsigned long long)old_id, (unsigned long long)new_id);
+          std::fprintf(stderr, "[UI] Closing old tab id=%llu (replaced by id=%llu)\n", (unsigned long long)old_id, (unsigned long long)new_id);
           tabs_[old_id].reset();
           tabs_.erase(old_id);
           RefPtr<JSContext> lock(view()->LockJSContext());
@@ -2363,7 +2367,8 @@ ultralight::JSValue UI::OnInstallDrmDependencies(const JSObject &, const JSArgs 
 
   drm_install_running_ = true;
   AppendDrmLog("Starting installation for " + dependency_manager->GetName() + "...");
-  auto sink = [this](const std::string &line) {
+  auto sink = [this](const std::string &line)
+  {
     AppendDrmLog(line);
   };
   bool success = dependency_manager->Install(sink);
@@ -2732,7 +2737,7 @@ void UI::HandleSettingMutation(const std::string &key, bool value)
 
   bool &field = settings_.*(descriptor->member);
   bool old_value = field;
-  std::fprintf(stderr, "[UI] HandleSettingMutation invoked: key='%s' old=%s new=%s\n", key.c_str(), (old_value?"true":"false"), (value?"true":"false"));
+  std::fprintf(stderr, "[UI] HandleSettingMutation invoked: key='%s' old=%s new=%s\n", key.c_str(), (old_value ? "true" : "false"), (value ? "true" : "false"));
   if (field == value)
     return;
 

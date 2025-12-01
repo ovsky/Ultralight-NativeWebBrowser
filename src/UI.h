@@ -12,8 +12,8 @@
 
 namespace drm
 {
-class DRMWebViewManager;
-class DRMWebViewTab;
+  class DRMWebViewManager;
+  class DRMWebViewTab;
 }
 
 using ultralight::JSArgs;

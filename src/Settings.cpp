@@ -63,7 +63,8 @@ void SettingsManager::RestoreSettingsToDefaults(UI &ui)
 bool SettingsManager::LoadSettingsFromDisk(UI &ui)
 {
   RestoreSettingsToDefaults(ui);
-  auto read_file_to_string = [](const std::filesystem::path &p) -> std::string {
+  auto read_file_to_string = [](const std::filesystem::path &p) -> std::string
+  {
     if (p.empty())
       return std::string();
     std::ifstream in(p, std::ios::in | std::ios::binary);
