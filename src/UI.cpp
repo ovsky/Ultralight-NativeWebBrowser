@@ -1800,6 +1800,7 @@ void UI::OnReloadActiveNonSettingsTab(const JSObject &, const JSArgs &)
 
 void UI::ReloadActiveNonSettingsTab()
 {
+  std::fprintf(stderr, "[UI] ReloadActiveNonSettingsTab invoked: active_tab_id=%llu last_non_settings_tab_id=%llu\n", (unsigned long long)active_tab_id_, (unsigned long long)last_non_settings_tab_id_);
   // Prefer reloading the active browsing tab if it is NOT the settings page.
   if (active_tab() && active_tab()->view())
   {
@@ -1808,6 +1809,7 @@ void UI::ReloadActiveNonSettingsTab()
     const char *u = url.data() ? url.data() : "";
     if (std::strstr(u, "settings.html") == nullptr)
     {
+      std::fprintf(stderr, "[UI] Reloading active tab id=%llu url=%s\n", (unsigned long long)active_tab_id_, u);
       v->Reload();
       return;
     }
@@ -1828,6 +1830,7 @@ void UI::ReloadActiveNonSettingsTab()
         RefPtr<View> newView = CreateNewTabForChildView(String(urlstr.c_str()));
         if (newView)
         {
+            std::fprintf(stderr, "[UI] Recreated tab for last_non_settings_tab_id=%llu, new view created\n", (unsigned long long)last_non_settings_tab_id_);
           newView->LoadURL(String(urlstr.c_str()));
           uint64_t new_id = 0;
           for (auto &e : tabs_)
@@ -1857,6 +1860,7 @@ void UI::ReloadActiveNonSettingsTab()
           }
           if (tabs_.count(old_id))
           {
+            std::fprintf(stderr, "[UI] Closing old tab id=%llu (replaced by id=%llu)\n", (unsigned long long)old_id, (unsigned long long)new_id);
             tabs_[old_id].reset();
             tabs_.erase(old_id);
             RefPtr<JSContext> lock(view()->LockJSContext());
@@ -1883,6 +1887,7 @@ void UI::ReloadActiveNonSettingsTab()
       RefPtr<View> newView = CreateNewTabForChildView(String(urlstr.c_str()));
       if (newView)
       {
+        std::fprintf(stderr, "[UI] Recreated fallback tab id=%llu new view created\n", (unsigned long long)entry.first);
         newView->LoadURL(String(urlstr.c_str()));
         uint64_t new_id = 0;
         uint64_t old_id = entry.first;
@@ -1912,6 +1917,7 @@ void UI::ReloadActiveNonSettingsTab()
         }
         if (tabs_.count(old_id))
         {
+            std::fprintf(stderr, "[UI] Closing old tab id=%llu (replaced by id=%llu)\n", (unsigned long long)old_id, (unsigned long long)new_id);
           tabs_[old_id].reset();
           tabs_.erase(old_id);
           RefPtr<JSContext> lock(view()->LockJSContext());
@@ -2318,6 +2324,8 @@ void UI::HandleSettingMutation(const std::string &key, bool value)
     return;
 
   bool &field = settings_.*(descriptor->member);
+  bool old_value = field;
+  std::fprintf(stderr, "[UI] HandleSettingMutation invoked: key='%s' old=%s new=%s\n", key.c_str(), (old_value?"true":"false"), (value?"true":"false"));
   if (field == value)
     return;
 
@@ -2330,6 +2338,7 @@ void UI::HandleSettingMutation(const std::string &key, bool value)
   // immediately regardless of whether the settings page's JS requested it.
   if (key == "experimental_compact_tabs")
   {
+    std::fprintf(stderr, "[UI] experimental_compact_tabs changed -> ReloadChromeUI + ReloadActiveNonSettingsTab\n");
     ReloadChromeUI();
     ReloadActiveNonSettingsTab();
   }
