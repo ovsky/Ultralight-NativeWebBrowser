@@ -56,6 +56,8 @@ void SettingsManager::RestoreSettingsToDefaults(UI &ui)
       continue;
     ui.settings_.*(desc.member) = desc.default_value;
   }
+  ui.drm_settings_.SetEnabled(ui.settings_.enable_drm_webview);
+  ui.drm_settings_.Save();
 }
 
 bool SettingsManager::LoadSettingsFromDisk(UI &ui)
@@ -109,6 +111,10 @@ bool SettingsManager::LoadSettingsFromDisk(UI &ui)
   ui.saved_settings_ = ui.settings_;
   ui.settings_dirty_ = false;
 
+  ui.drm_settings_.Load();
+  ui.settings_.enable_drm_webview = ui.drm_settings_.IsEnabled();
+  ui.saved_settings_.enable_drm_webview = ui.settings_.enable_drm_webview;
+
   if (migrated)
   {
     SaveSettingsToDisk(ui);
@@ -120,6 +126,9 @@ bool SettingsManager::SaveSettingsToDisk(UI &ui)
 {
   EnsureDataDirectoryExists();
   const auto &catalog = GetSettingsCatalog();
+
+  ui.drm_settings_.SetEnabled(ui.settings_.enable_drm_webview);
+  ui.drm_settings_.Save();
 
   std::ostringstream doc;
   doc << "{\n";
