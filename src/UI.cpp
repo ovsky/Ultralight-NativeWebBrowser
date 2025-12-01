@@ -48,6 +48,7 @@ namespace
     const char *description;
     const char *category;
     const char *note;
+    bool reload_page;
     bool UI::BrowserSettings::*member;
     bool default_value;
   };
@@ -55,102 +56,102 @@ namespace
   constexpr std::array<SettingDescriptor, 27> kFallbackSettingsCatalog = {
       // Appearance
       SettingDescriptor{"launch_dark_theme", "Launch in dark theme",
-                        "Start Ultralight with dark chrome, toolbars, and tabs by default.",
-                        "appearance", nullptr, &UI::BrowserSettings::launch_dark_theme, false},
+            "Start Ultralight with dark chrome, toolbars, and tabs by default.",
+            "appearance", nullptr, false, &UI::BrowserSettings::launch_dark_theme, false},
       SettingDescriptor{"vibrant_window_theme", "Vibrant window theme",
-                        "Apply a subtle color wash to the window frame for a livelier finish.",
-                        "appearance", nullptr, &UI::BrowserSettings::vibrant_window_theme, false},
+            "Apply a subtle color wash to the window frame for a livelier finish.",
+            "appearance", nullptr, false, &UI::BrowserSettings::vibrant_window_theme, false},
       SettingDescriptor{"experimental_transparent_toolbar", "Transparent toolbar",
-                        "Blend the toolbar into page content with a translucent, glass-like surface.",
-                        "appearance", "Experimental", &UI::BrowserSettings::experimental_transparent_toolbar, false},
+            "Blend the toolbar into page content with a translucent, glass-like surface.",
+            "appearance", "Experimental", false, &UI::BrowserSettings::experimental_transparent_toolbar, false},
       SettingDescriptor{"experimental_compact_tabs", "Compact tabs",
-                        "Reduce tab height and spacing so more tabs stay visible without scrolling.",
-                        "appearance", "Experimental", &UI::BrowserSettings::experimental_compact_tabs, false},
+            "Reduce tab height and spacing so more tabs stay visible without scrolling.",
+            "appearance", "Experimental", true, &UI::BrowserSettings::experimental_compact_tabs, false},
 
       // Privacy & Security
       SettingDescriptor{"enable_adblock", "Enable ad blocking",
-                        "Filter network requests using bundled block lists to hide intrusive ads.",
-                        "privacy", nullptr, &UI::BrowserSettings::enable_adblock, true},
+            "Filter network requests using bundled block lists to hide intrusive ads.",
+            "privacy", nullptr, false, &UI::BrowserSettings::enable_adblock, true},
       SettingDescriptor{"log_blocked_requests", "Log blocked requests",
-                        "Write each blocked network request to the console for debugging rules.",
-                        "privacy", nullptr, &UI::BrowserSettings::log_blocked_requests, false},
+            "Write each blocked network request to the console for debugging rules.",
+            "privacy", nullptr, false, &UI::BrowserSettings::log_blocked_requests, false},
       SettingDescriptor{"clear_history_on_exit", "Clear history on exit",
-                        "Remove browsing history when Ultralight closes and skip saving new visits.",
-                        "privacy", nullptr, &UI::BrowserSettings::clear_history_on_exit, true},
+            "Remove browsing history when Ultralight closes and skip saving new visits.",
+            "privacy", nullptr, false, &UI::BrowserSettings::clear_history_on_exit, true},
       SettingDescriptor{"enable_javascript", "Enable JavaScript",
-                        "Allow websites to run JavaScript code for interactive features and dynamic content.",
-                        "privacy", nullptr, &UI::BrowserSettings::enable_javascript, true},
+            "Allow websites to run JavaScript code for interactive features and dynamic content.",
+            "privacy", nullptr, false, &UI::BrowserSettings::enable_javascript, true},
       SettingDescriptor{"enable_web_security", "Enable web security",
-                        "Enforce same-origin policy and other web security restrictions.",
-                        "privacy", nullptr, &UI::BrowserSettings::enable_web_security, true},
+            "Enforce same-origin policy and other web security restrictions.",
+            "privacy", nullptr, false, &UI::BrowserSettings::enable_web_security, true},
       SettingDescriptor{"block_third_party_cookies", "Block third-party cookies",
-                        "Prevent websites from setting cookies that track you across different sites.",
-                        "privacy", nullptr, &UI::BrowserSettings::block_third_party_cookies, false},
+            "Prevent websites from setting cookies that track you across different sites.",
+            "privacy", nullptr, false, &UI::BrowserSettings::block_third_party_cookies, false},
       SettingDescriptor{"do_not_track", "Send Do Not Track header",
-                        "Request that websites not track your browsing activity.",
-                        "privacy", nullptr, &UI::BrowserSettings::do_not_track, true},
+            "Request that websites not track your browsing activity.",
+            "privacy", nullptr, false, &UI::BrowserSettings::do_not_track, true},
 
       // Address Bar & Suggestions
       SettingDescriptor{"enable_suggestions", "Show address bar suggestions",
-                        "Surface history matches and popular sites while typing in the address bar.",
-                        "suggestions", nullptr, &UI::BrowserSettings::enable_suggestions, true},
+            "Surface history matches and popular sites while typing in the address bar.",
+            "suggestions", nullptr, false, &UI::BrowserSettings::enable_suggestions, true},
       SettingDescriptor{"enable_suggestion_favicons", "Show favicons in suggestions",
-                        "Display site icons next to suggestion rows whenever an icon is available.",
-                        "suggestions", nullptr, &UI::BrowserSettings::enable_suggestion_favicons, true},
+            "Display site icons next to suggestion rows whenever an icon is available.",
+            "suggestions", nullptr, false, &UI::BrowserSettings::enable_suggestion_favicons, true},
 
       // Downloads
       SettingDescriptor{"show_download_badge", "Show download badge",
-                        "Highlight the toolbar downloads button whenever transfers are active.",
-                        "downloads", nullptr, &UI::BrowserSettings::show_download_badge, true},
+            "Highlight the toolbar downloads button whenever transfers are active.",
+            "downloads", nullptr, false, &UI::BrowserSettings::show_download_badge, true},
       SettingDescriptor{"auto_open_download_panel", "Open downloads panel automatically",
-                        "Pop open the quick downloads overlay as soon as a new download begins.",
-                        "downloads", nullptr, &UI::BrowserSettings::auto_open_download_panel, true},
+            "Pop open the quick downloads overlay as soon as a new download begins.",
+            "downloads", nullptr, false, &UI::BrowserSettings::auto_open_download_panel, true},
       SettingDescriptor{"ask_download_location", "Ask where to save downloads",
-                        "Show a file picker dialog for each download instead of using default location.",
-                        "downloads", nullptr, &UI::BrowserSettings::ask_download_location, false},
+            "Show a file picker dialog for each download instead of using default location.",
+            "downloads", nullptr, false, &UI::BrowserSettings::ask_download_location, false},
 
       // Performance
       SettingDescriptor{"smooth_scrolling", "Smooth scrolling",
-                        "Enable smooth animated scrolling for a more fluid browsing experience.",
-                        "performance", nullptr, &UI::BrowserSettings::smooth_scrolling, true},
+            "Enable smooth animated scrolling for a more fluid browsing experience.",
+            "performance", nullptr, false, &UI::BrowserSettings::smooth_scrolling, true},
       SettingDescriptor{"hardware_acceleration", "Hardware acceleration",
-                        "Use GPU to accelerate graphics rendering for better performance.",
-                        "performance", nullptr, &UI::BrowserSettings::hardware_acceleration, true},
+            "Use GPU to accelerate graphics rendering for better performance.",
+            "performance", nullptr, false, &UI::BrowserSettings::hardware_acceleration, true},
       SettingDescriptor{"enable_local_storage", "Enable local storage",
-                        "Allow websites to store data locally for offline functionality.",
-                        "performance", nullptr, &UI::BrowserSettings::enable_local_storage, true},
+            "Allow websites to store data locally for offline functionality.",
+            "performance", nullptr, false, &UI::BrowserSettings::enable_local_storage, true},
       SettingDescriptor{"enable_database", "Enable database storage",
-                        "Allow websites to use IndexedDB and Web SQL for data storage.",
-                        "performance", nullptr, &UI::BrowserSettings::enable_database, true},
+            "Allow websites to use IndexedDB and Web SQL for data storage.",
+            "performance", nullptr, false, &UI::BrowserSettings::enable_database, true},
 
       // Accessibility
       SettingDescriptor{"reduce_motion", "Reduce motion effects",
-                        "Limit animated transitions and parallax flourishes for a calmer experience.",
-                        "accessibility", nullptr, &UI::BrowserSettings::reduce_motion, false},
+            "Limit animated transitions and parallax flourishes for a calmer experience.",
+            "accessibility", nullptr, false, &UI::BrowserSettings::reduce_motion, false},
       SettingDescriptor{"high_contrast_ui", "High contrast UI",
-                        "Boost contrast for overlays, menus, and dialogs to improve readability.",
-                        "accessibility", nullptr, &UI::BrowserSettings::high_contrast_ui, false},
+            "Boost contrast for overlays, menus, and dialogs to improve readability.",
+            "accessibility", nullptr, false, &UI::BrowserSettings::high_contrast_ui, false},
       SettingDescriptor{"enable_caret_browsing", "Enable caret browsing",
-                        "Navigate web pages using keyboard cursor like in a text editor.",
-                        "accessibility", nullptr, &UI::BrowserSettings::enable_caret_browsing, false},
+            "Navigate web pages using keyboard cursor like in a text editor.",
+            "accessibility", nullptr, false, &UI::BrowserSettings::enable_caret_browsing, false},
 
       // Developer
       SettingDescriptor{"enable_remote_inspector", "Enable remote inspector",
-                        "Allow remote debugging via Chrome DevTools Protocol.",
-                        "developer", nullptr, &UI::BrowserSettings::enable_remote_inspector, false},
+            "Allow remote debugging via Chrome DevTools Protocol.",
+            "developer", nullptr, false, &UI::BrowserSettings::enable_remote_inspector, false},
       SettingDescriptor{"show_performance_overlay", "Show performance overlay",
-                        "Display FPS counter and rendering statistics on screen.",
-                        "developer", nullptr, &UI::BrowserSettings::show_performance_overlay, false},
+            "Display FPS counter and rendering statistics on screen.",
+            "developer", nullptr, false, &UI::BrowserSettings::show_performance_overlay, false},
 
       // General behavior
       SettingDescriptor{"auto_save_settings", "Auto save settings",
-            "Automatically save changes to settings as soon as you toggle options.",
-            "general", nullptr, &UI::BrowserSettings::auto_save_settings, true},
+        "Automatically save changes to settings as soon as you toggle options.",
+        "general", nullptr, false, &UI::BrowserSettings::auto_save_settings, true},
 
       // Networking / User Agent
       SettingDescriptor{"use_custom_user_agent", "Use custom user agent",
-                        "When enabled, send a user agent string that you specify instead of the automatic Chromium-like default.",
-                        "privacy", nullptr, &UI::BrowserSettings::use_custom_user_agent, false}};
+            "When enabled, send a user agent string that you specify instead of the automatic Chromium-like default.",
+            "privacy", nullptr, false, &UI::BrowserSettings::use_custom_user_agent, false}};
 
   struct ParsedCatalogEntry
   {
@@ -162,6 +163,8 @@ namespace
     bool has_note = false;
     bool has_default = false;
     bool default_value = false;
+    bool has_reload_page = false;
+    bool reload_page = false;
   };
 
   // RuntimeSettingDescriptor is now declared in UI.h and used throughout the project.
@@ -356,6 +359,12 @@ namespace
         entry.has_default = true;
         entry.default_value = defValue;
       }
+      bool reloadValue = false;
+      if (ExtractJsonBoolField(object, "reload_page", reloadValue))
+      {
+        entry.has_reload_page = true;
+        entry.reload_page = reloadValue;
+      }
 
       out[entry.key] = std::move(entry);
     }
@@ -384,6 +393,7 @@ namespace
       runtime.note = fallback.note ? fallback.note : "";
       runtime.member = fallback.member;
       runtime.default_value = fallback.default_value;
+      runtime.reload_page = fallback.reload_page;
 
       auto it = parsed_entries.find(runtime.key);
       if (it != parsed_entries.end())
@@ -399,6 +409,8 @@ namespace
           runtime.note = meta.note;
         if (meta.has_default)
           runtime.default_value = meta.default_value;
+        if (meta.has_reload_page)
+          runtime.reload_page = meta.reload_page;
       }
 
       g_settings_index[runtime.key] = g_settings_catalog.size();
@@ -962,6 +974,10 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["GetAdblockEnabled"] = BindJSCallbackWithRetval(&UI::OnGetAdblockEnabled);
   global["OnOpenSettingsPanel"] = BindJSCallback(&UI::OnOpenSettingsPanel);
   global["OnCloseSettingsPanel"] = BindJSCallback(&UI::OnCloseSettingsPanel);
+  // Allow UI documents (including settings) to request a chrome overlay reload.
+  global["OnReloadChromeUI"] = BindJSCallback(&UI::OnReloadChromeUI);
+  // Allow UI documents to request reloading the active non-settings tab.
+  global["OnReloadActiveNonSettingsTab"] = BindJSCallback(&UI::OnReloadActiveNonSettingsTab);
 
   // Bind settings bridge functions to ALL views (not just UI overlay)
   // This ensures settings.html can call GetSettingsSnapshot when loaded in a tab
@@ -1042,7 +1058,35 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   {
     SyncAdblockStateToUI();
     SyncSettingsStateToUI(true);
-    CreateNewTab();
+    // Rehydrate tab strip from existing C++ tabs if present. This avoids
+    // creating a spurious new tab when the chrome overlay reloads and
+    // preserves the user's open tabs (including settings tab) and active
+    // selection.
+    RefPtr<JSContext> lock(view()->LockJSContext());
+    if (tabs_.empty())
+    {
+      CreateNewTab();
+    }
+    else
+    {
+      for (auto &entry : tabs_)
+      {
+        if (!entry.second)
+          continue;
+        // addTab expects: id, title, favicon, is_loading
+        addTab({entry.first, entry.second->view()->title(), GetFaviconURL(entry.second->view()->url()), entry.second->view()->is_loading()});
+      }
+
+      // Ensure the active tab state is reflected in the chrome UI
+      if (tabs_.count(active_tab_id_) && tabs_[active_tab_id_])
+      {
+        auto tab_view = tabs_[active_tab_id_]->view();
+        SetLoading(tab_view->is_loading());
+        SetCanGoBack(tab_view->CanGoBack());
+        SetCanGoForward(tab_view->CanGoBack());
+        SetURL(tab_view->url());
+      }
+    }
   }
 }
 
@@ -1131,6 +1175,17 @@ void UI::OnActiveTabChange(const JSObject &obj, const JSArgs &args)
     }
 
     active_tab_id_ = id;
+    // If the newly active tab is NOT the settings page, mark it as the
+    // last non-settings active tab so reloads requested from the settings
+    // page will target a meaningful browsing tab.
+    auto tabView = tabs_[active_tab_id_]->view();
+    if (tabView)
+    {
+      auto tab_url = tabView->url().utf8();
+      const char *tab_u = tab_url.data() ? tab_url.data() : "";
+      if (std::strstr(tab_u, "settings.html") == nullptr)
+        last_non_settings_tab_id_ = active_tab_id_;
+    }
     tabs_[active_tab_id_]->Show();
 
     auto tab_view = tabs_[active_tab_id_]->view();
@@ -1733,6 +1788,147 @@ void UI::OnCloseSettingsPanel(const JSObject &, const JSArgs &)
   // Legacy no-op: settings now open in a dedicated tab.
 }
 
+void UI::OnReloadChromeUI(const JSObject &, const JSArgs &)
+{
+  ReloadChromeUI();
+}
+
+void UI::OnReloadActiveNonSettingsTab(const JSObject &, const JSArgs &)
+{
+  ReloadActiveNonSettingsTab();
+}
+
+void UI::ReloadActiveNonSettingsTab()
+{
+  std::fprintf(stderr, "[UI] ReloadActiveNonSettingsTab invoked: active_tab_id=%llu last_non_settings_tab_id=%llu\n", (unsigned long long)active_tab_id_, (unsigned long long)last_non_settings_tab_id_);
+  // Prefer reloading the active browsing tab if it is NOT the settings page.
+  if (active_tab() && active_tab()->view())
+  {
+    auto v = active_tab()->view();
+    auto url = v->url().utf8();
+    const char *u = url.data() ? url.data() : "";
+    if (std::strstr(u, "settings.html") == nullptr)
+    {
+      std::fprintf(stderr, "[UI] Reloading active tab id=%llu url=%s\n", (unsigned long long)active_tab_id_, u);
+      v->Reload();
+      return;
+    }
+  }
+
+  // Otherwise, prefer the most-recently active non-settings tab and recreate it.
+  if (last_non_settings_tab_id_ != 0)
+  {
+    auto it = tabs_.find(last_non_settings_tab_id_);
+    if (it != tabs_.end() && it->second && it->second->view())
+    {
+      auto v = it->second->view();
+      auto url = v->url().utf8();
+      const char *u = url.data() ? url.data() : "";
+      if (std::strstr(u, "settings.html") == nullptr)
+      {
+        std::string urlstr = u;
+        RefPtr<View> newView = CreateNewTabForChildView(String(urlstr.c_str()));
+        if (newView)
+        {
+            std::fprintf(stderr, "[UI] Recreated tab for last_non_settings_tab_id=%llu, new view created\n", (unsigned long long)last_non_settings_tab_id_);
+          newView->LoadURL(String(urlstr.c_str()));
+          uint64_t new_id = 0;
+          for (auto &e : tabs_)
+          {
+            if (e.second && e.second->view() == newView)
+            {
+              new_id = e.first;
+              break;
+            }
+          }
+          uint64_t old_id = last_non_settings_tab_id_;
+          bool was_active = (old_id == active_tab_id_);
+          if (was_active && new_id != 0)
+          {
+            if (tabs_.count(old_id) && tabs_[old_id])
+              tabs_[old_id]->Hide();
+            active_tab_id_ = new_id;
+            if (tabs_.count(active_tab_id_) && tabs_[active_tab_id_])
+            {
+              tabs_[active_tab_id_]->Show();
+              auto tab_view = tabs_[active_tab_id_]->view();
+              SetLoading(tab_view->is_loading());
+              SetCanGoBack(tab_view->CanGoBack());
+              SetCanGoForward(tab_view->CanGoBack());
+              SetURL(tab_view->url());
+            }
+          }
+          if (tabs_.count(old_id))
+          {
+            std::fprintf(stderr, "[UI] Closing old tab id=%llu (replaced by id=%llu)\n", (unsigned long long)old_id, (unsigned long long)new_id);
+            tabs_[old_id].reset();
+            tabs_.erase(old_id);
+            RefPtr<JSContext> lock(view()->LockJSContext());
+            closeTab({old_id});
+          }
+        }
+        return;
+      }
+    }
+  }
+
+  for (auto &entry : tabs_)
+  {
+    if (!entry.second)
+      continue;
+    auto v = entry.second->view();
+    if (!v)
+      continue;
+    auto url = v->url().utf8();
+    const char *u = url.data() ? url.data() : "";
+    if (std::strstr(u, "settings.html") == nullptr)
+    {
+      std::string urlstr = u;
+      RefPtr<View> newView = CreateNewTabForChildView(String(urlstr.c_str()));
+      if (newView)
+      {
+        std::fprintf(stderr, "[UI] Recreated fallback tab id=%llu new view created\n", (unsigned long long)entry.first);
+        newView->LoadURL(String(urlstr.c_str()));
+        uint64_t new_id = 0;
+        uint64_t old_id = entry.first;
+        for (auto &e : tabs_)
+        {
+          if (e.second && e.second->view() == newView)
+          {
+            new_id = e.first;
+            break;
+          }
+        }
+        bool was_active = (old_id == active_tab_id_);
+        if (was_active && new_id != 0)
+        {
+          if (tabs_.count(old_id) && tabs_[old_id])
+            tabs_[old_id]->Hide();
+          active_tab_id_ = new_id;
+          if (tabs_.count(active_tab_id_) && tabs_[active_tab_id_])
+          {
+            tabs_[active_tab_id_]->Show();
+            auto tab_view = tabs_[active_tab_id_]->view();
+            SetLoading(tab_view->is_loading());
+            SetCanGoBack(tab_view->CanGoBack());
+            SetCanGoForward(tab_view->CanGoBack());
+            SetURL(tab_view->url());
+          }
+        }
+        if (tabs_.count(old_id))
+        {
+            std::fprintf(stderr, "[UI] Closing old tab id=%llu (replaced by id=%llu)\n", (unsigned long long)old_id, (unsigned long long)new_id);
+          tabs_[old_id].reset();
+          tabs_.erase(old_id);
+          RefPtr<JSContext> lock(view()->LockJSContext());
+          closeTab({old_id});
+        }
+      }
+      return;
+    }
+  }
+}
+
 ultralight::JSValue UI::OnGetSettings(const JSObject &, const JSArgs &)
 {
   // Build a fresh snapshot of current settings state
@@ -1820,6 +2016,7 @@ ultralight::JSValue UI::OnRestoreSettingsDefaults(const JSObject &, const JSArgs
   UpdateSettingsDirtyFlag();
   ApplySettings(false, false);
   UpdateSettingsDirtyFlag();
+
   std::string payload = BuildSettingsPayload(false);
   ultralight::String ul_payload(payload.c_str());
   return ultralight::JSValue(ul_payload);
@@ -2110,6 +2307,7 @@ std::string UI::BuildSettingsPayload(bool snapshot_is_baseline) const
     ss << "\"saved\": " << (saved_value ? "true" : "false");
     if (!desc.note.empty())
       ss << ",\"note\":\"" << util::EscapeJsonString(desc.note) << "\"";
+    ss << ",\"reload_page\": " << (desc.reload_page ? "true" : "false");
     ss << "}";
     first = false;
   }
@@ -2126,6 +2324,8 @@ void UI::HandleSettingMutation(const std::string &key, bool value)
     return;
 
   bool &field = settings_.*(descriptor->member);
+  bool old_value = field;
+  std::fprintf(stderr, "[UI] HandleSettingMutation invoked: key='%s' old=%s new=%s\n", key.c_str(), (old_value?"true":"false"), (value?"true":"false"));
   if (field == value)
     return;
 
@@ -2133,6 +2333,15 @@ void UI::HandleSettingMutation(const std::string &key, bool value)
   UpdateSettingsDirtyFlag();
   ApplySettings(false, false);
   UpdateSettingsDirtyFlag();
+
+  // If compact tabs changed, ensure the chrome UI and browsing tab update
+  // immediately regardless of whether the settings page's JS requested it.
+  if (key == "experimental_compact_tabs")
+  {
+    std::fprintf(stderr, "[UI] experimental_compact_tabs changed -> ReloadChromeUI + ReloadActiveNonSettingsTab\n");
+    ReloadChromeUI();
+    ReloadActiveNonSettingsTab();
+  }
 
   if (key == "clear_history_on_exit")
   {
@@ -2156,6 +2365,16 @@ void UI::AdjustUIHeight(uint32_t new_height)
   // Note: Do NOT move or resize tabs here; we only enlarge the UI overlay canvas.
   if (downloads_overlay_)
     LayoutDownloadsOverlay();
+}
+
+void UI::ReloadChromeUI()
+{
+  if (!overlay_)
+    return;
+  auto v = overlay_->view();
+  if (!v)
+    return;
+  v->LoadURL("file:///ui.html");
 }
 
 void UI::SyncAdblockStateToUI()
