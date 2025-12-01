@@ -138,6 +138,12 @@ public:
   void OnUpdateSetting(const JSObject &obj, const JSArgs &args);
   ultralight::JSValue OnRestoreSettingsDefaults(const JSObject &obj, const JSArgs &args);
   void OnSaveSettings(const JSObject &obj, const JSArgs &args);
+  // Reload the main chrome UI overlay (ui.html) so layout-dependent
+  // settings such as compact tabs take effect immediately.
+  void OnReloadChromeUI(const JSObject &obj, const JSArgs &args);
+  // Reload the active browsing tab (skip settings tab) when a setting
+  // indicates the page should be reloaded (e.g. compact tabs metadata).
+  void OnReloadActiveNonSettingsTab(const JSObject &obj, const JSArgs &args);
   // Suggestions callback (address bar autocomplete)
   ultralight::JSValue OnGetSuggestions(const JSObject &obj, const JSArgs &args);
   // Adjust UI overlay height for suggestions dropdown
@@ -196,11 +202,15 @@ protected:
   bool SaveSettingsToDisk();
   void EnsureDataDirectoryExists();
   void RestoreSettingsToDefaults();
+  // Helper used by OnReloadChromeUI to refresh the chrome overlay.
+  void ReloadChromeUI();
   std::string BuildSettingsJSON() const;
   std::string BuildSettingsPayload(bool snapshot_is_baseline) const;
   bool ParseSettingsBool(const std::string &buffer, const char *key, bool fallback) const;
   void HandleSettingMutation(const std::string &key, bool value);
   void UpdateSettingsDirtyFlag();
+  // Reload helpers
+  void ReloadActiveNonSettingsTab();
 
   // Suggestions / persistence helpers
   void LoadPopularSites();
@@ -261,6 +271,9 @@ protected:
 
   std::map<uint64_t, std::unique_ptr<Tab>> tabs_;
   uint64_t active_tab_id_ = 0;
+  // Track the most recently active non-settings tab so we can reload it
+  // when the settings tab is active and requests a reload.
+  uint64_t last_non_settings_tab_id_ = 0;
   uint64_t tab_id_counter_ = 0;
   Cursor cur_cursor_;
   bool is_resizing_inspector_;
@@ -353,6 +366,7 @@ struct RuntimeSettingDescriptor
   std::string description;
   std::string category;
   std::string note;
+  bool reload_page = false;
   bool UI::BrowserSettings::*member = nullptr;
   bool default_value = false;
 };
