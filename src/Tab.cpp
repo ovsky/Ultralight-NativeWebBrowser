@@ -286,6 +286,8 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
       global["OnUpdateSetting"] = BindJSCallback(&Tab::JS_UpdateSetting);
       global["OnSaveSettings"] = BindJSCallback(&Tab::JS_SaveSettings);
       global["OnRestoreSettingsDefaults"] = BindJSCallbackWithRetval(&Tab::JS_RestoreSettingsDefaults);
+      global["GetDrmStatus"] = BindJSCallbackWithRetval(&Tab::JS_GetDrmStatus);
+      global["InstallDrmDependencies"] = BindJSCallbackWithRetval(&Tab::JS_InstallDrmDependencies);
       // settings page detected with bridge functions bound
     }
 
@@ -917,6 +919,20 @@ JSValue Tab::JS_RestoreSettingsDefaults(const JSObject &obj, const JSArgs &args)
   if (!ui_)
     return JSValue();
   return ui_->OnRestoreSettingsDefaults(obj, args);
+}
+
+JSValue Tab::JS_GetDrmStatus(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_)
+    return JSValue();
+  return ui_->OnGetDrmStatus(obj, args);
+}
+
+JSValue Tab::JS_InstallDrmDependencies(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_)
+    return JSValue();
+  return ui_->OnInstallDrmDependencies(obj, args);
 }
 
 // (Disable-history removed)
