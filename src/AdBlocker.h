@@ -39,7 +39,7 @@ public:
     // Clear all rules
     void Clear();
 
-    // NetworkListener override
+    // NetworkListener override (purely decides to allow or block).
     bool OnNetworkRequest(ultralight::View *caller, ultralight::NetworkRequest &request) override;
 
     // Add a blocked host (suffix-match, case-insensitive)

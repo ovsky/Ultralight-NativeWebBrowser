@@ -102,5 +102,13 @@
     "category": "appearance",
     "note": null,
     "default": false
+  },
+  {
+    "key": "use_custom_user_agent",
+    "name": "Use custom user agent",
+    "description": "When enabled, send a user agent string that you specify instead of the automatic Chromium-like default.",
+    "category": "privacy",
+    "note": null,
+    "default": false
   }
 ]
