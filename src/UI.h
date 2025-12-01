@@ -13,7 +13,7 @@ using ultralight::JSObject;
 using namespace ultralight;
 
 class Console;
-class AdBlocker; // forward declaration, optional dependency
+class AdBlocker;       // forward declaration, optional dependency
 class SettingsManager; // forward-declare the helper to make it a friend
 class DownloadManager;
 
@@ -71,6 +71,18 @@ public:
     bool enable_remote_inspector = false;
     bool show_performance_overlay = false;
 
+    // Networking / User Agent
+    // When true, always send the value from custom_user_agent.
+    // When false, send a best-effort Chromium-like user agent string.
+    bool use_custom_user_agent = false;
+    // User-defined override string (used when use_custom_user_agent == true).
+    std::string custom_user_agent;
+
+    // General behavior
+    // When true, settings changes are written to disk immediately.
+    // When false, user must press "Save Changes" in the Settings UI.
+    bool auto_save_settings = true;
+
     bool operator==(const BrowserSettings &other) const;
     bool operator!=(const BrowserSettings &other) const { return !(*this == other); }
   };
@@ -126,6 +138,12 @@ public:
   void OnUpdateSetting(const JSObject &obj, const JSArgs &args);
   ultralight::JSValue OnRestoreSettingsDefaults(const JSObject &obj, const JSArgs &args);
   void OnSaveSettings(const JSObject &obj, const JSArgs &args);
+  // Reload the main chrome UI overlay (ui.html) so layout-dependent
+  // settings such as compact tabs take effect immediately.
+  void OnReloadChromeUI(const JSObject &obj, const JSArgs &args);
+  // Reload the active browsing tab (skip settings tab) when a setting
+  // indicates the page should be reloaded (e.g. compact tabs metadata).
+  void OnReloadActiveNonSettingsTab(const JSObject &obj, const JSArgs &args);
   // Suggestions callback (address bar autocomplete)
   ultralight::JSValue OnGetSuggestions(const JSObject &obj, const JSArgs &args);
   // Adjust UI overlay height for suggestions dropdown
@@ -184,11 +202,15 @@ protected:
   bool SaveSettingsToDisk();
   void EnsureDataDirectoryExists();
   void RestoreSettingsToDefaults();
+  // Helper used by OnReloadChromeUI to refresh the chrome overlay.
+  void ReloadChromeUI();
   std::string BuildSettingsJSON() const;
   std::string BuildSettingsPayload(bool snapshot_is_baseline) const;
   bool ParseSettingsBool(const std::string &buffer, const char *key, bool fallback) const;
   void HandleSettingMutation(const std::string &key, bool value);
   void UpdateSettingsDirtyFlag();
+  // Reload helpers
+  void ReloadActiveNonSettingsTab();
 
   // Suggestions / persistence helpers
   void LoadPopularSites();
@@ -249,6 +271,9 @@ protected:
 
   std::map<uint64_t, std::unique_ptr<Tab>> tabs_;
   uint64_t active_tab_id_ = 0;
+  // Track the most recently active non-settings tab so we can reload it
+  // when the settings tab is active and requests a reload.
+  uint64_t last_non_settings_tab_id_ = 0;
   uint64_t tab_id_counter_ = 0;
   Cursor cur_cursor_;
   bool is_resizing_inspector_;
@@ -313,6 +338,11 @@ protected:
   void ApplyDarkModeToView(RefPtr<View> v);
   void RemoveDarkModeFromView(RefPtr<View> v);
 
+  // Cached user agent string currently applied to outgoing requests.
+  std::string active_user_agent_;
+  // Compute a Chromium-like user agent string approximating the host platform.
+  std::string BuildDefaultChromiumUserAgent() const;
+
   // Shortcuts mapping (eg, "Ctrl+T" -> "new-tab") loaded from assets/shortcuts.json
   std::map<std::string, std::string> shortcuts_;
   void LoadShortcuts();
@@ -336,6 +366,7 @@ struct RuntimeSettingDescriptor
   std::string description;
   std::string category;
   std::string note;
+  bool reload_page = false;
   bool UI::BrowserSettings::*member = nullptr;
   bool default_value = false;
 };

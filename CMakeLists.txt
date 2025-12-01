@@ -68,8 +68,8 @@ set(SOURCES
 	"src/Tab.cpp"
 	"src/UI.h"
 	"src/UI.cpp"
-    "src/Utils.cpp"
-    "src/Settings.cpp"
+  "src/Utils.cpp"
+  "src/Settings.cpp"
 	"src/main.cpp"
 	"${CMAKE_CURRENT_BINARY_DIR}/browser.rc"
 )

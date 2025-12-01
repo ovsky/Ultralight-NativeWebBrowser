@@ -24,7 +24,8 @@
     "high_contrast_ui": false,
     "enable_caret_browsing": false,
     "enable_remote_inspector": false,
-    "show_performance_overlay": false
+    "show_performance_overlay": false,
+    "auto_save_settings": true
   },
   "meta": {
     "updated_at": "2025-11-09T12:00:00Z",
