@@ -9,7 +9,6 @@
     <style>
         * {
             box-sizing: border-box;
-            transition: all 0.2s ease-in-out;
         }
 
         :root {
@@ -29,6 +28,10 @@
             background: var(--bg, #f6f7f9);
             color: var(--fg, #111);
             min-height: 100vh;
+            opacity: 0;
+            /* Fade in on load (CSS only) */
+            animation: ul_fade_in 1s ease forwards;
+            -webkit-animation: ul_fade_in 1s ease forwards;
         }
 
         .container {
@@ -171,6 +174,8 @@
                 color: #9ca3af;
             }
         }
+    @keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
+    @-webkit-keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 
@@ -352,3 +357,7 @@
 </body>
 
 </html>
+
+<script>
+    
+</script>

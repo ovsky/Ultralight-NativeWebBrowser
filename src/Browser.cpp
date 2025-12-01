@@ -26,6 +26,19 @@ Browser::Browser()
   window_->SetTitle("Ultralight | Web Browser");
 
 #if defined(_WIN32)
+  // Ensure the native window class background is a dark color so the title
+  // bar and unpainted areas are dark by default.
+  HWND hwnd_bg = (HWND)window_->native_handle();
+  if (hwnd_bg) {
+    HBRUSH hBrush = CreateSolidBrush(RGB(22, 21, 29));
+    SetClassLongPtr(hwnd_bg, GCLP_HBRBACKGROUND, (LONG_PTR)hBrush);
+    class_bg_brush_ = hBrush;
+    InvalidateRect(hwnd_bg, NULL, TRUE);
+    UpdateWindow(hwnd_bg);
+  }
+#endif
+
+#if defined(_WIN32)
   HWND hwnd = (HWND)window_->native_handle();
   if (hwnd)
   {
@@ -73,6 +86,12 @@ Browser::~Browser()
 
   window_ = nullptr;
   app_ = nullptr;
+#if defined(_WIN32)
+  if (class_bg_brush_) {
+    DeleteObject(class_bg_brush_);
+    class_bg_brush_ = nullptr;
+  }
+#endif
 }
 
 void Browser::Run()

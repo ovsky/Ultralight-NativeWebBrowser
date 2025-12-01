@@ -7,13 +7,16 @@
   <style>
     html,
     * {
-      transition: all 0.2s ease-in-out;
     }
     body {
       background: transparent;
       margin: 0;
       padding: 0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      opacity: 0;
+      /* Fade in on load (CSS only) */
+      animation: ul_fade_in 1s ease forwards;
+      -webkit-animation: ul_fade_in 1s ease forwards;
     }
 
     html,
@@ -62,6 +65,8 @@
       background: rgba(255, 255, 255, 0.08);
       margin: 6px 0;
     }
+  @keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
+  @-webkit-keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
   </style>
 </head>
 
@@ -157,6 +162,12 @@
     // Expose for native
     window.setupContextMenu = setupContextMenu;
   </script>
+  </script>
+
+  <script>
+    
+  </script>
+
 </body>
 
 </html>
