@@ -2,6 +2,7 @@
 #include "UI.h"
 #include "Utils.h"
 #include "DownloadManager.h"
+#include "ExtensionManager.h"
 #include <iostream>
 #include <string>
 #include <cstdio>
@@ -390,6 +391,24 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
       };
     })())JS";
     caller->EvaluateScript(netPatch, nullptr);
+  }
+
+  // Inject extension scripts for matching URLs (only for non-internal pages)
+  if (is_main_frame)
+  {
+    auto url_str = url.utf8();
+    const char *c = url_str.data();
+    // Skip internal pages (file:/// URLs)
+    if (c && std::strncmp(c, "file://", 7) != 0)
+    {
+      std::string script_code = extensions::ExtensionManager::Instance().GetContentScriptsForURL(c);
+      if (!script_code.empty())
+      {
+        // Wrap in IIFE to isolate scope
+        std::string wrapped = "(function(){\ntry{\n" + script_code + "\n}catch(e){console.error('Extension error:',e);}\n})();";
+        caller->EvaluateScript(String(wrapped.c_str()), nullptr);
+      }
+    }
   }
 
   // If this is our History page, expose native methods

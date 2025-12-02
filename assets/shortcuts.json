@@ -3,6 +3,7 @@
   "Ctrl+W": "close-tab",
   "Ctrl+H": "open-history",
   "Ctrl+J": "open-downloads",
+  "Ctrl+Shift+E": "open-extensions",
   "Ctrl+L": "focus-address",
   "Ctrl+,": "open-settings"
 }
