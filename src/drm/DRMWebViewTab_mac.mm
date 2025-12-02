@@ -165,6 +165,19 @@ public:
     observer_ = nil;
   }
 
+  void DetachFromParent() override
+  {
+    // On macOS/WKWebView, hiding and moving off-screen is sufficient
+    // WKWebView doesn't intercept keyboard like WebView2 does on Windows
+    Hide();
+  }
+
+  void ReattachToParent() override
+  {
+    // Restore visibility if it was visible before
+    // This is a no-op on macOS since Hide/Show handle everything
+  }
+
   std::string GetTitle() const override { return current_title_; }
   std::string GetURL() const override { return current_url_; }
   bool CanGoBack() const override { return web_view_ ? [web_view_ canGoBack] : false; }
