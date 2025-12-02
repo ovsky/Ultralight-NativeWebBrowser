@@ -248,6 +248,18 @@ tar -xzf Ultralight-WebBrowser-*.tar.gz -C ~/.local/opt
 - **DRM Status Indicators** – Visual feedback for DRM content detection
 - **Per-Platform Optimization** – Native framework integration for best performance
 
+### Extension System
+- **Simple Extension Support** – Chrome-like extension architecture with JS script injection
+  - Extensions stored in `settings_directory/extensions/`
+  - JSON manifest format with id, name, version, content_scripts
+  - URL pattern matching with wildcards (e.g., `*://*.google.com/*`)
+  - Content scripts injected on DOM ready
+- **Extension Management UI** – Dedicated page for managing extensions (`Ctrl+E`)
+  - List installed extensions with enable/disable toggles
+  - Create new extensions with custom scripts
+  - Delete extensions and open extensions folder
+- **Sample Extensions Included** – Hello World and Dark Mode Toggle demos
+
 ### Developer Features
 - **JavaScript ↔ Native Bridge** – `window.__ul` API for deep integration
 - **Local History API** – In-memory browsing history (non-persistent by default)
@@ -332,6 +344,7 @@ Major feature sync bringing all development improvements to the stable branch.
 - Custom User Agent
 - Settings Search
 - Compact Tabs Mode
+- Extension System
 
 </td>
 <td width="33%" valign="top">
@@ -348,7 +361,6 @@ Major feature sync bringing all development improvements to the stable branch.
 
 ### 🔮 Planned
 - Session Restore
-- Extension/Plugin API
 - Persistent History
 - Multi-Profile Support
 - Password Manager
@@ -508,6 +520,52 @@ The DRM WebView subsystem provides native WebView integration for playing protec
 </details>
 
 <details>
+<summary><b>🧩 Extension System</b></summary>
+
+Extensions allow you to inject custom JavaScript into web pages. Each extension has a manifest and content scripts.
+
+**Extension Structure:**
+```
+extensions/
+└── my-extension/
+    ├── manifest.json
+    └── content.js
+```
+
+**Manifest Format:**
+```json
+{
+  "id": "my-extension",
+  "name": "My Extension",
+  "version": "1.0.0",
+  "description": "A simple browser extension",
+  "content_scripts": [
+    {
+      "matches": ["*://*/*"],
+      "js": ["content.js"]
+    }
+  ]
+}
+```
+
+**URL Pattern Matching:**
+- `*://*/*` — All HTTP/HTTPS pages
+- `*://*.google.com/*` — All Google subdomains
+- `https://example.com/*` — Specific domain
+
+**Managing Extensions:**
+- Open Extensions page: `Ctrl+E` or Menu → Extensions
+- Enable/disable extensions with toggle switches
+- Create new extensions directly from the browser
+- Reload individual extensions or all at once
+
+**Sample Extensions Included:**
+- `hello-world` — Shows notification on page load
+- `dark-mode-toggle` — Adds dark mode button to pages
+
+</details>
+
+<details>
 <summary><b>🛡️ Ad Blocking</b></summary>
 
 Rules loaded from:
@@ -560,6 +618,7 @@ Shortcuts are customizable via `assets/shortcuts.json`:
 | Address Bar | `Ctrl+L` |
 | Find | `Ctrl+F` |
 | Settings | `Ctrl+,` |
+| Extensions | `Ctrl+E` |
 | Developer Tools | `F12` |
 
 </details>
