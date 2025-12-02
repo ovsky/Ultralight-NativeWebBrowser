@@ -587,16 +587,33 @@ void UI::HideDrmTab(uint64_t id)
   auto it = drm_tabs_.find(id);
   if (it == drm_tabs_.end() || !it->second)
     return;
+  it->second->Blur();  // Release focus before hiding
   it->second->Hide();
   if (id == active_tab_id_)
   {
     auto tab_it = tabs_.find(id);
     if (tab_it != tabs_.end() && tab_it->second)
+    {
       tab_it->second->Show();
+      tab_it->second->view()->Focus();  // Give focus back to Ultralight tab
+    }
   }
   drm_tab_titles_.erase(id);
   drm_tab_urls_.erase(id);
   UpdateDrmBadge(id, false);
+}
+
+void UI::HideAllDrmTabs()
+{
+  // Hide ALL DRM tabs to ensure none interfere with input
+  for (auto &entry : drm_tabs_)
+  {
+    if (entry.second)
+    {
+      entry.second->Blur();
+      entry.second->Hide();
+    }
+  }
 }
 
 void UI::UpdateDrmBadge(uint64_t id, bool is_drm)
@@ -691,8 +708,13 @@ bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_init
 
   drm_tab_urls_[tab_id] = url;
   drm_tab_titles_[tab_id] = "Loading DRM System...";
+  
+  // Show loading page in Ultralight tab while WebView2 initializes
   if (ultra_tab)
-    ultra_tab->Hide();
+  {
+    ultra_tab->view()->LoadURL("file:///drm_loading.html");
+    ultra_tab->Show();  // Keep showing the loading page
+  }
   drm_it->second->Show();
   UpdateDrmBadge(tab_id, true);
 
@@ -754,6 +776,14 @@ void UI::HandleDrmLoading(uint64_t tab_id, bool is_loading)
 {
   if (tab_id == active_tab_id_)
     SetLoading(is_loading);
+  
+  // When WebView2 starts loading content, hide the Ultralight loading page
+  if (is_loading)
+  {
+    auto tab_it = tabs_.find(tab_id);
+    if (tab_it != tabs_.end() && tab_it->second)
+      tab_it->second->Hide();
+  }
 }
 
 void UI::HandleDrmNavigationState(uint64_t tab_id, bool can_back, bool can_forward)
@@ -1499,10 +1529,11 @@ void UI::OnActiveTabChange(const JSObject &obj, const JSArgs &args)
     if (!tab)
       return;
 
-    bool previous_was_drm = ActiveTabIsDRM();
-    if (previous_was_drm)
-      HideDrmTab(active_tab_id_);
-    else if (tabs_.count(active_tab_id_) && tabs_[active_tab_id_])
+    // Always hide all DRM tabs first to ensure clean state
+    HideAllDrmTabs();
+    
+    // Hide the previous Ultralight tab if it wasn't DRM
+    if (tabs_.count(active_tab_id_) && tabs_[active_tab_id_])
       tabs_[active_tab_id_]->Hide();
 
     if (tabs_[active_tab_id_]->ready_to_close())
@@ -1527,6 +1558,7 @@ void UI::OnActiveTabChange(const JSObject &obj, const JSArgs &args)
     if (drm_tab)
     {
       drm_tab->Show();
+      drm_tab->Focus();  // Give focus to DRM tab
       auto title_it = drm_tab_titles_.find(active_tab_id_);
       auto url_it = drm_tab_urls_.find(active_tab_id_);
       if (url_it != drm_tab_urls_.end())
@@ -1538,6 +1570,7 @@ void UI::OnActiveTabChange(const JSObject &obj, const JSArgs &args)
     else
     {
       tabs_[active_tab_id_]->Show();
+      tabs_[active_tab_id_]->view()->Focus();  // Give focus to Ultralight tab
       auto tab_view = tabs_[active_tab_id_]->view();
       SetLoading(tab_view->is_loading());
       SetCanGoBack(tab_view->CanGoBack());
@@ -1562,13 +1595,14 @@ void UI::OnRequestChangeURL(const JSObject &obj, const JSArgs &args)
       return;
 
     // Not a DRM site - close any existing DRM tab and show Ultralight tab
-    HideDrmTab(active_tab_id_);
+    HideAllDrmTabs();
     if (!tabs_.empty())
     {
       auto &tab = tabs_[active_tab_id_];
       if (tab)
       {
         tab->Show();
+        tab->view()->Focus();  // Ensure focus returns to Ultralight
         tab->view()->LoadURL(url);
       }
     }
@@ -1592,13 +1626,14 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
       return;
 
     // Not a DRM site - close any existing DRM tab and show Ultralight tab
-    HideDrmTab(active_tab_id_);
+    HideAllDrmTabs();
     if (!tabs_.empty())
     {
       auto &tab = tabs_[active_tab_id_];
       if (tab)
       {
         tab->Show();
+        tab->view()->Focus();  // Ensure focus returns to Ultralight
         tab->view()->LoadURL(url);
       }
     }
@@ -1915,6 +1950,9 @@ void UI::OnOpenExtensionsFolder(const JSObject &obj, const JSArgs &args)
 
 void UI::CreateNewTab()
 {
+  // Hide all DRM tabs when creating a new standard tab
+  HideAllDrmTabs();
+  
   uint64_t id = tab_id_counter_++;
   RefPtr<Window> window = window_;
   int tab_height = window->height() - ui_height_;
@@ -1934,6 +1972,9 @@ void UI::CreateNewTab()
 
 RefPtr<View> UI::CreateNewTabForChildView(const String &url)
 {
+  // Hide all DRM tabs when creating a new standard tab
+  HideAllDrmTabs();
+  
   uint64_t id = tab_id_counter_++;
   RefPtr<Window> window = window_;
   int tab_height = window->height() - ui_height_;
