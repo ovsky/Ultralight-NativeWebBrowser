@@ -139,29 +139,68 @@ namespace drm
 
         void Blur() override
         {
-            // Remove focus from WebView2 by setting focus to parent window
+            // Remove focus from WebView2 completely
+            if (controller_)
+            {
+                // Tell WebView2 to release focus
+                controller_->MoveFocus(COREWEBVIEW2_MOVE_FOCUS_REASON_NEXT);
+            }
+            // Also set Windows focus to parent
             if (parent_hwnd_)
                 SetFocus(parent_hwnd_);
         }
 
         void Resize(uint32_t width, uint32_t height, uint32_t offset_x, uint32_t offset_y) override
         {
+            // Store the new config for Show() to use
+            config_.width = width;
+            config_.height = height;
+            config_.offset_x = offset_x;
+            config_.offset_y = offset_y;
+            
             if (!controller_)
                 return;
-            RECT bounds = {static_cast<LONG>(offset_x), static_cast<LONG>(offset_y), static_cast<LONG>(offset_x + width), static_cast<LONG>(offset_y + height)};
-            controller_->put_Bounds(bounds);
+            // Only update bounds if visible
+            BOOL visible = FALSE;
+            controller_->get_IsVisible(&visible);
+            if (visible)
+            {
+                RECT bounds = {static_cast<LONG>(offset_x), static_cast<LONG>(offset_y), static_cast<LONG>(offset_x + width), static_cast<LONG>(offset_y + height)};
+                controller_->put_Bounds(bounds);
+            }
         }
 
         void Show() override
         {
             if (controller_)
+            {
+                // Restore bounds when showing
+                RECT bounds = {
+                    static_cast<LONG>(config_.offset_x),
+                    static_cast<LONG>(config_.offset_y),
+                    static_cast<LONG>(config_.offset_x + config_.width),
+                    static_cast<LONG>(config_.offset_y + config_.height)
+                };
+                controller_->put_Bounds(bounds);
                 controller_->put_IsVisible(TRUE);
+            }
         }
 
         void Hide() override
         {
             if (controller_)
+            {
+                // First blur to release focus
+                controller_->MoveFocus(COREWEBVIEW2_MOVE_FOCUS_REASON_NEXT);
+                // Hide the control
                 controller_->put_IsVisible(FALSE);
+                // Move WebView2 off-screen to prevent it from capturing any input
+                RECT offscreen = {-10000, -10000, -9000, -9000};
+                controller_->put_Bounds(offscreen);
+            }
+            // Ensure parent window has focus
+            if (parent_hwnd_)
+                SetFocus(parent_hwnd_);
         }
 
         void Close() override
