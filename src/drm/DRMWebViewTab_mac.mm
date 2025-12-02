@@ -18,24 +18,23 @@ namespace drm { class DRMWebViewTabMac; }
 
 namespace drm
 {
-namespace
-{
-  std::string ToStdString(NSString *str)
-  {
-    if (!str)
-      return {};
-    const char *cstr = [str UTF8String];
-    return cstr ? std::string(cstr) : std::string();
-  }
 
-  NSURLRequest *RequestForURL(const std::string &url)
-  {
-    NSString *nsUrl = [NSString stringWithUTF8String:url.c_str()];
-    NSURL *nsURL = [NSURL URLWithString:nsUrl];
-    if (!nsURL)
-      return nil;
-    return [NSURLRequest requestWithURL:nsURL];
-  }
+// Helper functions for converting between Objective-C and C++ types
+static std::string ToStdString(NSString *str)
+{
+  if (!str)
+    return {};
+  const char *cstr = [str UTF8String];
+  return cstr ? std::string(cstr) : std::string();
+}
+
+static NSURLRequest *RequestForURL(const std::string &url)
+{
+  NSString *nsUrl = [NSString stringWithUTF8String:url.c_str()];
+  NSURL *nsURL = [NSURL URLWithString:nsUrl];
+  if (!nsURL)
+    return nil;
+  return [NSURLRequest requestWithURL:nsURL];
 }
 
 class DRMWebViewTabMac : public DRMWebViewTab
