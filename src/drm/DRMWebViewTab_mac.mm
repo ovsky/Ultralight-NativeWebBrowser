@@ -200,6 +200,12 @@ std::unique_ptr<DRMWebViewTab> CreatePlatformWebViewTab(uint64_t id,
   return std::make_unique<DRMWebViewTabMac>(id, config, callbacks);
 }
 
+void PrewarmWebViewEnvironment()
+{
+  // WKWebView on macOS doesn't need pre-warming - it's fast to initialize
+  // The WebKit process pool is managed by the system
+}
+
 } // namespace drm
 
 // Objective-C implementation must be at global scope

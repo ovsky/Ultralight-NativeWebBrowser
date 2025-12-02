@@ -4,6 +4,8 @@
 
 #include <windows.h>
 #include <string>
+#include <mutex>
+#include <shlobj.h>
 
 #if defined(__has_include)
 #if __has_include(<WebView2.h>)
@@ -27,6 +29,26 @@ namespace drm
 #if ULTRALIGHT_HAS_WEBVIEW2
     namespace
     {
+        // Cached shared WebView2 environment for faster tab creation
+        static Microsoft::WRL::ComPtr<ICoreWebView2Environment> g_shared_environment;
+        static std::mutex g_environment_mutex;
+        static bool g_environment_creating = false;
+        
+        // Get or create the shared WebView2 environment
+        std::wstring GetUserDataFolder()
+        {
+            wchar_t path[MAX_PATH];
+            if (SUCCEEDED(SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, 0, path)))
+            {
+                std::wstring result = path;
+                result += L"\\UltralightWebBrowser\\WebView2";
+                CreateDirectoryW((std::wstring(path) + L"\\UltralightWebBrowser").c_str(), nullptr);
+                CreateDirectoryW(result.c_str(), nullptr);
+                return result;
+            }
+            return L"";
+        }
+
         std::wstring ToWide(const std::string &value)
         {
             if (value.empty())
@@ -74,8 +96,14 @@ namespace drm
         void LoadURL(const std::string &url) override
         {
             current_url_ = url;
+            pending_url_ = url;  // Store as pending in case webview isn't ready
             if (!webview_)
+            {
+                // WebView not ready yet - notify loading state
+                if (callbacks_.on_loading_state)
+                    callbacks_.on_loading_state(id_, true);
                 return;
+            }
             webview_->Navigate(ToWide(url).c_str());
         }
 
@@ -157,35 +185,71 @@ namespace drm
         bool CanGoForward() const override { return can_go_forward_; }
 
     private:
+        void CreateControllerFromEnvironment(ICoreWebView2Environment *env)
+        {
+            if (!env || !parent_hwnd_)
+                return;
+            env->CreateCoreWebView2Controller(parent_hwnd_,
+                Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
+                    [this](HRESULT controller_result, ICoreWebView2Controller *controller) -> HRESULT
+                    {
+                        if (FAILED(controller_result) || !controller)
+                            return controller_result;
+                        controller_ = controller;
+                        controller_->get_CoreWebView2(&webview_);
+                        controller_->put_IsVisible(TRUE);
+                        SetupEvents();
+                        // Navigate to pending URL if one was set before webview was ready
+                        if (!pending_url_.empty())
+                        {
+                            webview_->Navigate(ToWide(pending_url_).c_str());
+                            pending_url_.clear();
+                        }
+                        return S_OK;
+                    })
+                    .Get());
+        }
+
         void Initialize()
         {
             if (!parent_hwnd_)
                 return;
 
-            HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(nullptr, nullptr, nullptr,
-                                                                  Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
-                                                                      [this](HRESULT result, ICoreWebView2Environment *env) -> HRESULT
-                                                                      {
-                                                                          if (FAILED(result) || !env)
-                                                                              return result;
-                                                                          environment_ = env;
-                                                                          return env->CreateCoreWebView2Controller(parent_hwnd_,
-                                                                                                                   Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
-                                                                                                                       [this](HRESULT controller_result, ICoreWebView2Controller *controller) -> HRESULT
-                                                                                                                       {
-                                                                                                                           if (FAILED(controller_result) || !controller)
-                                                                                                                               return controller_result;
-                                                                                                                           controller_ = controller;
-                                                                                                                           controller_->get_CoreWebView2(&webview_);
-                                                                                                                           controller_->put_IsVisible(TRUE);
-                                                                                                                           SetupEvents();
-                                                                                                                           if (!current_url_.empty())
-                                                                                                                               webview_->Navigate(ToWide(current_url_).c_str());
-                                                                                                                           return S_OK;
-                                                                                                                       })
-                                                                                                                       .Get());
-                                                                      })
-                                                                      .Get());
+            // Check if we have a cached environment (fast path)
+            {
+                std::lock_guard<std::mutex> lock(g_environment_mutex);
+                if (g_shared_environment)
+                {
+                    environment_ = g_shared_environment;
+                    CreateControllerFromEnvironment(environment_.Get());
+                    return;
+                }
+            }
+
+            // Create new environment with user data folder for persistence
+            std::wstring userDataFolder = GetUserDataFolder();
+            HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(
+                nullptr,
+                userDataFolder.empty() ? nullptr : userDataFolder.c_str(),
+                nullptr,
+                Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
+                    [this](HRESULT result, ICoreWebView2Environment *env) -> HRESULT
+                    {
+                        if (FAILED(result) || !env)
+                            return result;
+                        
+                        // Cache the environment for reuse
+                        {
+                            std::lock_guard<std::mutex> lock(g_environment_mutex);
+                            if (!g_shared_environment)
+                                g_shared_environment = env;
+                        }
+                        
+                        environment_ = env;
+                        CreateControllerFromEnvironment(env);
+                        return S_OK;
+                    })
+                    .Get());
             (void)hr;
         }
 
@@ -290,6 +354,7 @@ namespace drm
         BOOL can_go_forward_ = FALSE;
         std::string current_title_ = "DRM WebView";
         std::string current_url_;
+        std::string pending_url_;  // URL to navigate when webview becomes ready
     };
 #else
 
@@ -328,6 +393,38 @@ namespace drm
         (void)config;
         (void)callbacks;
         return nullptr;
+#endif
+    }
+
+    void PrewarmWebViewEnvironment()
+    {
+#if ULTRALIGHT_HAS_WEBVIEW2
+        // Check if already initialized
+        {
+            std::lock_guard<std::mutex> lock(g_environment_mutex);
+            if (g_shared_environment || g_environment_creating)
+                return;
+            g_environment_creating = true;
+        }
+
+        std::wstring userDataFolder = GetUserDataFolder();
+        CreateCoreWebView2EnvironmentWithOptions(
+            nullptr,
+            userDataFolder.empty() ? nullptr : userDataFolder.c_str(),
+            nullptr,
+            Microsoft::WRL::Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
+                [](HRESULT result, ICoreWebView2Environment *env) -> HRESULT
+                {
+                    if (SUCCEEDED(result) && env)
+                    {
+                        std::lock_guard<std::mutex> lock(g_environment_mutex);
+                        if (!g_shared_environment)
+                            g_shared_environment = env;
+                    }
+                    g_environment_creating = false;
+                    return S_OK;
+                })
+                .Get());
 #endif
     }
 

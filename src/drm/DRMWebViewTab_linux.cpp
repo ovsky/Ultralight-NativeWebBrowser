@@ -192,6 +192,12 @@ namespace drm
         return std::make_unique<DRMWebViewTabLinux>(id, config, callbacks);
     }
 
+    void PrewarmWebViewEnvironment()
+    {
+        // GTK/WebKitGTK doesn't need pre-warming - widgets are created on demand
+        // and are fast to initialize
+    }
+
 } // namespace drm
 
 #endif

@@ -57,4 +57,7 @@ namespace drm
                                                             const DRMWebViewConfig &config,
                                                             DRMWebViewCallbacks callbacks);
 
+    // Pre-initialize the WebView environment to reduce first-load lag
+    void PrewarmWebViewEnvironment();
+
 } // namespace drm
