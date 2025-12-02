@@ -97,6 +97,32 @@ elseif(UNIX)
 		"src/drm/DRMWebViewTab_linux.cpp")
 endif()
 
+# On Linux, DRM webview support depends on GTK and WebKit2GTK.
+# CI images may not have these dev packages installed, so
+# make the DRM Linux sources conditional on finding the
+# required headers/libs. This keeps non-DRM builds working
+# while allowing full DRM functionality when dependencies
+# are present.
+if(UNIX AND NOT APPLE)
+	find_package(PkgConfig QUIET)
+	if(PkgConfig_FOUND)
+		pkg_check_modules(GTK3 QUIET gtk+-3.0)
+		pkg_check_modules(WEBKIT2 QUIET webkit2gtk-4.0)
+	endif()
+
+	if(GTK3_FOUND AND WEBKIT2_FOUND)
+		message(STATUS "Building DRM Linux WebView using GTK3/WebKit2GTK")
+		target_include_directories(Ultralight-WebBrowser PRIVATE ${GTK3_INCLUDE_DIRS} ${WEBKIT2_INCLUDE_DIRS})
+		target_link_libraries(Ultralight-WebBrowser PRIVATE ${GTK3_LIBRARIES} ${WEBKIT2_LIBRARIES})
+	else()
+		message(WARNING "GTK3/WebKit2GTK not found; DRM Linux WebView will be disabled (DRMWebViewTab_linux.cpp not linked).")
+		# Remove Linux DRM webview sources if present to avoid build failures.
+		list(REMOVE_ITEM SOURCES
+			"src/drm/DRMDependencyManager_linux.cpp"
+			"src/drm/DRMWebViewTab_linux.cpp")
+	endif()
+endif()
+
 add_app(Ultralight-WebBrowser ${SOURCES})
 
  # Unit test for utils
