@@ -125,6 +125,16 @@ public:
   JSValue JS_GetDrmStatus(const JSObject &obj, const JSArgs &args);
   JSValue JS_InstallDrmDependencies(const JSObject &obj, const JSArgs &args);
 
+  // Extensions page callbacks
+  JSValue JS_GetExtensions(const JSObject &obj, const JSArgs &args);
+  void JS_ToggleExtension(const JSObject &obj, const JSArgs &args);
+  void JS_ReloadExtension(const JSObject &obj, const JSArgs &args);
+  void JS_ReloadAllExtensions(const JSObject &obj, const JSArgs &args);
+  void JS_DeleteExtension(const JSObject &obj, const JSArgs &args);
+  void JS_LoadExtension(const JSObject &obj, const JSArgs &args);
+  void JS_CreateExtension(const JSObject &obj, const JSArgs &args);
+  void JS_OpenExtensionsFolder(const JSObject &obj, const JSArgs &args);
+
 protected:
   UI *ui_;
   RefPtr<Overlay> overlay_;

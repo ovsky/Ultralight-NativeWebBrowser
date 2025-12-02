@@ -279,6 +279,7 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
     // Check if this is the settings page
     auto url_utf8 = url.utf8();
     bool is_settings_page = url_utf8.data() && std::strstr(url_utf8.data(), "settings.html") != nullptr;
+    bool is_extensions_page = url_utf8.data() && std::strstr(url_utf8.data(), "extensions.html") != nullptr;
 
     if (is_settings_page)
     {
@@ -290,6 +291,19 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
       global["GetDrmStatus"] = BindJSCallbackWithRetval(&Tab::JS_GetDrmStatus);
       global["InstallDrmDependencies"] = BindJSCallbackWithRetval(&Tab::JS_InstallDrmDependencies);
       // settings page detected with bridge functions bound
+    }
+
+    if (is_extensions_page)
+    {
+      // Bind extensions bridge functions when extensions page loads in a tab
+      global["GetExtensions"] = BindJSCallbackWithRetval(&Tab::JS_GetExtensions);
+      global["OnToggleExtension"] = BindJSCallback(&Tab::JS_ToggleExtension);
+      global["OnReloadExtension"] = BindJSCallback(&Tab::JS_ReloadExtension);
+      global["OnReloadAllExtensions"] = BindJSCallback(&Tab::JS_ReloadAllExtensions);
+      global["OnDeleteExtension"] = BindJSCallback(&Tab::JS_DeleteExtension);
+      global["OnLoadExtension"] = BindJSCallback(&Tab::JS_LoadExtension);
+      global["OnCreateExtension"] = BindJSCallback(&Tab::JS_CreateExtension);
+      global["OnOpenExtensionsFolder"] = BindJSCallback(&Tab::JS_OpenExtensionsFolder);
     }
 
     // Expose a unified native bridge on window.__ul using global function proxies
@@ -952,6 +966,56 @@ JSValue Tab::JS_InstallDrmDependencies(const JSObject &obj, const JSArgs &args)
   if (!ui_)
     return JSValue();
   return ui_->OnInstallDrmDependencies(obj, args);
+}
+
+// --- Extensions page JS bridge (forward to UI) ---
+JSValue Tab::JS_GetExtensions(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_)
+    return JSValue();
+  return ui_->OnGetExtensions(obj, args);
+}
+
+void Tab::JS_ToggleExtension(const JSObject &obj, const JSArgs &args)
+{
+  if (ui_)
+    ui_->OnToggleExtension(obj, args);
+}
+
+void Tab::JS_ReloadExtension(const JSObject &obj, const JSArgs &args)
+{
+  if (ui_)
+    ui_->OnReloadExtension(obj, args);
+}
+
+void Tab::JS_ReloadAllExtensions(const JSObject &obj, const JSArgs &args)
+{
+  if (ui_)
+    ui_->OnReloadAllExtensions(obj, args);
+}
+
+void Tab::JS_DeleteExtension(const JSObject &obj, const JSArgs &args)
+{
+  if (ui_)
+    ui_->OnDeleteExtension(obj, args);
+}
+
+void Tab::JS_LoadExtension(const JSObject &obj, const JSArgs &args)
+{
+  if (ui_)
+    ui_->OnLoadExtension(obj, args);
+}
+
+void Tab::JS_CreateExtension(const JSObject &obj, const JSArgs &args)
+{
+  if (ui_)
+    ui_->OnCreateExtension(obj, args);
+}
+
+void Tab::JS_OpenExtensionsFolder(const JSObject &obj, const JSArgs &args)
+{
+  if (ui_)
+    ui_->OnOpenExtensionsFolder(obj, args);
 }
 
 // (Disable-history removed)
