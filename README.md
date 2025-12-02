@@ -60,7 +60,7 @@ Traditional browsers embed full, sandboxed operating systems. They're powerful�
 ### 🧠 Architecture Benefits
 
 - ✅ No multi-process bloat
-- ✅ No background daemons  
+- ✅ No background daemons
 - ✅ No gigabytes of RAM for a few tabs
 - ✅ Native C++ performance
 - ✅ Simple embedding & extension
@@ -538,7 +538,7 @@ MIT License — see [LICENSE](./LICENSE) for details.
 
 <p align="center">
   <sub>
-    ⚠️ <b>Disclaimer:</b> This is an educational project demonstrating minimal browser architecture. 
+    ⚠️ <b>Disclaimer:</b> This is an educational project demonstrating minimal browser architecture.
     Not recommended for security-critical tasks without additional hardening.
   </sub>
 </p>
