@@ -97,27 +97,53 @@ public:
     // Remove focus from WebView by making window first responder
     if (ns_window_)
       [ns_window_ makeFirstResponder:nil];
+    // Also resign first responder from web view
+    if (web_view_)
+      [[web_view_ window] makeFirstResponder:nil];
   }
 
   void Resize(uint32_t width, uint32_t height, uint32_t offset_x, uint32_t offset_y) override
   {
+    // Store config for Show() to use
+    config_.width = width;
+    config_.height = height;
+    config_.offset_x = offset_x;
+    config_.offset_y = offset_y;
+    
     if (!host_view_)
       return;
-    NSRect frame = NSMakeRect(offset_x, offset_y, width, height);
-    [host_view_ setFrame:frame];
-    [web_view_ setFrame:[host_view_ bounds]];
+    // Only update if visible
+    if (![host_view_ isHidden])
+    {
+      NSRect frame = NSMakeRect(offset_x, offset_y, width, height);
+      [host_view_ setFrame:frame];
+      [web_view_ setFrame:[host_view_ bounds]];
+    }
   }
 
   void Show() override
   {
     if (host_view_)
+    {
+      // Restore proper position before showing
+      NSRect frame = NSMakeRect(config_.offset_x, config_.offset_y, config_.width, config_.height);
+      [host_view_ setFrame:frame];
+      [web_view_ setFrame:[host_view_ bounds]];
       [host_view_ setHidden:NO];
+    }
   }
 
   void Hide() override
   {
+    // First blur to release focus
+    Blur();
     if (host_view_)
+    {
       [host_view_ setHidden:YES];
+      // Move off-screen to prevent any input capture
+      NSRect offscreen = NSMakeRect(-10000, -10000, 100, 100);
+      [host_view_ setFrame:offscreen];
+    }
   }
 
   void Close() override
