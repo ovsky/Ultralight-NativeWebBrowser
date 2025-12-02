@@ -216,7 +216,7 @@ namespace drm
 
             if (SUCCEEDED(webview_->add_SourceChanged(
                     Microsoft::WRL::Callback<ICoreWebView2SourceChangedEventHandler>(
-                        [this](ICoreWebView2 *sender, ICoreWebView2SourceChangedEventArgs *, IUnknown *) -> HRESULT
+                        [this](ICoreWebView2 *sender, ICoreWebView2SourceChangedEventArgs *) -> HRESULT
                         {
                             LPWSTR source = nullptr;
                             if (SUCCEEDED(sender->get_Source(&source)) && source)
@@ -240,7 +240,7 @@ namespace drm
 
             if (SUCCEEDED(webview_->add_NavigationStarting(
                     Microsoft::WRL::Callback<ICoreWebView2NavigationStartingEventHandler>(
-                        [this](ICoreWebView2 *, ICoreWebView2NavigationStartingEventArgs *, IUnknown *) -> HRESULT
+                        [this](ICoreWebView2 *, ICoreWebView2NavigationStartingEventArgs *) -> HRESULT
                         {
                             if (callbacks_.on_loading_state)
                                 callbacks_.on_loading_state(id_, true);
@@ -254,7 +254,7 @@ namespace drm
 
             if (SUCCEEDED(webview_->add_NavigationCompleted(
                     Microsoft::WRL::Callback<ICoreWebView2NavigationCompletedEventHandler>(
-                        [this](ICoreWebView2 *sender, ICoreWebView2NavigationCompletedEventArgs *args, IUnknown *) -> HRESULT
+                        [this](ICoreWebView2 *sender, ICoreWebView2NavigationCompletedEventArgs *args) -> HRESULT
                         {
                             BOOL is_success = FALSE;
                             if (args)
@@ -286,8 +286,8 @@ namespace drm
         bool source_handler_registered_ = false;
         bool nav_starting_registered_ = false;
         bool nav_completed_registered_ = false;
-        bool can_go_back_ = false;
-        bool can_go_forward_ = false;
+        BOOL can_go_back_ = FALSE;
+        BOOL can_go_forward_ = FALSE;
         std::string current_title_ = "DRM WebView";
         std::string current_url_;
     };
