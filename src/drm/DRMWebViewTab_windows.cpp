@@ -83,6 +83,7 @@ namespace drm
     public:
         DRMWebViewTabWindows(uint64_t id, const DRMWebViewConfig &config, const DRMWebViewCallbacks &callbacks)
             : DRMWebViewTab(id, config, callbacks)
+            , desired_visible_(false)  // Start hidden until explicitly shown
         {
             parent_hwnd_ = static_cast<HWND>(config.parent_window);
             Initialize();
@@ -172,6 +173,7 @@ namespace drm
 
         void Show() override
         {
+            desired_visible_ = true;
             if (controller_)
             {
                 // Restore bounds when showing
@@ -188,6 +190,7 @@ namespace drm
 
         void Hide() override
         {
+            desired_visible_ = false;
             if (controller_)
             {
                 // First blur to release focus
@@ -244,15 +247,26 @@ namespace drm
                         controller_ = controller;
                         controller_->get_CoreWebView2(&webview_);
                         
-                        // Set initial bounds from config
-                        RECT bounds = {
-                            static_cast<LONG>(config_.offset_x),
-                            static_cast<LONG>(config_.offset_y),
-                            static_cast<LONG>(config_.offset_x + config_.width),
-                            static_cast<LONG>(config_.offset_y + config_.height)
-                        };
-                        controller_->put_Bounds(bounds);
-                        controller_->put_IsVisible(TRUE);
+                        // Respect the desired visibility state (may have been set to hidden before controller was ready)
+                        if (desired_visible_)
+                        {
+                            // Set initial bounds from config
+                            RECT bounds = {
+                                static_cast<LONG>(config_.offset_x),
+                                static_cast<LONG>(config_.offset_y),
+                                static_cast<LONG>(config_.offset_x + config_.width),
+                                static_cast<LONG>(config_.offset_y + config_.height)
+                            };
+                            controller_->put_Bounds(bounds);
+                            controller_->put_IsVisible(TRUE);
+                        }
+                        else
+                        {
+                            // Start hidden off-screen
+                            RECT offscreen = {-10000, -10000, -9000, -9000};
+                            controller_->put_Bounds(offscreen);
+                            controller_->put_IsVisible(FALSE);
+                        }
                         
                         SetupEvents();
                         // Navigate to pending URL if one was set before webview was ready
@@ -406,6 +420,7 @@ namespace drm
         bool source_handler_registered_ = false;
         bool nav_starting_registered_ = false;
         bool nav_completed_registered_ = false;
+        bool desired_visible_ = false;  // Tracks desired visibility state (respects Hide() before controller ready)
         BOOL can_go_back_ = FALSE;
         BOOL can_go_forward_ = FALSE;
         std::string current_title_ = "DRM WebView";
