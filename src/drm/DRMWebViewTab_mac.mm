@@ -1,14 +1,17 @@
 #if defined(__APPLE__)
 
+// Ensure C++ types are available.
+#include "drm/DRMWebViewTab.h"
+
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
 
 // Forward-declare the C++ DRMWebViewTabMac for use in Obj-C
 // and define Objective-C types at true global scope.
-class DRMWebViewTabMac;
+namespace drm { class DRMWebViewTabMac; }
 
 @interface DRMWebViewObserver : NSObject <WKNavigationDelegate>
-@property(nonatomic, assign) DRMWebViewTabMac *owner;
+@property(nonatomic, assign) drm::DRMWebViewTabMac *owner;
 @end
 
 namespace drm
