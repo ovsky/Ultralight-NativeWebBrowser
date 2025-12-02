@@ -18,6 +18,13 @@ Tab::Tab(UI *ui, uint64_t id, uint32_t width, uint32_t height, int x, int y,
   ultralight::ViewConfig cfg;
   cfg.initial_device_scale = ui->window_->scale();
   
+  // Match acceleration/display settings with main UI view to avoid GPU driver issues
+  if (ui->overlay_ && ui->overlay_->view())
+  {
+    cfg.is_accelerated = ui->overlay_->view()->is_accelerated();
+    cfg.display_id = ui->overlay_->view()->display_id();
+  }
+  
   // Always set a user agent - use provided one or fall back to a Chromium-like default
   if (!user_agent.empty())
   {
