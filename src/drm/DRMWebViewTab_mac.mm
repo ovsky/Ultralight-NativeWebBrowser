@@ -193,6 +193,16 @@ private:
   std::string current_url_;
 };
 
+std::unique_ptr<DRMWebViewTab> CreatePlatformWebViewTab(uint64_t id,
+                                                        const DRMWebViewConfig &config,
+                                                        DRMWebViewCallbacks callbacks)
+{
+  return std::make_unique<DRMWebViewTabMac>(id, config, callbacks);
+}
+
+} // namespace drm
+
+// Objective-C implementation must be at global scope
 @implementation DRMWebViewObserver
 
 - (void)webView:(WKWebView *)webView didStartProvisionalNavigation:(WKNavigation *)navigation
@@ -242,14 +252,5 @@ private:
 }
 
 @end
-
-std::unique_ptr<DRMWebViewTab> CreatePlatformWebViewTab(uint64_t id,
-                                                        const DRMWebViewConfig &config,
-                                                        DRMWebViewCallbacks callbacks)
-{
-  return std::make_unique<DRMWebViewTabMac>(id, config, callbacks);
-}
-
-} // namespace drm
 
 #endif
