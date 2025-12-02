@@ -116,7 +116,7 @@ namespace drm
         {
             if (!web_view_)
                 return;
-            gchar *title = webkit_web_view_get_title(WEBKIT_WEB_VIEW(web_view_));
+            const gchar *title = webkit_web_view_get_title(WEBKIT_WEB_VIEW(web_view_));
             current_title_ = ToStdString(title);
             if (callbacks_.on_title_changed)
                 callbacks_.on_title_changed(id_, current_title_);
