@@ -715,7 +715,9 @@ bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_init
     ultra_tab->view()->LoadURL("file:///drm_loading.html");
     ultra_tab->Show();  // Keep showing the loading page
   }
-  drm_it->second->Show();
+  // DON'T show WebView2 yet - it will be shown when it starts loading
+  // This ensures the loading page is visible while WebView2 initializes
+  drm_it->second->Hide();
   UpdateDrmBadge(tab_id, true);
 
   // Update tab UI to show loading state
@@ -777,9 +779,19 @@ void UI::HandleDrmLoading(uint64_t tab_id, bool is_loading)
   if (tab_id == active_tab_id_)
     SetLoading(is_loading);
   
-  // When WebView2 starts loading content, hide the Ultralight loading page
+  // When WebView2 starts loading content, show it and hide the Ultralight loading page
   if (is_loading)
   {
+    // Show the DRM tab now that it's actually loading, but only if no overlays are open
+    auto drm_it = drm_tabs_.find(tab_id);
+    if (drm_it != drm_tabs_.end() && drm_it->second)
+    {
+      // Only show if this is the active tab and no overlays are covering the content
+      if (tab_id == active_tab_id_ && !menu_overlay_ && !downloads_overlay_ && !context_menu_overlay_ && !suggestions_overlay_)
+        drm_it->second->Show();
+    }
+    
+    // Hide the Ultralight loading page
     auto tab_it = tabs_.find(tab_id);
     if (tab_it != tabs_.end() && tab_it->second)
       tab_it->second->Hide();
@@ -2428,6 +2440,11 @@ void UI::ShowDownloadsOverlay()
 
   downloads_overlay_user_dismissed_ = false;
 
+  // Hide active DRM WebView2 tab so overlay appears on top
+  auto drm_it = drm_tabs_.find(active_tab_id_);
+  if (drm_it != drm_tabs_.end() && drm_it->second)
+    drm_it->second->Hide();
+
   ultralight::ViewConfig cfg;
   cfg.is_transparent = true;
   cfg.initial_device_scale = window_->scale();
@@ -2474,6 +2491,14 @@ void UI::HideDownloadsOverlay()
   }
 
   downloads_overlay_ = nullptr;
+
+  // Restore active DRM WebView2 tab if no other overlays are open
+  if (!menu_overlay_ && !context_menu_overlay_)
+  {
+    auto drm_it = drm_tabs_.find(active_tab_id_);
+    if (drm_it != drm_tabs_.end() && drm_it->second)
+      drm_it->second->Show();
+  }
 }
 
 void UI::LayoutDownloadsOverlay()
@@ -3261,6 +3286,11 @@ void UI::ShowMenuOverlay()
   if (menu_overlay_)
     return;
 
+  // Hide active DRM WebView2 tab so overlay appears on top
+  auto drm_it = drm_tabs_.find(active_tab_id_);
+  if (drm_it != drm_tabs_.end() && drm_it->second)
+    drm_it->second->Hide();
+
   // Create a transparent View so only the dropdown is visible over content
   ultralight::ViewConfig cfg;
   cfg.is_transparent = true;
@@ -3292,6 +3322,14 @@ void UI::HideMenuOverlay()
     overlay_->Focus();
   menu_overlay_->view()->set_load_listener(nullptr);
   menu_overlay_ = nullptr;
+
+  // Restore active DRM WebView2 tab if no other overlays are open
+  if (!downloads_overlay_ && !context_menu_overlay_)
+  {
+    auto drm_it = drm_tabs_.find(active_tab_id_);
+    if (drm_it != drm_tabs_.end() && drm_it->second)
+      drm_it->second->Show();
+  }
 }
 
 void UI::ShowContextMenuOverlay(int x, int y, const ultralight::String &json_info)
@@ -3301,6 +3339,11 @@ void UI::ShowContextMenuOverlay(int x, int y, const ultralight::String &json_inf
   {
     HideContextMenuOverlay();
   }
+
+  // Hide active DRM WebView2 tab so overlay appears on top
+  auto drm_it = drm_tabs_.find(active_tab_id_);
+  if (drm_it != drm_tabs_.end() && drm_it->second)
+    drm_it->second->Hide();
 
   ultralight::ViewConfig cfg;
   cfg.is_transparent = true;
@@ -3334,6 +3377,14 @@ void UI::HideContextMenuOverlay()
   context_menu_overlay_->view()->set_load_listener(nullptr);
   context_menu_overlay_ = nullptr;
   pending_ctx_info_json_ = "";
+
+  // Restore active DRM WebView2 tab if no other overlays are open
+  if (!menu_overlay_ && !downloads_overlay_)
+  {
+    auto drm_it = drm_tabs_.find(active_tab_id_);
+    if (drm_it != drm_tabs_.end() && drm_it->second)
+      drm_it->second->Show();
+  }
 }
 
 void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
@@ -4345,6 +4396,11 @@ void UI::ShowSuggestionsOverlay(int x, int y, int width, const ultralight::Strin
   if (suggestions_overlay_)
     HideSuggestionsOverlay();
 
+  // Hide active DRM WebView2 tab so overlay appears on top
+  auto drm_it = drm_tabs_.find(active_tab_id_);
+  if (drm_it != drm_tabs_.end() && drm_it->second)
+    drm_it->second->Hide();
+
   ultralight::ViewConfig cfg;
   cfg.is_transparent = true;
   cfg.initial_device_scale = window_->scale();
@@ -4374,6 +4430,14 @@ void UI::HideSuggestionsOverlay()
   suggestions_overlay_->view()->set_load_listener(nullptr);
   suggestions_overlay_ = nullptr;
   pending_sugg_json_ = "";
+
+  // Restore active DRM WebView2 tab if no other overlays are open
+  if (!menu_overlay_ && !downloads_overlay_ && !context_menu_overlay_)
+  {
+    auto drm_it = drm_tabs_.find(active_tab_id_);
+    if (drm_it != drm_tabs_.end() && drm_it->second)
+      drm_it->second->Show();
+  }
 }
 
 void UI::OnOpenSuggestionsOverlay(const JSObject &obj, const JSArgs &args)
