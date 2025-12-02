@@ -400,6 +400,37 @@ ctest --test-dir build --output-on-failure
 
 ---
 
+## 🔐 DRM WebView Notes
+
+The DRM WebView subsystem provides native WebView integration for playing DRM-protected content (Netflix, Disney+, etc.) that cannot be rendered by the Ultralight engine.
+
+### How It Works
+1. **Detection**: Browser detects DRM-protected content via content type or site rules
+2. **Fallback**: Automatically switches from Ultralight to native WebView
+3. **Integration**: Native WebView overlays the main window with proper z-ordering
+4. **Return**: User can switch back to Ultralight for regular browsing
+
+### Platform Implementations
+
+| Platform | Native WebView | DRM Support | Notes |
+|----------|---------------|-------------|-------|
+| Windows | WebView2 (Edge/Chromium) | Widevine, PlayReady | Requires Edge runtime |
+| macOS | WKWebView | FairPlay, Widevine | Native Cocoa/WebKit |
+| Linux | WebKit2GTK | Limited | WebKit2GTK 4.1 preferred |
+
+### Enabling DRM WebView
+1. Open **Settings** → **DRM Content**
+2. Toggle **Enable DRM WebView**
+3. Navigate to DRM-protected content
+4. Browser will automatically use native WebView when needed
+
+### Build Requirements
+- **Windows**: WebView2 SDK (auto-detected by CMake)
+- **macOS**: Xcode with Cocoa/WebKit frameworks
+- **Linux**: `libwebkit2gtk-4.1-dev` or `libwebkit2gtk-4.0-dev`
+
+---
+
 ## 🧩 JavaScript Bridge API (`window.__ul`)
 Injected into the main frame once DOM is ready.
 
@@ -494,12 +525,26 @@ cpack --config build/CPackConfig.cmake -C Release -G TGZ
 ---
 
 ## 🔄 CI / Automation
-Three workflows:
-- `build-linux.yml` – Detects latest x64/arm64 SDK, builds, tests, packages (TGZ/DEB/RPM).
-- `build-macos.yml` – Detects macOS SDK (supports multiple naming conventions), packages TGZ/DMG, cleans large artifacts.
-- `build-windows.yml` – Detects Windows SDK, builds, optional NSIS installer when `create_installer` is true.
 
-Environment variables / inputs:
+### Active Workflows
+Six platform-specific workflows with unified orchestration:
+- `build-all.yml` – Meta-workflow triggering all platform builds (main badge workflow)
+- `build-linux.yml` – Linux x64 build with GTK3, WebKit2GTK integration
+- `build-linux-arm64.yml` – Linux ARM64 build (self-hosted/emulated runners)
+- `build-macos.yml` – macOS x64 build with Cocoa/WebKit framework linking
+- `build-macos-arm64.yml` – macOS ARM64 (Apple Silicon) build
+- `build-windows.yml` – Windows x64 build with optional NSIS installer
+
+### Platform-Specific Build Features
+| Platform | DRM WebView | Native Frameworks | Architecture |
+|----------|-------------|-------------------|--------------|
+| Windows x64 | WebView2 | N/A | x64 |
+| Linux x64 | WebKit2GTK | GTK+3, NSS | x64 |
+| Linux ARM64 | WebKit2GTK | GTK+3, NSS | ARM64 |
+| macOS x64 | WKWebView | Cocoa, WebKit, Foundation, AppKit | x64 |
+| macOS ARM64 | WKWebView | Cocoa, WebKit, Foundation, AppKit | ARM64 |
+
+### Environment Variables / Inputs
 | Variable | Purpose |
 |----------|---------|
 | `ULTRALIGHT_SDK_URL` | Override auto-detected SDK archive URL |
@@ -508,15 +553,11 @@ Environment variables / inputs:
 | `PACKAGE_GENERATORS` (Linux/macOS) | CPack generator list (`TGZ;DEB;RPM`, `TGZ;DMG`, etc.) |
 | `CREATE_INSTALLER` (Windows) | Build NSIS installer when true |
 
-### 🚧 Suggested Future Enhancement (ARM64 Matrix)
-```yaml
-strategy:
-  matrix:
-    os: [ubuntu-latest, self-hosted-arm64]
-    arch: [x64, arm64]
-runs-on: ${{ matrix.os }}
-```
-Set `TARGET_ARCH` and select appropriate SDK archive per matrix entry.
+### Recent CI/CD Improvements
+- ✅ Full ARM64 support for Linux and macOS
+- ✅ Conditional Objective-C++ compilation (macOS only)
+- ✅ Proper framework linking for DRM WebView components
+- ✅ Cross-platform DRM subsystem build validation
 
 ---
 
@@ -535,6 +576,10 @@ Set `TARGET_ARCH` and select appropriate SDK archive per matrix entry.
 | Arm64 archive not detected | CI runner architecture mismatch | Provide `sdk_url` manually or run on arm64 runner |
 | Downloads not appearing | Download manager initialization | Check permissions for downloads directory; verify UI overlay loaded |
 | Shortcuts not working | JSON parse error | Validate `assets/shortcuts.json` syntax; check console for errors |
+| DRM content not playing | DRM WebView disabled | Enable "DRM WebView" in Settings → DRM Content |
+| DRM WebView crash (macOS) | Missing frameworks | Ensure Cocoa, WebKit frameworks are available; check system version |
+| DRM WebView crash (Linux) | WebKit2GTK missing | Install `libwebkit2gtk-4.1-dev` or `libwebkit2gtk-4.0-dev` |
+| Bookmarks not saving | File permission issues | Check write permissions for bookmarks storage directory |
 
 ### Debug Tips
 1. **Enable Debug Panel** – Settings → Developer → Show Performance Overlay
