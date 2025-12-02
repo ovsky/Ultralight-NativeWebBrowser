@@ -137,6 +137,13 @@ namespace drm
                 controller_->MoveFocus(COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC);
         }
 
+        void Blur() override
+        {
+            // Remove focus from WebView2 by setting focus to parent window
+            if (parent_hwnd_)
+                SetFocus(parent_hwnd_);
+        }
+
         void Resize(uint32_t width, uint32_t height, uint32_t offset_x, uint32_t offset_y) override
         {
             if (!controller_)
@@ -197,7 +204,17 @@ namespace drm
                             return controller_result;
                         controller_ = controller;
                         controller_->get_CoreWebView2(&webview_);
+                        
+                        // Set initial bounds from config
+                        RECT bounds = {
+                            static_cast<LONG>(config_.offset_x),
+                            static_cast<LONG>(config_.offset_y),
+                            static_cast<LONG>(config_.offset_x + config_.width),
+                            static_cast<LONG>(config_.offset_y + config_.height)
+                        };
+                        controller_->put_Bounds(bounds);
                         controller_->put_IsVisible(TRUE);
+                        
                         SetupEvents();
                         // Navigate to pending URL if one was set before webview was ready
                         if (!pending_url_.empty())

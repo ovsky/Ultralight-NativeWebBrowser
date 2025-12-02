@@ -92,6 +92,13 @@ public:
       [[web_view_ window] makeFirstResponder:web_view_];
   }
 
+  void Blur() override
+  {
+    // Remove focus from WebView by making window first responder
+    if (ns_window_)
+      [ns_window_ makeFirstResponder:nil];
+  }
+
   void Resize(uint32_t width, uint32_t height, uint32_t offset_x, uint32_t offset_y) override
   {
     if (!host_view_)

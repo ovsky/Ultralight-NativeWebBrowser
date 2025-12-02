@@ -1093,6 +1093,9 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
     {
       address_bar_is_focused_ = true;
       view()->Focus();
+      // If a DRM tab is active, blur it so keyboard input goes to Ultralight UI
+      if (auto drm_tab = active_drm_tab())
+        drm_tab->Blur();
     }
     view()->FireMouseEvent(evt);
     return false;
@@ -1110,6 +1113,11 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
     if (active_tab())
     {
       active_tab()->view()->Focus();
+    }
+    // If DRM tab is active, focus it when clicking in the content area
+    else if (auto drm_tab = active_drm_tab())
+    {
+      drm_tab->Focus();
     }
   }
   if (active_tab() && active_tab()->IsInspectorShowing())
