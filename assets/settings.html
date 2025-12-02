@@ -73,6 +73,33 @@
             font-weight: 400;
         }
 
+        /* Settings search */
+        .settings-search {
+            margin-top: 12px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .settings-search input {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-soft);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        .settings-search .clear-btn {
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border-soft);
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
         #settings-container {
             padding: 20px 30px 30px 30px;
             max-height: calc(100vh - 280px);
@@ -441,6 +468,10 @@
         <header>
             <h1>Settings</h1>
             <p class="subtitle">Configure your browser preferences</p>
+            <div class="settings-search">
+                <input id="settings-search" type="search" placeholder="Search settings (name, key, description)..." aria-label="Search settings">
+                <button id="settings-search-clear" class="clear-btn" title="Clear search">Clear</button>
+            </div>
         </header>
         <div id="settings-container">
             <div class="loading">Loading settings...</div>
@@ -596,6 +627,29 @@
             loadSettings();
             document.getElementById('btn-save').addEventListener('click', saveSettings);
             document.getElementById('btn-restore').addEventListener('click', restoreDefaults);
+            // Search box wiring
+            const searchEl = document.getElementById('settings-search');
+            const clearBtn = document.getElementById('settings-search-clear');
+            let searchTimer = null;
+            if (searchEl) {
+                searchEl.addEventListener('input', (e) => {
+                    if (searchTimer) clearTimeout(searchTimer);
+                    const val = (e.target.value || '').trim();
+                    searchTimer = setTimeout(() => {
+                        applySettingsSearch(val);
+                    }, 160);
+                });
+            }
+            if (clearBtn) {
+                clearBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (searchEl) {
+                        searchEl.value = '';
+                        applySettingsSearch('');
+                        searchEl.focus();
+                    }
+                });
+            }
         });
 
         function loadSettings() {
@@ -644,14 +698,22 @@
         function renderSettings() {
             const container = document.getElementById('settings-container');
             container.innerHTML = '';
+            const query = (window.__settingsSearchTerm || '').trim().toLowerCase();
+            let anyRendered = false;
             Object.keys(settingsDefinitions).forEach(groupKey => {
                 const group = settingsDefinitions[groupKey];
+                // Filter group's settings by search query
+                const matchedSettings = (query.length === 0) ? group.settings : group.settings.filter(s => {
+                    const hay = ((s.name || '') + ' ' + (s.description || '') + ' ' + (s.key || '')).toLowerCase();
+                    return hay.indexOf(query) !== -1;
+                });
+                if (!matchedSettings.length) return; // skip group if none match
                 const groupDiv = document.createElement('div');
                 groupDiv.className = 'settings-group';
                 const title = document.createElement('h2');
                 title.textContent = group.title;
                 groupDiv.appendChild(title);
-                group.settings.forEach(setting => {
+                matchedSettings.forEach(setting => {
                     const itemDiv = document.createElement('div');
                     itemDiv.className = 'setting-item';
                     const infoDiv = document.createElement('div');
@@ -780,6 +842,13 @@
                 }
             };
         }
+
+        // Search helpers
+        function applySettingsSearch(term) {
+            window.__settingsSearchTerm = (term || '').toString();
+            renderSettings();
+        }
+
 
         function cacheDrmElements() {
             drmElements.panel = document.getElementById('drm-panel');
