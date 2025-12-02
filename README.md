@@ -1,629 +1,548 @@
-# Ultralight Web Browser ✨
-> Ultra‑fast / Ultra‑light / Ultra‑portable
-
-[![Build - All (x64 + ARM64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-all.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-all.yml?query=branch%3Adev)
-[![Build - Linux (x64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux.yml?query=branch%3Adev)
-[![Build - Linux (ARM64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux-arm64.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux-arm64.yml?query=branch%3Adev)
-[![Build - macOS (x64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos.yml?query=branch%3Adev)
-[![Build - macOS (ARM64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos-arm64.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos-arm64.yml?query=branch%3Adev)
-[![Build - Windows (x64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-windows.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-windows.yml?query=branch%3Adev)
-
 <p align="center">
-  <img src="https://github.com/ultralight-ux/Ultralight/raw/master/media/logo.png" width="200" alt="Ultralight Logo">
+  <img src="https://github.com/ultralight-ux/Ultralight/raw/master/media/logo.png" width="180" alt="Ultralight Logo">
 </p>
 
-<strong>A native C++ proof‑of‑concept browser focused on minimal overhead, cold‑start speed, and resource efficiency.</strong><br/>
-No multi‑process bloat, no background daemons, no gigabytes of RAM for a handful of tabs—just a lean renderer + native UI.
+<h1 align="center">Ultralight Web Browser</h1>
 
-> Download: [Ultralight Web → Browser Releases Page](https://github.com/ovsky/Ultralight-WebBrowser/releases) | Status: Development / Experimental / Educational
----
+<p align="center">
+  <strong>Ultra‑fast · Ultra‑light · Ultra‑portable</strong><br/>
+  A native C++ browser focused on minimal overhead, instant startup, and resource efficiency.
+</p>
 
-<img width="1366" height="768" alt="ultralight-downloads" src="https://github.com/user-attachments/assets/fe2c4609-6930-483c-9fa3-eab64664b539" />
+<p align="center">
+  <a href="https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-all.yml?query=branch%3Adev">
+    <img src="https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-all.yml/badge.svg?branch=dev" alt="Build Status">
+  </a>
+  <a href="https://github.com/ovsky/Ultralight-WebBrowser/releases">
+    <img src="https://img.shields.io/github/v/release/ovsky/Ultralight-WebBrowser?include_prereleases&label=release" alt="Release">
+  </a>
+  <a href="./LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
+  </a>
+  <img src="https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platforms">
+</p>
 
----
-
-## 🧭 Table of Contents
-1. [Why Ultralight?](#-why-ultralight-ditch-the-bloat)
-2. [Project Philosophy & Goals](#-project-philosophy--goals)
-3. [Supported Platforms & Architectures](#-supported-platforms--architectures)
-4. [Get the App](#-get-the-app)
-5. [Installation](#-installation)
-6. [Features](#-features)
-7. [Recent Updates](#-recent-updates)
-8. [Tech Stack](#-tech-stack)
-9. [Build From Source](#-build-from-source)
-10. [ARM64 Build Notes](#-arm64-build-notes)
-11. [JavaScript Bridge API](#-javascript-bridge-api-window__ul)
-12. [Create Packages Locally](#-create-packages-locally-optional)
-13. [CI / Automation](#-ci--automation)
-14. [Roadmap](#-roadmap--ideas)
-15. [Troubleshooting](#-troubleshooting)
-16. [Contributing](#-contributing)
-17. [Security & Privacy](#-security--privacy)
-18. [License](#-license)
-19. [Acknowledgements](#-acknowledgements)
-20. [Disclaimer](#-disclaimer)
+<p align="center">
+  <a href="https://github.com/ovsky/Ultralight-WebBrowser/releases">📦 Download</a> ·
+  <a href="#-features">✨ Features</a> ·
+  <a href="#-build-from-source">🔧 Build</a> ·
+  <a href="#-documentation">📚 Docs</a>
+</p>
 
 ---
 
-## 🚀 Why Ultralight? Ditch the Bloat
-Traditional browsers (and desktop web stacks like Electron / CEF) embed full, sandboxed operating systems (Chromium). They are powerful—but heavy. This project explores how far you can go by combining a lightweight GPU renderer with a native shell for a dramatically smaller footprint and near‑instant startup.
-
-![Ultralight Memory Usage](https://ultralig.ht/media/base-memory-usage.webp)
-
-Result: lower memory pressure, near‑instant cold starts, smaller footprint, simple embedding, and much more.
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/fe2c4609-6930-483c-9fa3-eab64664b539" width="100%" alt="Ultralight Browser Screenshot">
+</p>
 
 ---
 
-## 🎯 Project Philosophy & Goals
-| Feature | Ultralight (This Project) | Electron / CEF |
-|--------|---------------------------|----------------|
-| Performance | ⚡ Up to 6× faster in simple page render ops | Chromium baseline CEF |
-| Memory Usage | 🧠 ~1/10 RAM (no multi-process sandbox) | High (multi-process JS + GPU + Extensions) |
-| Startup | 🚀 < 1s typical | 3–5s cold start |
-| Disk Footprint | 📦 ~30–50 MB packaged | 1+ GB (runtime + Cache) |
-| Rendering | 🎨 Lightweight GPU | Full Chromium CEF Stack |
-| Architecture | 🧱 Native C++ + pixel buffer compositing | Node.js + Chromium + Interop Bridge |
+## 🎯 Why Ultralight?
 
-Goals:
-- Showcase minimal native browser shell design.
-- Provide reference for Ultralight SDK Browser.
-- Preliminary lightweight content / ad-block / tracking-block.
-- Highlight performance vs conventional heavy frameworks.
+Traditional browsers embed full, sandboxed operating systems. They're powerful—but heavy. This project explores how far you can go with a **lightweight GPU renderer** + **native shell** for dramatically smaller footprint and near-instant startup.
 
----
+<table>
+<tr>
+<td width="50%">
 
-## 🖥️ Supported Platforms & Architectures
-| Platform | Architectures | CI Artifacts | Notes |
-|----------|---------------|--------------|-------|
-| Windows 10/11+ | x64 | Portable ZIP, optional NSIS installer | ARM64 SDK not yet published by Ultralight |
-| macOS 12+ | x64, arm64 | TGZ, optional DMG | ARM64 auto‑detected when runner host is ARM64 |
-| Linux (Ubuntu/Fedora etc.) | x64, arm64 | TGZ / DEB / RPM | ARM64 requires aarch64 runner; workflow automatically includes detection & fallback |
+### ⚡ Performance Comparison
 
-ARM64 archives are probed automatically when available in the `base-sdk` branch (eg: `ultralight-free-sdk-<ver>-linux-arm64.7z`, `...-mac-arm64.7z`). Current public CI uses x64 runners; arm64 builds may require:
-- Self‑hosted runner (Apple Silicon / aarch64 Linux)
-- Future strategy matrix addition (see CI section)
+| Metric | Ultralight | Electron/CEF |
+|--------|:----------:|:------------:|
+| Startup Time | **< 1s** | 3–5s |
+| Memory Usage | **~50 MB** | 500+ MB |
+| Disk Footprint | **~40 MB** | 1+ GB |
+| Render Speed | **6× faster** | Baseline |
 
----
+</td>
+<td width="50%">
 
-## 📥 Get the App
-Official tagged releases:
-[🎉 Ultralight Web → Browser Releases Page](https://github.com/ovsky/Ultralight-WebBrowser/releases)
+### 🧠 Architecture Benefits
 
-Development (continuous) artifacts (latest successful `dev` workflow runs):
+- ✅ No multi-process bloat
+- ✅ No background daemons  
+- ✅ No gigabytes of RAM for a few tabs
+- ✅ Native C++ performance
+- ✅ Simple embedding & extension
 
-| Platform | Architectures | Packages | Latest Runs |
-|----------|----------------|----------|-------------|
-| Linux | x64, arm64* | TGZ, DEB, RPM | [Open runs](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux.yml?query=branch%3Adev) |
-| macOS | x64, arm64 | TGZ, DMG | [Open runs](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos.yml?query=branch%3Adev) |
-| Windows | x64 | ZIP (portable) / optional Installer | [Open runs](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-windows.yml?query=branch%3Adev) |
+</td>
+</tr>
+</table>
 
-Notes:
-- ✅ Linux AMD64 artifacts appear when an x64 runner is used or when `ULTRALIGHT_SDK_URL` points to an AMD64 SDK.
-- ✅ Linux ARM64 artifacts appear when an aarch64 runner is used or when `ULTRALIGHT_SDK_URL` points to an arm64 SDK.
-- ✅ Windows AMD64 artifacts appear when an aarch64 runner is used or when `ULTRALIGHT_SDK_URL` points to an arm64 SDK.
-- ✅ macOS ARM64 artifacts are produced automatically when the CI runner is Apple Silicon.
-- ✅ macOS AMD64 artifacts appear when an x64 runner is used or when `ULTRALIGHT_SDK_URL` points to an AMD64 SDK.
-- 🕒 Windows ARM64 artifacts are not yet published by Ultralight [SOON™].
-
-How to fetch artifacts:
-1. Open the workflow link for your platform/arch.
-2. Click the latest green run (success).
-3. Scroll to “Artifacts” (bottom) and download the desired archive.
-
----
-
-## 📦 Installation
-
-### Windows (x64)
-1. Download `Ultralight-WebBrowser-*-Windows-Portable.zip`.
-2. Extract & run `Ultralight-WebBrowser.exe`.
-3. Optional: Run installer (`*-Windows-Installer.exe`) if generated.
-
-### macOS (x64/arm64)
-- TGZ: Extract, move folder anywhere, run `Ultralight-WebBrowser`.
-- DMG: Mount, drag the app folder to `/Applications` (or preferred location), run the binary.
-
-### Linux (x64/arm64)
-DEB (Debian/Ubuntu):
-```bash
-sudo apt install ./Ultralight-WebBrowser-*.deb
-ultralight-webbrowser
-```
-RPM (Fedora/RHEL/openSUSE):
-```bash
-sudo dnf install Ultralight-WebBrowser-*.rpm
-ultralight-webbrowser
-```
-Portable TGZ (no root):
-```bash
-tar -C "$HOME/.local/opt" -xzf Ultralight-WebBrowser-*.tar.gz
-"$HOME/.local/opt/UltralightWebBrowser/Ultralight-WebBrowser"
-```
-Packages install a desktop entry and icon + CLI launcher `ultralight-webbrowser`.
+<p align="center">
+  <img src="https://ultralig.ht/media/base-memory-usage.webp" width="600" alt="Memory Comparison">
+</p>
 
 ---
 
 ## ✨ Features
 
-### Core Browser Functionality
-- **GPU‑Accelerated Rendering** – Powered by Ultralight core engine
-- **Low Memory Footprint** – Single process shell architecture (~1/10 RAM vs. Electron)
-- **HTML5 / CSS3 / Modern JS Support** – Full web standards compliance
-- **Multi‑Tab Interface** – Chrome-style draggable tabs with smooth animations
-- **Navigation Controls** – Back / Forward / Reload / Stop / Address bar
-- **Dynamic Page Indicators** – Real-time title updates and loading states
-- **Responsive Resize** – Fluid layout adaptation
+<table>
+<tr>
+<td width="50%" valign="top">
 
-### Privacy & Security
-- **Lightweight Ad & Tracker Filtering**
-  - Domain + substring + glob pattern matching
-  - Rule sources: `assets/blocklist.txt` + all `.txt` in `assets/filters/`
-  - Formats: `example.com`, `0.0.0.0 example.com`, `||example.com^`, `/ads.js`, `*://*/*analytics*.js`
-  - Always allowed: `file://`, `data:`
-  - Toggle via toolbar icon or Settings
-  - Requires SDK network interception capabilities
-- **Do Not Track (DNT)** – Configurable header setting
-- **Clear History on Exit** – Optional automatic cleanup
-- **Web Security Controls** – JavaScript, cookies, storage permissions
+### 🌐 Core Browser
+- **GPU-Accelerated Rendering** – Ultralight engine
+- **Multi-Tab Interface** – Chrome-style draggable tabs
+- **Full Web Standards** – HTML5, CSS3, Modern JS
+- **Smart Navigation** – Back, Forward, Reload, Stop
+- **Intelligent Suggestions** – URL autocompletion with favicons
 
-### User Interface & Experience
-- **Modern Glassmorphic Design** – Semi-transparent overlays with backdrop blur
-- **Dark Mode** – Global theme toggle with persistent preferences
-- **Compact Tabs Mode** – Space-saving layout (60px UI height, 12em tab width)
-- **Toolbar Icons** – Quick access to Inspector, Downloads, AdBlock, Menu
-- **Bookmark System** – Save favorite sites with toolbar star icon and bookmarks bar
-- **Bookmark Manager** – Organize bookmarks with folder support and quick access
-- **Download Manager** – Full-featured UI with progress tracking and notifications
-- **Settings Panel** – Comprehensive configuration across 7+ categories:
-  - Appearance (Dark Mode, Vibrant Window, Transparent Toolbar, Compact Tabs)
-  - Privacy & Security (AdBlock, Trackers, JavaScript, Web Security, Cookies, DNT, History)
-  - Address Bar & Suggestions (Autocompletion, Favicons)
-  - Downloads (Badge, Auto-open Panel, Ask Location)
-  - Performance (Smooth Scrolling, Hardware Acceleration, Local Storage, Database)
-  - Accessibility (Reduce Motion, High Contrast, Caret Browsing)
-  - Developer (Remote Inspector, Performance Overlay)
-  - DRM Content (DRM WebView toggle for protected content)
-- **Settings Search** – Quick search to find specific settings
-- **Auto-Save Settings** – Automatic persistence of preference changes
-- **Custom User Agent** – Configurable browser identification string
-- **Persistent Settings** – JSON-based storage with runtime updates
-- **Context Menu** – Right-click actions and shortcuts
-- **Keyboard Shortcuts** – Customizable shortcut mapping system
-- **Favicon Support** – Site icons in tabs and suggestions
-- **Autosuggestion** – Intelligent URL/search completions with popular sites
+### 🎨 Modern Interface
+- **Glassmorphic Design** – Semi-transparent overlays with blur
+- **Dark Mode** – System-wide theme with persistence
+- **Compact Tabs** – Space-saving layout option
+- **Responsive Layout** – Fluid adaptation to any size
 
-### DRM Content Support (Experimental)
-- **DRM WebView Subsystem** – Platform-native WebView for DRM-protected content
-  - Windows: WebView2 (Edge/Chromium) integration
-  - macOS: Native WKWebView with Cocoa/WebKit frameworks
-  - Linux: WebKit2GTK integration
-- **Automatic Fallback** – Seamless switching between Ultralight and native WebView
-- **DRM Status Indicators** – Visual feedback for DRM content detection
-- **Per-Platform Optimization** – Native framework integration for best performance
+### 🔒 Privacy & Security
+- **Ad & Tracker Blocking** – Domain, glob, and pattern matching
+- **Do Not Track** – Configurable DNT header
+- **Privacy Controls** – JavaScript, cookies, storage permissions
+- **Auto-Clear History** – Optional cleanup on exit
 
-### Developer Features
-- **JavaScript ↔ Native Bridge** – `window.__ul` API for deep integration
-- **Local History API** – In-memory browsing history (non-persistent by default)
-- **Shortcut Mapping** – JSON-based keyboard shortcut configuration
-- **Debug Panel** – Runtime settings inspection and diagnostics
+</td>
+<td width="50%" valign="top">
+
+### ⚙️ Power Features
+- **Bookmark System** – Star icon, bookmarks bar, manager
+- **Download Manager** – Progress tracking, notifications
+- **Settings Panel** – 26+ configurable options across 7 categories
+- **Settings Search** – Quick-find any preference
+- **Auto-Save** – Automatic preference persistence
+- **Custom User Agent** – Configurable browser identity
+- **Keyboard Shortcuts** – Fully customizable mappings
+
+### 🎬 DRM Content Support
+- **Native WebView Fallback** – For protected streaming
+- **Windows** – WebView2 (Edge/Chromium)
+- **macOS** – WKWebView (Cocoa/WebKit)
+- **Linux** – WebKit2GTK integration
+- **Automatic Detection** – Seamless content switching
+
+### 🛠️ Developer Tools
+- **JS Bridge API** – `window.__ul` for deep integration
+- **Debug Panel** – Runtime inspection
+- **Performance Overlay** – Real-time metrics
+
+</td>
+</tr>
+</table>
 
 ---
 
-## 🆕 Recent Updates
+## 🖥️ Platform Support
 
-### Latest Merged Features (dev → main)
-
-#### PR #45: Implement Features from Dev into Main
-Major feature sync bringing all development improvements to the stable branch.
-
-#### PR #43: Fully Functional Compact Tabs
-- Dynamic compact tabs mode with live toggle
-- No restart required for layout changes
-- Improved tab reload and settings mutation handling
-
-#### PR #42: Settings Auto-Save Functionality
-- Automatic saving of settings changes
-- Toggle option for auto-save behavior
-- Seamless preference persistence
-
-#### PR #41: Custom User Agent Setting
-- Configurable browser User-Agent string
-- New UI handling for setting changes
-- Enhanced request customization
-
-#### PR #40: Icons Bar Styles Fix
-- Fixed toolbar icon styles and transitions
-- Improved download icon behavior
-- Polished visual feedback
-
-#### PR #39: General Project Optimization
-- NSIS path detection improvements
-- PowerShell environment variable fixes
-- Windows CI workflow enhancements
-
-### Current Development (feature/drm-subsystem-implementation)
-- **DRM WebView Subsystem** – Cross-platform native WebView integration
-- **Bookmark System** – Full bookmark management with toolbar integration
-- **Settings Search** – Quick-find functionality for settings panel
-- **CI/CD Improvements** – Full ARM64 support for Linux and macOS
+| Platform | Architecture | Status | Package Formats |
+|:--------:|:------------:|:------:|:---------------:|
+| **Windows** | x64 | ✅ Full | ZIP, NSIS Installer |
+| **macOS** | x64 | ✅ Full | TGZ, DMG |
+| **macOS** | ARM64 (Apple Silicon) | ✅ Full | TGZ, DMG |
+| **Linux** | x64 | ✅ Full | TGZ, DEB, RPM |
+| **Linux** | ARM64 | ✅ Full | TGZ, DEB, RPM |
+| **Windows** | ARM64 | 🔜 Soon | — |
 
 ---
 
-## 🛠️ Tech Stack
-| Layer | Technology |
-|-------|------------|
-| Renderer | [Ultralight SDK](https://ultralig.ht/) |
-| DRM WebView (Windows) | WebView2 (Edge/Chromium) |
-| DRM WebView (macOS) | WKWebView (Cocoa/WebKit) |
-| DRM WebView (Linux) | WebKit2GTK |
-| Language | C++17, Objective-C++ (macOS) |
-| Windowing/Input | [GLFW](https://www.glfw.org/) |
-| Graphics | OpenGL 3.3 |
-| Build | CMake + CPack |
-| CI | GitHub Actions (x64 + ARM64) |
-| Testing | Google Test |
+## 📥 Installation
+
+<details>
+<summary><b>🪟 Windows</b></summary>
+
+1. Download `Ultralight-WebBrowser-*-Windows-Portable.zip` from [Releases](https://github.com/ovsky/Ultralight-WebBrowser/releases)
+2. Extract to any folder
+3. Run `Ultralight-WebBrowser.exe`
+
+*Optional: Use the NSIS installer (`*-Windows-Installer.exe`) if available.*
+
+</details>
+
+<details>
+<summary><b>🍎 macOS</b></summary>
+
+**TGZ Archive:**
+```bash
+tar -xzf Ultralight-WebBrowser-*.tar.gz
+./Ultralight-WebBrowser
+```
+
+**DMG Image:**
+1. Mount the DMG
+2. Drag to Applications
+3. Right-click → Open (first launch, to bypass Gatekeeper)
+
+</details>
+
+<details>
+<summary><b>🐧 Linux</b></summary>
+
+**Debian/Ubuntu (DEB):**
+```bash
+sudo apt install ./Ultralight-WebBrowser-*.deb
+ultralight-webbrowser
+```
+
+**Fedora/RHEL (RPM):**
+```bash
+sudo dnf install ./Ultralight-WebBrowser-*.rpm
+ultralight-webbrowser
+```
+
+**Portable (TGZ):**
+```bash
+tar -xzf Ultralight-WebBrowser-*.tar.gz -C ~/.local/opt
+~/.local/opt/UltralightWebBrowser/Ultralight-WebBrowser
+```
+
+</details>
 
 ---
 
-## 🗺️ Roadmap and Ideas
-
-### ✅ Completed
-- ✓ Context Menu System
-- ✓ Local History Management
-- ✓ Optimized Content Filtering
-- ✓ Universal Menu Interface
-- ✓ Keyboard Shortcut Mapping
-- ✓ Dark Theme Support
-- ✓ JavaScript Bridge API
-- ✓ Favicon Support
-- ✓ Autosuggestion / Autocompletion
-- ✓ Download Manager with UI
-- ✓ Tab UX Improvements (Chrome-style draggable tabs)
-- ✓ **Settings System** – Comprehensive preferences panel with 26+ options
-- ✓ **Glassmorphic UI** – Modern semi-transparent design with backdrop blur
-- ✓ **Compact Tabs Mode** – Space-saving layout option with live toggle
-- ✓ **AdBlock Toolbar Icon** – Quick toggle access
-- ✓ **Runtime Settings Updates** – No restart required for changes
-- ✓ **Persistent Configuration** – JSON-based settings storage
-- ✓ **Auto-Save Settings** – Automatic preference persistence
-- ✓ **Custom User Agent** – Configurable browser identification
-- ✓ **Settings Search** – Quick-find functionality in settings panel
-- ✓ **Bookmark System** – Save and organize favorite sites with toolbar star
-- ✓ **Bookmarks Bar** – Quick access to saved bookmarks
-- ✓ **DRM WebView Subsystem** – Native WebView for protected content (Windows/macOS/Linux)
-- ✓ **Full ARM64 CI/CD** – Linux ARM64 and macOS ARM64 build support
-
-### 🚧 In Progress
-- Bookmark Manager Improvements (folder organization, import/export)
-- DRM Content Detection Enhancement
-- Performance Optimization (Smooth Scrolling, Hardware Acceleration Toggles)
-- Accessibility Features (Reduced Motion, Caret Browsing improvements)
-
-### 🧩 Planned / Open
-- **Session Management** – Restore tabs on startup
-- **Plugin / Extension API** – Script injection framework
-- **Persistent History** – Optional long-term storage
-- **Advanced Privacy Filters** – Cosmetic blocking (CSS selectors)
-- **Multi-profile Support** – Separate settings/history per profile
-- **Sync Service Integration** – Cross-device settings sync
-- **Enhanced Developer Tools** – Integrated console and network inspector
-- **Custom Themes** – User-defined color schemes
-- **Password Manager** – Secure credential storage
-- **Tab Groups** – Organize tabs into collapsible groups
-- **Reader Mode** – Distraction-free article reading
-- **Screenshot Tool** – Capture full page or visible area
-- **Multi-process Isolation** – Optional sandboxing (research phase)
-- **Autosign Project Builds** – Sign project with proper certificates
-- **Widevine DRM Support** – Protected streaming content (via sidecar process)
-
----
-
-## 🧪 Build From Source
+## 🔧 Build from Source
 
 ### Prerequisites
-1. CMake ≥ 3.10
-2. C++17 compiler (MSVC 2019+, GCC 9+, Clang 9+)
-3. Ultralight SDK (bundled fallback under `data/`; override via `ULTRALIGHT_SDK_ROOT`)
 
-### Steps
+- CMake ≥ 3.10
+- C++17 compiler (MSVC 2019+, GCC 9+, Clang 9+)
+- Ultralight SDK (bundled or set `ULTRALIGHT_SDK_ROOT`)
+
+### Quick Build
+
 ```bash
+# Clone
 git clone https://github.com/ovsky/Ultralight-WebBrowser.git
 cd Ultralight-WebBrowser
 
-# (Optional) Submodules
-git submodule update --init --recursive
-
 # Configure
-cmake -S . -B build \
-  -DULTRALIGHT_SDK_ROOT="/absolute/path/to/ultralight-sdk" \
-  -DWEBBROWSER_VERSION="dev"
+cmake -S . -B build -DWEBBROWSER_VERSION="dev"
 
-# Build (Linux/macOS)
-cmake --build build --parallel
-
-# Build (Windows multi-config)
+# Build
 cmake --build build --config Release
 ```
 
-PowerShell helper scripts (cross-platform):
+### Platform-Specific Notes
+
+<details>
+<summary><b>Windows</b></summary>
+
 ```powershell
-# Windows (PowerShell):
-./compilation_compile.ps1           # configure + build (Release)
-./compilation_complete.ps1          # configure + build (Release) + run built executable
-./compilation_run.ps1               # run the built executable from build folder
-./compilation_fastbuild.ps1         # fast incremental build (then launches the built exe by default)
-
-# Linux / macOS (PowerShell Core / pwsh):
-
-pwsh ./compilation_compile.ps1 -- -DULTRIGHT_SDK_ROOT=/path/to/sdk
-pwsh ./compilation_complete.ps1 -- -DULTRALIGHT_SDK_ROOT=/path/to/sdk
-pwsh ./compilation_run.ps1 -- "--some-app-flag"
-pwsh ./compilation_fastbuild.ps1 -- Release  # runs cmake --build and then launches exe (detached)
-
-# You can also make the scripts executable on Unix and run them directly
-chmod +x ./compilation_compile.ps1 ./compilation_complete.ps1 ./compilation_run.ps1 ./compilation_fastbuild.ps1
-./compilation_compile.ps1 -- -DULTRALIGHT_SDK_ROOT=/path/to/sdk
-
-Note: `compilation_fastbuild.ps1` runs only the incremental build step ("cmake --build build --config <CONFIG>")
-and then attempts to launch the built `Ultralight-WebBrowser` executable automatically (detached by default).
-Pass an explicit configuration (e.g. `Debug`) as the first argument, and any extra `cmake --build` args after `--`.
+# Quick scripts available:
+./compilation_complete.ps1    # Configure + Build + Run
+./compilation_fastbuild.ps1   # Incremental build + Run
 ```
 
-Tests (if enabled):
+</details>
+
+<details>
+<summary><b>macOS (ARM64)</b></summary>
+
 ```bash
-ctest --test-dir build --output-on-failure
+# Download ARM64 SDK, then:
+cmake -S . -B build -DULTRALIGHT_SDK_ROOT=/path/to/arm64/sdk
+cmake --build build --parallel
 ```
 
----
+</details>
 
-## 🧬 ARM64 Build Notes
+<details>
+<summary><b>Linux</b></summary>
 
-### macOS (Apple Silicon)
-- CI auto‑probes arm64 archives if the runner hardware is arm64.
-- Local build: download `ultralight-free-sdk-<version>-mac-arm64.7z` (or `...-macos-arm64.7z` / `...-osx-arm64.7z`) into a directory and set:
-  ```bash
-  cmake -S . -B build -DULTRALIGHT_SDK_ROOT=/path/to/arm64/sdk
-  ```
+```bash
+# Install dependencies (Ubuntu/Debian):
+sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev
 
-### Linux (aarch64)
-- Workflow contains detection logic for `*-linux-arm64.7z`, but public CI runs on x64.
-- Use a self‑hosted aarch64 runner or manually supply `ULTRALIGHT_SDK_URL` via workflow dispatch input.
-- Native build steps identical; ensure system dependencies match (GTK3, NSS, etc.).
-
-### Windows (arm64)
-- Not yet supported in CI; requires arm64 Ultralight SDK + arm64 toolchain.
-- Proposed steps:
-  1. Acquire arm64 SDK archive (if/when published).
-  2. Use Visual Studio with ARM64 configuration or cross toolchain.
-  3. Add a strategy matrix entry in workflow (see CI section).
-
----
-
-## 🔐 DRM WebView Notes
-
-The DRM WebView subsystem provides native WebView integration for playing DRM-protected content (Netflix, Disney+, etc.) that cannot be rendered by the Ultralight engine.
-
-### How It Works
-1. **Detection**: Browser detects DRM-protected content via content type or site rules
-2. **Fallback**: Automatically switches from Ultralight to native WebView
-3. **Integration**: Native WebView overlays the main window with proper z-ordering
-4. **Return**: User can switch back to Ultralight for regular browsing
-
-### Platform Implementations
-
-| Platform | Native WebView | DRM Support | Notes |
-|----------|---------------|-------------|-------|
-| Windows | WebView2 (Edge/Chromium) | Widevine, PlayReady | Requires Edge runtime |
-| macOS | WKWebView | FairPlay, Widevine | Native Cocoa/WebKit |
-| Linux | WebKit2GTK | Limited | WebKit2GTK 4.1 preferred |
-
-### Enabling DRM WebView
-1. Open **Settings** → **DRM Content**
-2. Toggle **Enable DRM WebView**
-3. Navigate to DRM-protected content
-4. Browser will automatically use native WebView when needed
-
-### Build Requirements
-- **Windows**: WebView2 SDK (auto-detected by CMake)
-- **macOS**: Xcode with Cocoa/WebKit frameworks
-- **Linux**: `libwebkit2gtk-4.1-dev` or `libwebkit2gtk-4.0-dev`
-
----
-
-## 🧩 JavaScript Bridge API (`window.__ul`)
-Injected into the main frame once DOM is ready.
-
-### Navigation
-```js
-__ul.back();                              // Navigate back
-__ul.forward();                           // Navigate forward
-__ul.reload();                            // Reload current page
-__ul.stop();                              // Stop loading
-__ul.navigate("https://example.com");     // Navigate to URL
-__ul.newTab("https://example.org");       // Open new tab with URL
-__ul.closeTab();                          // Close current tab
-__ul.closeTab(id);                        // Close specific tab by ID
-__ul.openHistory();                       // Open history overlay
+cmake --build build --parallel
 ```
 
-### Settings Management
-```js
-// Get complete settings snapshot
+</details>
+
+---
+
+## 📚 Documentation
+
+<details>
+<summary><b>🧩 JavaScript Bridge API</b></summary>
+
+The `window.__ul` API is injected into the main frame for native integration:
+
+```javascript
+// Navigation
+__ul.navigate("https://example.com");
+__ul.newTab("https://example.org");
+__ul.back(); __ul.forward(); __ul.reload();
+
+// Settings
 const settings = __ul.getSettingsSnapshot();
-// Returns: { values: { dark_mode: true, ... }, meta: { ... } }
-
-// Update individual setting
 __ul.updateSetting("enable_adblock", true);
-__ul.updateSetting("experimental_compact_tabs", false);
-
-// Save current settings to disk
 __ul.saveSettings();
 
-// Restore factory defaults
-__ul.restoreSettingsDefaults();
-```
+// Theme
+__ul.toggleDarkMode();
+if (__ul.isDarkModeEnabled()) { /* ... */ }
 
-### AdBlock Control
-```js
-// Check AdBlock status
-const isEnabled = __ul.getAdblockEnabled();
-
-// Toggle AdBlock
-__ul.toggleAdblock();
-```
-
-### History
-```js
-// Get browsing history
-const h = __ul.getHistory();
-// Returns: { items: [{ url, title, time }, ...] }
-
-// Clear all history
+// History
+const history = __ul.getHistory();
 __ul.clearHistory();
-```
 
-### Theme
-```js
-// Check dark mode status
-if (!__ul.isDarkModeEnabled()) {
-    __ul.toggleDarkMode();
-}
-```
-
-### App Info
-```js
-// Get application metadata
+// App Info
 const info = __ul.getAppInfo();
-// Returns: { name: "Ultralight WebBrowser", version: "1.4.0" }
+// { name: "Ultralight WebBrowser", version: "1.4.0" }
 ```
 
-### Notes
-- Bridge not injected into subframes (security consideration)
-- History is in-memory; cleared on exit unless persistence enabled
-- Settings are persisted to `setup/settings.json` on save
-- Calls become no-ops if underlying state unavailable
-- All settings changes trigger runtime updates (no restart required)
+</details>
+
+<details>
+<summary><b>🔐 DRM WebView System</b></summary>
+
+For DRM-protected content (Netflix, Disney+, etc.):
+
+| Platform | WebView | DRM Support |
+|----------|---------|-------------|
+| Windows | WebView2 | Widevine, PlayReady |
+| macOS | WKWebView | FairPlay, Widevine |
+| Linux | WebKit2GTK | Limited |
+
+**Enable:** Settings → DRM Content → Enable DRM WebView
+
+The DRM WebView subsystem provides native WebView integration for playing protected content that cannot be rendered by the Ultralight engine.
+
+**How It Works:**
+1. Browser detects DRM-protected content via content type or site rules
+2. Automatically switches from Ultralight to native WebView
+3. Native WebView overlays the main window with proper z-ordering
+4. User can switch back to Ultralight for regular browsing
+
+</details>
+
+<details>
+<summary><b>🛡️ Ad Blocking</b></summary>
+
+Rules loaded from:
+- `assets/blocklist.txt`
+- `assets/filters/*.txt`
+
+Supported formats:
+```
+example.com
+0.0.0.0 example.com
+||example.com^
+/ads.js
+*://*/*analytics*.js
+```
+
+Always allowed: `file://`, `data:` URLs
+
+Toggle via toolbar icon or Settings → Privacy → Enable AdBlock
+
+</details>
+
+<details>
+<summary><b>⚙️ Settings Categories</b></summary>
+
+| Category | Options |
+|----------|---------|
+| **Appearance** | Dark Mode, Vibrant Window, Transparent Toolbar, Compact Tabs |
+| **Privacy & Security** | AdBlock, Tracker Blocking, JavaScript, Cookies, DNT, Clear History |
+| **Address Bar** | Autocompletion, Favicons, Suggestions |
+| **Downloads** | Badge, Auto-open Panel, Location Prompt |
+| **Performance** | Smooth Scrolling, Hardware Acceleration, Local Storage |
+| **Accessibility** | Reduce Motion, High Contrast, Caret Browsing |
+| **Developer** | Remote Inspector, Performance Overlay |
+| **DRM Content** | Enable DRM WebView |
+
+</details>
+
+<details>
+<summary><b>⌨️ Keyboard Shortcuts</b></summary>
+
+Shortcuts are customizable via `assets/shortcuts.json`:
+
+| Action | Default Shortcut |
+|--------|------------------|
+| New Tab | `Ctrl+T` |
+| Close Tab | `Ctrl+W` |
+| Reload | `Ctrl+R` / `F5` |
+| Back | `Alt+Left` |
+| Forward | `Alt+Right` |
+| Address Bar | `Ctrl+L` |
+| Find | `Ctrl+F` |
+| Settings | `Ctrl+,` |
+| Developer Tools | `F12` |
+
+</details>
 
 ---
 
-## 📦 Create Packages Locally (Optional)
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
+## 🗺️ Roadmap
 
-# Linux
-cpack --config build/CPackConfig.cmake -C Release -G TGZ
-cpack --config build/CPackConfig.cmake -C Release -G DEB
-cpack --config build/CPackConfig.cmake -C Release -G RPM
+<table>
+<tr>
+<td width="33%" valign="top">
 
-# macOS
-cpack --config build/CPackConfig.cmake -C Release -G TGZ
-# (DMG enabled via workflow or DragNDrop generator)
-```
+### ✅ Complete
+- GPU-Accelerated Rendering
+- Multi-Tab Interface
+- Ad & Tracker Blocking
+- Download Manager
+- Bookmark System
+- Settings Panel (26+ options)
+- Dark Mode & Themes
+- DRM WebView (all platforms)
+- ARM64 Support
+- Auto-Save Settings
+- Custom User Agent
+- Settings Search
+- Compact Tabs Mode
+
+</td>
+<td width="33%" valign="top">
+
+### 🚧 In Progress
+- Bookmark Import/Export
+- Folder Organization
+- DRM Detection Improvements
+- Performance Optimizations
+- Accessibility Enhancements
+
+</td>
+<td width="33%" valign="top">
+
+### 🔮 Planned
+- Session Restore
+- Extension/Plugin API
+- Persistent History
+- Multi-Profile Support
+- Password Manager
+- Tab Groups
+- Reader Mode
+- Screenshot Tool
+- Custom Themes
+- Sync Service
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🔧 Troubleshooting
+
+<details>
+<summary><b>Common Issues</b></summary>
+
+| Issue | Solution |
+|-------|----------|
+| Blank window | Verify OpenGL 3.3 support; check library files |
+| Settings not loading | Check `setup/settings.json` exists and is valid JSON |
+| AdBlock not working | Ensure SDK supports network interception |
+| DRM not playing | Enable in Settings → DRM Content |
+| DRM WebView crash (macOS) | Ensure Cocoa/WebKit frameworks available |
+| DRM WebView crash (Linux) | Install `libwebkit2gtk-4.1-dev` |
+| macOS Gatekeeper | Right-click → Open (first launch) |
+| Bookmarks not saving | Check write permissions for storage directory |
+
+</details>
+
+<details>
+<summary><b>Debug Tips</b></summary>
+
+1. **Launch from terminal** to see initialization logs
+2. **Enable Performance Overlay** in Settings → Developer
+3. **Delete `setup/settings.json`** to reset to defaults
+4. **Check `assets/blocklist.txt`** for filter syntax errors
+5. **Verify SDK presence** in `data/` or `ULTRALIGHT_SDK_ROOT`
+
+</details>
 
 ---
 
 ## 🔄 CI / Automation
 
 ### Active Workflows
-Six platform-specific workflows with unified orchestration:
-- `build-all.yml` – Meta-workflow triggering all platform builds (main badge workflow)
-- `build-linux.yml` – Linux x64 build with GTK3, WebKit2GTK integration
-- `build-linux-arm64.yml` – Linux ARM64 build (self-hosted/emulated runners)
-- `build-macos.yml` – macOS x64 build with Cocoa/WebKit framework linking
-- `build-macos-arm64.yml` – macOS ARM64 (Apple Silicon) build
-- `build-windows.yml` – Windows x64 build with optional NSIS installer
 
-### Platform-Specific Build Features
-| Platform | DRM WebView | Native Frameworks | Architecture |
-|----------|-------------|-------------------|--------------|
-| Windows x64 | WebView2 | N/A | x64 |
-| Linux x64 | WebKit2GTK | GTK+3, NSS | x64 |
-| Linux ARM64 | WebKit2GTK | GTK+3, NSS | ARM64 |
-| macOS x64 | WKWebView | Cocoa, WebKit, Foundation, AppKit | x64 |
-| macOS ARM64 | WKWebView | Cocoa, WebKit, Foundation, AppKit | ARM64 |
+| Workflow | Platform | Features |
+|----------|----------|----------|
+| `build-all.yml` | All | Meta-workflow (main badge) |
+| `build-windows.yml` | Windows x64 | Optional NSIS installer |
+| `build-macos.yml` | macOS x64 | Cocoa/WebKit linking |
+| `build-macos-arm64.yml` | macOS ARM64 | Apple Silicon |
+| `build-linux.yml` | Linux x64 | GTK3, WebKit2GTK |
+| `build-linux-arm64.yml` | Linux ARM64 | Self-hosted/emulated |
 
-### Environment Variables / Inputs
+### Environment Variables
+
 | Variable | Purpose |
 |----------|---------|
-| `ULTRALIGHT_SDK_URL` | Override auto-detected SDK archive URL |
-| `ULTRALIGHT_VERSION` | Override version embedded / probed |
-| `WEBBROWSER_VERSION` | App version label during build |
-| `PACKAGE_GENERATORS` (Linux/macOS) | CPack generator list (`TGZ;DEB;RPM`, `TGZ;DMG`, etc.) |
-| `CREATE_INSTALLER` (Windows) | Build NSIS installer when true |
-
-### Recent CI/CD Improvements
-- ✅ Full ARM64 support for Linux and macOS
-- ✅ Conditional Objective-C++ compilation (macOS only)
-- ✅ Proper framework linking for DRM WebView components
-- ✅ Cross-platform DRM subsystem build validation
+| `ULTRALIGHT_SDK_URL` | Override auto-detected SDK URL |
+| `ULTRALIGHT_VERSION` | Override SDK version |
+| `WEBBROWSER_VERSION` | App version label |
+| `PACKAGE_GENERATORS` | CPack generators (`TGZ;DEB;RPM`) |
+| `CREATE_INSTALLER` | Build NSIS installer (Windows) |
 
 ---
 
-## 🔧 Troubleshooting
-| Issue | Cause | Resolution |
-|-------|-------|------------|
-| Blank window / no render | Missing GPU context / failed SDK load | Verify OpenGL 3.3 support; check `lib` / `dylib` / `dll` presence |
-| Cannot load external pages | Network interception not available | Use full Ultralight SDK version; confirm `ULTRALIGHT_SDK_ROOT` contents |
-| High CPU on resize | Continuous repaint loop | Known in rapid resize scenarios; consider throttle patch |
-| Rules not applied | SDK lacks interception | Build with proper network layer; confirm rule file paths |
-| Settings not loading | Bridge initialization failed | Check browser console for "Bridge not ready" errors; verify `settings.json` exists in `setup/` directory |
-| Settings won't save | File permission issues | Ensure write permissions for `setup/settings.json`; check disk space |
-| AdBlock not working | Network interception disabled | Verify SDK supports request filtering; check AdBlock toggle in toolbar/settings |
-| Compact tabs gap | Dynamic resize failed | Try toggling compact mode off/on; restart browser if issue persists |
-| macOS gatekeeper warning | Unsigned binaries | Right‑click "Open" once or sign with local cert |
-| Arm64 archive not detected | CI runner architecture mismatch | Provide `sdk_url` manually or run on arm64 runner |
-| Downloads not appearing | Download manager initialization | Check permissions for downloads directory; verify UI overlay loaded |
-| Shortcuts not working | JSON parse error | Validate `assets/shortcuts.json` syntax; check console for errors |
-| DRM content not playing | DRM WebView disabled | Enable "DRM WebView" in Settings → DRM Content |
-| DRM WebView crash (macOS) | Missing frameworks | Ensure Cocoa, WebKit frameworks are available; check system version |
-| DRM WebView crash (Linux) | WebKit2GTK missing | Install `libwebkit2gtk-4.1-dev` or `libwebkit2gtk-4.0-dev` |
-| Bookmarks not saving | File permission issues | Check write permissions for bookmarks storage directory |
+## 🛠️ Tech Stack
 
-### Debug Tips
-1. **Enable Debug Panel** – Settings → Developer → Show Performance Overlay
-2. **Check Console Output** – Launch from terminal to see initialization logs
-3. **Verify Settings File** – `setup/settings.json` should contain valid JSON structure
-4. **Reset Settings** – Delete `setup/settings.json` to restore defaults
-5. **Clear Cache** – Remove temporary files if rendering issues occur
-
----
-
-## 🔒 Security & Privacy
-This project currently:
-- Does NOT implement hardened sandboxing found in mainstream browsers.
-- Stores only ephemeral in‑memory history (no disk persistence by default).
-- Performs lightweight filtering—no advanced tracker heuristics.
-- Should not be used for security‑critical browsing tasks (banking, credentials) without further auditing.
+| Component | Technology |
+|-----------|------------|
+| **Renderer** | [Ultralight SDK](https://ultralig.ht/) |
+| **Language** | C++17, Objective-C++ (macOS) |
+| **Window/Input** | [GLFW](https://www.glfw.org/) |
+| **Graphics** | OpenGL 3.3 |
+| **Build System** | CMake + CPack |
+| **CI/CD** | GitHub Actions (x64 + ARM64) |
+| **DRM (Windows)** | WebView2 (Edge/Chromium) |
+| **DRM (macOS)** | WKWebView (Cocoa/WebKit) |
+| **DRM (Linux)** | WebKit2GTK |
 
 ---
 
 ## 🤝 Contributing
-1. Fork the repository.
-2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Commit: `git commit -m "Add my feature"`
-4. Push: `git push origin feature/my-feature`
-5. Open a Pull Request.
 
-Please:
-- Keep PRs focused & small.
-- Include before/after perf notes if relevant.
-- Add tests when touching core logic (enable `BUILD_TESTING`).
+1. **Fork** the repository
+2. **Create** feature branch: `git checkout -b feature/amazing-feature`
+3. **Commit** changes: `git commit -m "Add amazing feature"`
+4. **Push**: `git push origin feature/amazing-feature`
+5. **Open** a Pull Request
+
+**Guidelines:**
+- Keep PRs focused and small
+- Include performance notes if relevant
+- Add tests for core logic changes
+- Follow existing code style
+
+---
+
+## 🔒 Security & Privacy
+
+This project:
+- Does **NOT** implement hardened sandboxing found in mainstream browsers
+- Stores only **ephemeral in-memory history** (no disk persistence by default)
+- Performs **lightweight filtering**—no advanced tracker heuristics
+- Should **not** be used for security-critical tasks without further auditing
 
 ---
 
 ## 📄 License
-MIT License – see [LICENSE](./LICENSE).
+
+MIT License — see [LICENSE](./LICENSE) for details.
 
 ---
 
 ## 🙏 Acknowledgements
-- [Ultralight](https://ultralig.ht/) team for the renderer.
-- [GLFW](https://www.glfw.org/) for cross‑platform window/input.
-- Open‑source ecosystem contributors.
+
+- [Ultralight](https://ultralig.ht/) — Lightweight HTML renderer
+- [GLFW](https://www.glfw.org/) — Cross-platform windowing
+- Open-source community contributors
 
 ---
 
-## 📌 Disclaimer
-This is an educational project illustrating a minimal browser shell. It does not aim to replicate full Chromium feature parity (e.g., comprehensive security sandbox, extension ecosystem, advanced privacy tooling).
+<p align="center">
+  <sub>
+    ⚠️ <b>Disclaimer:</b> This is an educational project demonstrating minimal browser architecture. 
+    Not recommended for security-critical tasks without additional hardening.
+  </sub>
+</p>
+
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/ovsky">@ovsky</a>
+</p>
