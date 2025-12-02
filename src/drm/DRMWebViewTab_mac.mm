@@ -1,11 +1,6 @@
-#include "drm/DRMWebViewTab.h"
-
-// Guard Obj-C++ implementation so it is only compiled when
-// targeting Apple platforms. Keep the preprocessor guard as
-// the very first thing after includes so that any non-Apple
-// compiler will skip the entire translation unit before it
-// sees Objective-C declarations.
 #if defined(__APPLE__)
+
+#include "drm/DRMWebViewTab.h"
 
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
