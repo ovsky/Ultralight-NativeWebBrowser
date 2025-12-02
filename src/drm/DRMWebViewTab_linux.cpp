@@ -72,31 +72,58 @@ namespace drm
 
         void Blur() override
         {
-            // Remove focus from WebView by focusing parent
+            // Remove focus from WebView by focusing parent window
             if (parent_window_)
+            {
                 gtk_window_present(GTK_WINDOW(parent_window_));
+                // Clear focus from web_view
+                if (web_view_)
+                    gtk_widget_set_can_focus(web_view_, FALSE);
+            }
         }
 
         void Resize(uint32_t width, uint32_t height, uint32_t offset_x, uint32_t offset_y) override
         {
-            if (!container_)
+            // Store config for Show() to use
+            config_.width = width;
+            config_.height = height;
+            config_.offset_x = offset_x;
+            config_.offset_y = offset_y;
+            
+            if (!container_ || !web_view_)
                 return;
-            gtk_fixed_move(GTK_FIXED(container_), web_view_, offset_x, offset_y);
-            gtk_widget_set_size_request(web_view_, width, height);
+            // Only update if visible
+            if (gtk_widget_get_visible(container_))
+            {
+                gtk_fixed_move(GTK_FIXED(container_), web_view_, offset_x, offset_y);
+                gtk_widget_set_size_request(web_view_, width, height);
+            }
         }
 
         void Show() override
         {
-            if (container_)
+            if (container_ && web_view_)
+            {
+                // Restore proper position
+                gtk_fixed_move(GTK_FIXED(container_), web_view_, config_.offset_x, config_.offset_y);
+                gtk_widget_set_size_request(web_view_, config_.width, config_.height);
+                gtk_widget_set_can_focus(web_view_, TRUE);
                 gtk_widget_show(container_);
-            if (web_view_)
                 gtk_widget_show(web_view_);
+            }
         }
 
         void Hide() override
         {
+            // First blur to release focus
+            Blur();
             if (container_)
+            {
                 gtk_widget_hide(container_);
+                // Move off-screen to prevent input capture
+                if (web_view_)
+                    gtk_fixed_move(GTK_FIXED(container_), web_view_, -10000, -10000);
+            }
         }
 
         void Close() override
