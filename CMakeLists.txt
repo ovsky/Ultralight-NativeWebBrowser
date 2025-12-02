@@ -97,6 +97,8 @@ elseif(UNIX)
 		"src/drm/DRMWebViewTab_linux.cpp")
 endif()
 
+add_app(Ultralight-WebBrowser ${SOURCES})
+
 # On Linux, DRM webview support depends on GTK and WebKit2GTK.
 # We require these packages in CI and link them when present.
 if(UNIX AND NOT APPLE)
@@ -115,8 +117,6 @@ if(UNIX AND NOT APPLE)
 	target_include_directories(Ultralight-WebBrowser PRIVATE ${GTK3_INCLUDE_DIRS} ${WEBKIT2_INCLUDE_DIRS})
 	target_link_libraries(Ultralight-WebBrowser PRIVATE ${GTK3_LIBRARIES} ${WEBKIT2_LIBRARIES})
 endif()
-
-add_app(Ultralight-WebBrowser ${SOURCES})
 
  # Unit test for utils
  enable_testing()
