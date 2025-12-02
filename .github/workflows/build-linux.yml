@@ -240,9 +240,10 @@ jobs:
       - name: 5. Install Linux Dependencies
         run: |
           sudo apt-get update
+          # Ubuntu 24.04 uses the -4.1 WebKit2GTK dev package name
           sudo apt-get install -y \
             libgtk-3-dev \
-            libwebkit2gtk-4.0-dev \
+            libwebkit2gtk-4.1-dev \
             libnss3-dev \
             libgdk-pixbuf2.0-dev \
             libxtst-dev \
