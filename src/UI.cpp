@@ -618,10 +618,16 @@ void UI::HideAllDrmTabs()
 
 void UI::UpdateDrmBadge(uint64_t id, bool is_drm)
 {
+  std::cout << "[DEBUG] UpdateDrmBadge called: id=" << id << ", is_drm=" << is_drm << std::endl;
   if (!setTabDrmState)
+  {
+    std::cout << "[DEBUG] ERROR: setTabDrmState function is not bound!" << std::endl;
     return;
+  }
   RefPtr<JSContext> lock(view()->LockJSContext());
+  std::cout << "[DEBUG] Calling JavaScript setTabDrmState(" << id << ", " << (is_drm ? 1.0 : 0.0) << ")" << std::endl;
   setTabDrmState({static_cast<double>(id), is_drm ? 1.0 : 0.0});
+  std::cout << "[DEBUG] JavaScript setTabDrmState completed" << std::endl;
 }
 
 void UI::EnsureDrmManager()
@@ -1690,6 +1696,8 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
       // DRM -> Non-DRM: Close DRM tab, convert to standard Ultralight tab
       uint64_t tab_id = active_tab_id_;
       
+      std::cout << "[DEBUG] DRM -> Non-DRM navigation detected for tab " << tab_id << std::endl;
+      
       // Close and remove DRM WebView2
       drm_it->second->Close();
       drm_tabs_.erase(tab_id);
@@ -1697,6 +1705,7 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
       drm_tab_titles_.erase(tab_id);
       
       // Update UI to remove DRM badge
+      std::cout << "[DEBUG] Calling UpdateDrmBadge(" << tab_id << ", false)" << std::endl;
       UpdateDrmBadge(tab_id, false);
       
       // Navigate the Ultralight tab to the new URL
