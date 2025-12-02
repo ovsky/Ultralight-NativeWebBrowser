@@ -63,6 +63,10 @@ public:
                              const String &error_domain, int error_code) override;
   virtual void OnUpdateHistory(View *caller) override;
 
+  // Early script injection point (before page scripts run)
+  virtual void OnWindowObjectReady(View *caller, uint64_t frame_id,
+                                   bool is_main_frame, const String &url) override;
+
   // Inject page-side hooks when DOM is ready to capture right-click context
   virtual void OnDOMReady(View *caller, uint64_t frame_id,
                           bool is_main_frame, const String &url) override;
