@@ -1,9 +1,13 @@
 cmake_minimum_required(VERSION 3.8)
-project(UltralightWebBrowser LANGUAGES CXX OBJCXX)
+if(APPLE)
+	project(UltralightWebBrowser LANGUAGES CXX OBJCXX)
+	set(CMAKE_OBJCXX_STANDARD 17)
+	set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
+else()
+	project(UltralightWebBrowser LANGUAGES CXX)
+endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_OBJCXX_STANDARD 17)
-set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
 
 option(CREATE_INSTALLER "Create a Windows installer via CPack (NSIS)" OFF)
 
