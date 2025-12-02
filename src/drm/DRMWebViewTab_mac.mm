@@ -1,5 +1,11 @@
 #include "drm/DRMWebViewTab.h"
 
+// Guard Obj-C++ implementation so it is only compiled
+// when building for Apple platforms. Some non-Apple CI
+// toolchains may still parse this file, so keep the
+// preprocessor guard as the very first thing after
+// includes to ensure @interface/@implementation remain
+// in global scope of a skipped translation unit.
 #if defined(__APPLE__)
 
 #import <Cocoa/Cocoa.h>
