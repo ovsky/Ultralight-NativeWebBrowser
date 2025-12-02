@@ -23,6 +23,14 @@ include_directories(
 	"${ULTRALIGHT_SDK_ROOT}/include"
 )
 
+include(FetchContent)
+FetchContent_Declare(
+	nlohmann_json
+	GIT_REPOSITORY https://github.com/nlohmann/json.git
+	GIT_TAG v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 function(add_app NAME)
 	if (WIN32)
 		add_executable(${NAME} WIN32 ${ARGN})
@@ -59,6 +67,8 @@ endfunction()
 
 # Sources
 set(SOURCES
+	"src/BookmarkStore.h"
+	"src/BookmarkStore.cpp"
 	"src/Browser.h"
 	"src/Browser.cpp"
 	"src/AdBlocker.h"
@@ -98,6 +108,7 @@ elseif(UNIX)
 endif()
 
 add_app(Ultralight-WebBrowser ${SOURCES})
+target_link_libraries(Ultralight-WebBrowser PRIVATE nlohmann_json::nlohmann_json)
 
  # Unit test for utils
  enable_testing()
@@ -131,6 +142,12 @@ add_app(Ultralight-WebBrowser ${SOURCES})
 	 	src/drm/DRMSettings.cpp)
 	 target_link_libraries(DRMSettingsTest PRIVATE GTest::gtest_main)
 	 add_test(NAME DRMSettingsTest COMMAND DRMSettingsTest)
+
+	 add_executable(BookmarkStoreTest
+	 	tests/BookmarkStoreTest.cpp
+	 	src/BookmarkStore.cpp)
+	 target_link_libraries(BookmarkStoreTest PRIVATE GTest::gtest_main nlohmann_json::nlohmann_json)
+	 add_test(NAME BookmarkStoreTest COMMAND BookmarkStoreTest)
  else()
 	 message(STATUS "Skipping UtilsTest on Windows when not using MSVC (to avoid linking MSVC .lib with MinGW)")
  endif()

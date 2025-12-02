@@ -66,9 +66,14 @@
                 <span class="menu-label">Ad blocking</span>
                 <span class="menu-value" id="adblock-value">OFF</span>
             </div>
+            <div class="menu-item menu-toggle" data-action="toggle-bookmark-bar">
+                <span class="menu-label">Bookmarks bar</span>
+                <span class="menu-value" id="bookmarks-bar-value">OFF</span>
+            </div>
             <div class="menu-separator"></div>
             <div class="menu-item" data-action="history">History [Ctrl+H]</div>
             <div class="menu-item" data-action="downloads">Downloads [Ctrl+J]</div>
+            <div class="menu-item" data-action="bookmarks">Bookmark manager [Ctrl+Shift+O]</div>
             <div class="menu-item" data-action="settings">Settings [Ctrl+,]</div>
         </div>
     </div>
@@ -98,6 +103,24 @@
                         adblockValue.textContent = adblockEnabled ? 'ON' : 'OFF';
                     }
                 }
+                updateBookmarksBarToggle();
+            }
+
+            function updateBookmarksBarToggle() {
+                if (!window.GetSettingsSnapshot)
+                    return;
+                try {
+                    const raw = GetSettingsSnapshot();
+                    const snapshot = (typeof raw === 'string') ? JSON.parse(raw || '{}') : (raw || {});
+                    const values = snapshot && typeof snapshot === 'object'
+                        ? (snapshot.values && typeof snapshot.values === 'object' ? snapshot.values : snapshot)
+                        : {};
+                    const toggle = document.getElementById('bookmarks-bar-value');
+                    if (toggle) {
+                        const state = !!values.show_bookmarks_bar;
+                        toggle.textContent = state ? 'ON' : 'OFF';
+                    }
+                } catch (e) { }
             }
 
             // Refresh on load
@@ -140,11 +163,20 @@
                             setTimeout(refreshToggles, 50);
                         }
                         return; // Don't close menu on toggle
+                    case 'toggle-bookmark-bar':
+                        if (window.OnToggleBookmarkBarCommand) {
+                            OnToggleBookmarkBarCommand();
+                            setTimeout(updateBookmarksBarToggle, 80);
+                        }
+                        return;
                     case 'history':
                         if (window.OnOpenHistoryNewTab) OnOpenHistoryNewTab();
                         break;
                     case 'downloads':
                         if (window.OnOpenDownloadsNewTab) OnOpenDownloadsNewTab();
+                        break;
+                    case 'bookmarks':
+                        if (window.OnShowBookmarkManager) OnShowBookmarkManager();
                         break;
                     case 'settings':
                         if (window.OnOpenSettingsPanel) OnOpenSettingsPanel();

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Bookmarks</title>
+    <link rel="stylesheet" href="bookmarks.css">
+</head>
+
+<body>
+    <main class="bookmark-manager">
+        <header class="manager-header">
+            <div>
+                <h1>Bookmark Manager</h1>
+                <p>Organize bookmarks, folders, and the bookmarks bar.</p>
+            </div>
+            <div class="header-actions">
+                <button id="bookmark-refresh" type="button">Refresh</button>
+            </div>
+        </header>
+
+        <section class="manager-controls">
+            <form id="bookmark-create-form" class="inline-form">
+                <input type="text" id="create-title" placeholder="Bookmark title" required>
+                <input type="url" id="create-url" placeholder="https://example.com" required>
+                <select id="create-folder"></select>
+                <button id="bookmark-submit" type="submit">Add bookmark</button>
+                <button id="bookmark-cancel-edit" type="button" style="display:none">Cancel</button>
+            </form>
+            <form id="folder-create-form" class="inline-form">
+                <input type="text" id="folder-name" placeholder="Folder name" required>
+                <select id="folder-parent"></select>
+                <button id="folder-submit" type="submit">Add folder</button>
+                <button id="folder-cancel-edit" type="button" style="display:none">Cancel</button>
+            </form>
+            <input type="search" id="bookmark-search" placeholder="Search bookmarks">
+        </section>
+
+        <section class="manager-grid">
+            <div class="tree-panel">
+                <h2>Bookmarks bar</h2>
+                <ul id="tree-bar" class="tree"></ul>
+            </div>
+            <div class="tree-panel">
+                <h2>Other bookmarks</h2>
+                <ul id="tree-other" class="tree"></ul>
+            </div>
+        </section>
+
+        <section class="table-panel">
+            <header>
+                <h2>All bookmarks</h2>
+                <span id="results-count">0 results</span>
+            </header>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>URL</th>
+                            <th>Folder</th>
+                            <th>Added</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bookmark-table-body"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script src="bookmarks.js"></script>
+</body>
+
+</html>

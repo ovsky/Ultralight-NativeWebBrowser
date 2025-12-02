@@ -1,6 +1,7 @@
 #pragma once
 #include <AppCore/AppCore.h>
 #include "Tab.h"
+#include "BookmarkStore.h"
 #include "drm/DRMSettings.h"
 #include <map>
 #include <memory>
@@ -64,6 +65,7 @@ public:
     bool show_download_badge = true;
     bool auto_open_download_panel = true;
     bool ask_download_location = false;
+    bool show_bookmarks_bar = true;
 
     // Performance
     bool smooth_scrolling = true;
@@ -152,6 +154,18 @@ public:
   void OnSaveSettings(const JSObject &obj, const JSArgs &args);
   ultralight::JSValue OnGetDrmStatus(const JSObject &obj, const JSArgs &args);
   ultralight::JSValue OnInstallDrmDependencies(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnGetBookmarksSnapshot(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnGetBookmarkFolders(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnGetActiveBookmarkInfo(const JSObject &obj, const JSArgs &args);
+  void OnBookmarkCreate(const JSObject &obj, const JSArgs &args);
+  void OnBookmarkUpdate(const JSObject &obj, const JSArgs &args);
+  void OnBookmarkCreateFolder(const JSObject &obj, const JSArgs &args);
+  void OnBookmarkUpdateFolder(const JSObject &obj, const JSArgs &args);
+  void OnBookmarkMove(const JSObject &obj, const JSArgs &args);
+  void OnBookmarkDelete(const JSObject &obj, const JSArgs &args);
+  void OnToggleBookmarkBarCommand(const JSObject &obj, const JSArgs &args);
+  void OnShowBookmarkManager(const JSObject &obj, const JSArgs &args);
+  void OnToggleBookmarkForActiveTab(const JSObject &obj, const JSArgs &args);
   // Reload the main chrome UI overlay (ui.html) so layout-dependent
   // settings such as compact tabs take effect immediately.
   void OnReloadChromeUI(const JSObject &obj, const JSArgs &args);
@@ -212,6 +226,10 @@ protected:
   void SyncAdblockStateToUI();
   void SyncSettingsStateToUI(bool snapshot_is_baseline = false);
   void ApplySettings(bool initial, bool snapshot_is_baseline);
+  void SyncBookmarkBarToUI();
+  void UpdateBookmarkStarForActiveTab();
+  void UpdateBookmarkStarForURL(const std::string &url);
+  void EnsureBookmarkStore();
   void SetDarkModeEnabled(bool enabled);
   void LoadSettingsFromDisk();
   bool SaveSettingsToDisk();
@@ -305,6 +323,7 @@ protected:
   bool suggestions_enabled_ = true;
   bool show_download_badge_ = true;
   bool auto_open_download_panel_ = true;
+  bool show_bookmark_bar_ = true;
   bool clear_history_on_exit_ = false;
   bool experimental_transparent_toolbar_enabled_ = false;
   bool experimental_compact_tabs_enabled_ = false;
@@ -325,6 +344,8 @@ protected:
   JSFunction setTabDrmState;
   JSFunction applySettings;
   JSFunction applySettingsPanel;
+  JSFunction applyBookmarksBar;
+  JSFunction setBookmarkStarState;
   // Context menu setup function in overlay view
   JSFunction setupContextMenu;
   JSFunction setupSuggestions;
@@ -382,6 +403,9 @@ protected:
   std::optional<bool> drm_last_install_result_;
   std::deque<std::string> drm_log_lines_;
 
+  std::unique_ptr<BookmarkStore> bookmark_store_;
+  std::string last_active_url_;
+
   void EnsureDrmManager();
   bool MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_initiated);
   void HandleDrmTitleChanged(uint64_t tab_id, const std::string &title);
@@ -393,6 +417,10 @@ protected:
   drm::DRMWebViewTab *GetDrmTab(uint64_t id);
   void HideDrmTab(uint64_t id);
   void UpdateDrmBadge(uint64_t id, bool is_drm);
+  std::string ActiveTabURLString() const;
+  std::string ActiveTabTitleString() const;
+  void OnBookmarkStoreChanged();
+  void ToggleBookmarkBar(bool visible);
 
   friend class Tab;
   friend class SettingsManager;

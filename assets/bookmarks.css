@@ -1,0 +1,271 @@
+* {
+    box-sizing: border-box;
+}
+
+:root {
+    color-scheme: dark;
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background: #0f111c;
+    color: #f5f4ff;
+    min-height: 100vh;
+}
+
+.bookmark-manager {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 24px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.manager-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.manager-header h1 {
+    margin: 0 0 6px 0;
+    font-size: 28px;
+}
+
+.manager-header p {
+    margin: 0;
+    color: #a3a2bd;
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.manager-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: flex-start;
+}
+
+.inline-form {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 12px;
+    background: #181a28;
+    border-radius: 14px;
+    border: 1px solid #26273c;
+}
+
+.inline-form input,
+.inline-form select,
+.inline-form button,
+#bookmark-search {
+    border-radius: 8px;
+    border: 1px solid #2f3044;
+    background: #0f1120;
+    color: #f5f4ff;
+    padding: 8px 10px;
+    font-size: 14px;
+}
+
+.inline-form button,
+.header-actions button {
+    border: none;
+    background: #665cff;
+    cursor: pointer;
+    padding: 8px 16px;
+    font-weight: 600;
+}
+
+.inline-form button:hover,
+.header-actions button:hover {
+    background: #7a71ff;
+}
+
+#bookmark-search {
+    flex: 1;
+    min-width: 220px;
+}
+
+.manager-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.tree-panel {
+    background: #181a28;
+    border-radius: 16px;
+    border: 1px solid #23253a;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.tree-panel h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.tree {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.tree li {
+    padding: 4px 0;
+}
+
+.node-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: center;
+    padding: 6px 8px;
+    border-radius: 8px;
+}
+
+.node-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.node-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.node-title {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.node-meta {
+    font-size: 12px;
+    color: #8b8aa4;
+    white-space: nowrap;
+}
+
+.node-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.node-actions button,
+.table-actions button {
+    border: none;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    background: #24263a;
+    color: #f9f8ff;
+}
+
+.node-actions button:hover,
+.table-actions button:hover {
+    background: #2f3149;
+}
+
+.table-panel {
+    background: #181a28;
+    border-radius: 16px;
+    border: 1px solid #23253a;
+    padding: 16px;
+}
+
+.table-panel header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+#results-count {
+    color: #9b9ab6;
+    font-size: 13px;
+}
+
+.table-wrapper {
+    max-height: 420px;
+    overflow: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+thead th {
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    color: #8d8cad;
+    border-bottom: 1px solid #23253a;
+    padding: 8px;
+}
+
+tbody td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #212238;
+    vertical-align: middle;
+}
+
+tbody tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.table-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.badge {
+    padding: 2px 6px;
+    border-radius: 999px;
+    font-size: 12px;
+    background: #2d3050;
+    color: #b3b1d1;
+}
+
+.empty-state {
+    padding: 40px 10px;
+    text-align: center;
+    color: #8b8aa4;
+}
+
+@media (max-width: 640px) {
+    .inline-form,
+    .manager-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .header-actions {
+        width: 100%;
+    }
+
+    .inline-form input,
+    .inline-form select,
+    #bookmark-search {
+        flex: 1 1 100%;
+    }
+}

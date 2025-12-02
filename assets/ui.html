@@ -60,9 +60,19 @@
                 <use xlink:href="#svg_stop" />
             </svg>
         </span>
-        <input onfocus="select_next_mouseup = true;"
-            onmouseup="if (select_next_mouseup) this.select(); select_next_mouseup = false;" type="text"
-            id="address"></input>
+        <div class="address-field">
+            <input onfocus="select_next_mouseup = true;"
+                onmouseup="if (select_next_mouseup) this.select(); select_next_mouseup = false;" type="text"
+                id="address" />
+            <button id="bookmark-star" class="icon" role="button" type="button" tabindex="0"
+                aria-label="Bookmark this page" data-tooltip="Bookmark this page">
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                    <path
+                        d="M12 17.3l-5.09 3.2l1.36-5.82L3 10.5l5.91-.51L12 4l3.09 6l5.91.51l-5.27 4.18l1.36 5.82z"
+                        fill="currentColor" />
+                </svg>
+            </button>
+        </div>
         <span id="toggle-tools" class="icon" role="button" tabindex="0" aria-label="Toggle inspector"
             data-tooltip="Inspector">
             <svg viewBox="0 0 24 24" width="18" height="18">
@@ -94,6 +104,22 @@
         </span>
     </div>
 
+    <div id="bookmarks-bar" class="bookmarks-bar" aria-hidden="true">
+        <div class="bookmark-bar-inner">
+            <div id="bookmark-bar-items" class="bookmark-items" role="toolbar" aria-label="Bookmarks bar"></div>
+            <button id="bookmark-bar-menu" class="bookmark-bar-menu" aria-haspopup="true"
+                aria-label="Bookmarks menu" title="Bookmarks menu">
+                <span class="bookmark-bar-menu-icon"></span>
+            </button>
+        </div>
+    </div>
+
+    <div id="bookmark-bar-collapsed" class="bookmark-bar-collapsed" aria-hidden="true">
+        <div class="bookmark-bar-collapsed-text">Bookmarks bar is hidden</div>
+        <button id="bookmark-bar-collapsed-button" type="button" class="bookmark-bar-collapsed-button"
+            aria-label="Add bookmarks bar">Add bookmarks bar</button>
+    </div>
+
     
     <div id="menu-dropdown" class="menu-dropdown hidden" role="menu" aria-hidden="true">
         <div class="menu-item" data-action="new-tab">New tab [Ctrl+T]</div>
@@ -101,6 +127,41 @@
         <div class="menu-separator"></div>
         <div class="menu-item" data-action="history">History</div>
         <div class="menu-item" data-action="downloads">Downloads</div>
+    </div>
+
+    <div id="bookmark-context-menu" class="bookmark-context hidden" role="menu" aria-hidden="true"></div>
+    <div id="bookmark-folder-flyout" class="bookmark-folder-flyout hidden" role="menu" aria-hidden="true"></div>
+
+    <div id="bookmark-dialog-backdrop" class="bookmark-dialog-backdrop hidden" role="presentation">
+        <div class="bookmark-dialog" role="dialog" aria-modal="true" aria-labelledby="bookmark-dialog-title-label">
+            <form id="bookmark-dialog-form">
+                <header class="bookmark-dialog-header">
+                    <div>
+                        <div class="bookmark-dialog-eyebrow" id="bookmark-dialog-mode">Add bookmark</div>
+                        <h2 id="bookmark-dialog-title-label">Bookmark details</h2>
+                    </div>
+                    <button type="button" id="bookmark-dialog-close" aria-label="Close bookmark dialog">&times;</button>
+                </header>
+                <div class="bookmark-dialog-body">
+                    <label class="bookmark-field">
+                        <span>Title</span>
+                        <input type="text" id="bookmark-dialog-title" autocomplete="off" required />
+                    </label>
+                    <label class="bookmark-field" id="bookmark-url-field">
+                        <span>URL</span>
+                        <input type="text" id="bookmark-dialog-url" autocomplete="off" />
+                    </label>
+                    <label class="bookmark-field">
+                        <span>Folder</span>
+                        <select id="bookmark-dialog-folder"></select>
+                    </label>
+                </div>
+                <footer class="bookmark-dialog-footer">
+                    <button type="button" id="bookmark-dialog-cancel" class="ghost">Cancel</button>
+                    <button type="submit" id="bookmark-dialog-save">Save</button>
+                </footer>
+            </form>
+        </div>
     </div>
 
     <script src="draggabilly.pkgd.min.js"></script>

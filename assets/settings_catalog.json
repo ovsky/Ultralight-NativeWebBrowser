@@ -56,6 +56,14 @@
     "default": true
   },
   {
+    "key": "show_bookmarks_bar",
+    "name": "Show bookmarks bar",
+    "description": "Keep the bookmarks toolbar visible under the address bar on every tab.",
+    "category": "bookmarks",
+    "note": null,
+    "default": true
+  },
+  {
     "key": "clear_history_on_exit",
     "name": "Clear history on exit",
     "description": "Remove browsing history when Ultralight closes and skip saving new visits.",

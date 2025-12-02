@@ -17,6 +17,7 @@
 #include <array>
 #include <vector>
 #include <cstdlib>
+#include <limits>
 #include "DownloadManager.h"
 #include "Settings.h"
 #include "Utils.h"
@@ -55,7 +56,7 @@ namespace
     bool default_value;
   };
 
-  constexpr std::array<SettingDescriptor, 28> kFallbackSettingsCatalog = {
+  constexpr std::array<SettingDescriptor, 29> kFallbackSettingsCatalog = {
       // Appearance
       SettingDescriptor{"launch_dark_theme", "Launch in dark theme",
                         "Start Ultralight with dark chrome, toolbars, and tabs by default.",
@@ -111,6 +112,11 @@ namespace
       SettingDescriptor{"ask_download_location", "Ask where to save downloads",
                         "Show a file picker dialog for each download instead of using default location.",
                         "downloads", nullptr, false, &UI::BrowserSettings::ask_download_location, false},
+
+      // Bookmarks
+      SettingDescriptor{"show_bookmarks_bar", "Show bookmarks bar",
+            "Keep the bookmarks toolbar visible under the address bar on every tab.",
+            "bookmarks", nullptr, false, &UI::BrowserSettings::show_bookmarks_bar, true},
 
       // Performance
       SettingDescriptor{"smooth_scrolling", "Smooth scrolling",
@@ -463,6 +469,7 @@ UI::UI(RefPtr<Window> window)
   EnsureDataDirectoryExists();
   settings_storage_path_ = SettingsFilePath().string();
   LoadSettingsFromDisk();
+  EnsureBookmarkStore();
 
   // No adblock-specific hooks here; UA overrides are applied in Tab
   // when new views are created.
@@ -508,6 +515,7 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
   EnsureDataDirectoryExists();
   settings_storage_path_ = SettingsFilePath().string();
   LoadSettingsFromDisk();
+  EnsureBookmarkStore();
   // UA overrides are applied in Tab when views are created.
 
   view()->set_load_listener(this);
@@ -702,6 +710,7 @@ void UI::HandleDrmUrlChanged(uint64_t tab_id, const std::string &url)
   if (tab_id == active_tab_id_)
   {
     SetURL(url_string);
+    UpdateBookmarkStarForURL(url);
   }
 }
 
@@ -805,13 +814,18 @@ bool UI::OnKeyEvent(const ultralight::KeyEvent &evt)
 
   if (evt.type == KeyEvent::kType_RawKeyDown && (evt.modifiers & KeyEvent::kMod_CtrlKey))
   {
-    // Build key identifier like "Ctrl+T" for A-Z
     int vk = evt.virtual_key_code;
     char ch = static_cast<char>(vk);
     if (std::isalpha(static_cast<unsigned char>(ch)))
     {
       ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
-      std::string key = std::string("Ctrl+") + ch;
+      std::string key = "Ctrl";
+      if (evt.modifiers & KeyEvent::kMod_ShiftKey)
+        key += "+Shift";
+      if (evt.modifiers & KeyEvent::kMod_AltKey)
+        key += "+Alt";
+      key += '+';
+      key.push_back(ch);
       auto it = shortcuts_.find(key);
       if (it != shortcuts_.end())
       {
@@ -856,7 +870,12 @@ void UI::LoadShortcuts()
   shortcuts_["Ctrl+T"] = "new-tab";
   shortcuts_["Ctrl+W"] = "close-tab";
   shortcuts_["Ctrl+H"] = "open-history";
+  shortcuts_["Ctrl+J"] = "open-downloads";
   shortcuts_["Ctrl+L"] = "focus-address";
+  shortcuts_["Ctrl+,"] = "open-settings";
+  shortcuts_["Ctrl+D"] = "bookmark-page";
+  shortcuts_["Ctrl+Shift+B"] = "toggle-bookmark-bar";
+  shortcuts_["Ctrl+Shift+O"] = "open-bookmark-manager";
 
   // Try load from assets/shortcuts.json
   std::ifstream in("assets/shortcuts.json", std::ios::in | std::ios::binary);
@@ -954,6 +973,21 @@ bool UI::RunShortcutAction(const std::string &action)
       return true;
     }
     return false;
+  }
+  if (action == "bookmark-page")
+  {
+    OnToggleBookmarkForActiveTab({}, {});
+    return true;
+  }
+  if (action == "toggle-bookmark-bar")
+  {
+    HandleSettingMutation("show_bookmarks_bar", !settings_.show_bookmarks_bar);
+    return true;
+  }
+  if (action == "open-bookmark-manager")
+  {
+    OnShowBookmarkManager({}, {});
+    return true;
   }
   return false;
 }
@@ -1151,8 +1185,10 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   bool is_sugg_view = url_utf8.data() && std::strstr(url_utf8.data(), "suggestions.html") != nullptr;
   bool is_downloads_overlay_view = url_utf8.data() && std::strstr(url_utf8.data(), "downloads-panel.html") != nullptr;
   bool is_settings_page_view = url_utf8.data() && std::strstr(url_utf8.data(), "settings.html") != nullptr;
+  bool is_chrome_ui_view = overlay_ && overlay_->view().get() == caller;
+  bool is_chrome_ui_main_frame = is_chrome_ui_view && is_main_frame;
 
-  if (!is_menu_view && !is_ctx_view && !is_sugg_view && !is_downloads_overlay_view && !is_settings_page_view)
+  if (is_chrome_ui_main_frame)
   {
     // Only main UI view has these functions
     updateBack = global["updateBack"];
@@ -1167,6 +1203,8 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     updateAdblockEnabled = global["updateAdblockEnabled"];
     setTabDrmState = global["setTabDrmState"];
     applySettings = global["applySettings"];
+    applyBookmarksBar = global["applyBookmarksBar"];
+    setBookmarkStarState = global["setBookmarkStarState"];
   }
 
   global["OnBack"] = BindJSCallback(&UI::OnBack);
@@ -1238,6 +1276,20 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnSuggestOpen"] = BindJSCallback(&UI::OnSuggestOpen);
   global["OnSuggestClose"] = BindJSCallback(&UI::OnSuggestClose);
 
+  // Bookmark management bridge for chrome UI
+  global["GetBookmarksSnapshot"] = BindJSCallbackWithRetval(&UI::OnGetBookmarksSnapshot);
+  global["GetBookmarkFolders"] = BindJSCallbackWithRetval(&UI::OnGetBookmarkFolders);
+  global["GetActiveBookmarkInfo"] = BindJSCallbackWithRetval(&UI::OnGetActiveBookmarkInfo);
+  global["OnBookmarkCreate"] = BindJSCallback(&UI::OnBookmarkCreate);
+  global["OnBookmarkUpdate"] = BindJSCallback(&UI::OnBookmarkUpdate);
+  global["OnBookmarkCreateFolder"] = BindJSCallback(&UI::OnBookmarkCreateFolder);
+  global["OnBookmarkUpdateFolder"] = BindJSCallback(&UI::OnBookmarkUpdateFolder);
+  global["OnBookmarkMove"] = BindJSCallback(&UI::OnBookmarkMove);
+  global["OnBookmarkDelete"] = BindJSCallback(&UI::OnBookmarkDelete);
+  global["OnToggleBookmarkBarCommand"] = BindJSCallback(&UI::OnToggleBookmarkBarCommand);
+  global["OnShowBookmarkManager"] = BindJSCallback(&UI::OnShowBookmarkManager);
+  global["OnToggleBookmarkForActiveTab"] = BindJSCallback(&UI::OnToggleBookmarkForActiveTab);
+
   if (is_downloads_overlay_view)
   {
     global["NativeGetDownloads"] = BindJSCallbackWithRetval(&UI::OnDownloadsOverlayGet);
@@ -1266,7 +1318,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     }
   }
 
-  if (!is_menu_view && !is_ctx_view && !is_sugg_view && !is_downloads_overlay_view && !is_settings_page_view)
+  if (is_chrome_ui_main_frame)
   {
     SyncAdblockStateToUI();
     SyncSettingsStateToUI(true);
@@ -1307,6 +1359,9 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
         SetURL(tab_view->url());
       }
     }
+
+    SyncBookmarkBarToUI();
+    UpdateBookmarkStarForActiveTab();
   }
 }
 
@@ -1368,6 +1423,14 @@ void UI::OnToggleTools(const JSObject &obj, const JSArgs &args)
 
 void UI::OnRequestNewTab(const JSObject &obj, const JSArgs &args)
 {
+  if (!args.empty() && args[0].IsString())
+  {
+    ultralight::String target = args[0].ToString();
+    RefPtr<View> child = CreateNewTabForChildView(target);
+    if (child)
+      child->LoadURL(target);
+    return;
+  }
   CreateNewTab();
 }
 
@@ -1464,6 +1527,7 @@ void UI::OnActiveTabChange(const JSObject &obj, const JSArgs &args)
       SetCanGoBack(tab_view->CanGoBack());
       SetCanGoForward(tab_view->CanGoBack());
       SetURL(tab_view->url());
+      UpdateBookmarkStarForActiveTab();
     }
   }
 }
@@ -1606,7 +1670,10 @@ void UI::UpdateTabURL(uint64_t id, const ultralight::String &url)
   }
 
   if (id == active_tab_id_ && !tabs_.empty())
+  {
     SetURL(url);
+    UpdateBookmarkStarForURL(url_utf8);
+  }
 }
 
 void UI::UpdateTabNavigation(uint64_t id, bool is_loading, bool can_go_back, bool can_go_forward)
@@ -1975,6 +2042,317 @@ void UI::OnDownloadsOverlayRemoveItem(const JSObject &, const JSArgs &args)
     return;
   uint64_t id = static_cast<uint64_t>((double)args[0]);
   RemoveDownloadItem(id);
+}
+
+// --- Bookmark system ---
+
+void UI::EnsureBookmarkStore()
+{
+  if (bookmark_store_)
+    return;
+  bookmark_store_ = std::make_unique<BookmarkStore>();
+  bookmark_store_->SetOnChanged([this]()
+                                { OnBookmarkStoreChanged(); });
+  auto path = SettingsDirectory() / "bookmarks.json";
+  if (!bookmark_store_->LoadOrCreate(path))
+  {
+    std::cerr << "Failed to load bookmarks from " << path << std::endl;
+  }
+}
+
+void UI::OnBookmarkStoreChanged()
+{
+  SyncBookmarkBarToUI();
+  UpdateBookmarkStarForActiveTab();
+}
+
+void UI::SyncBookmarkBarToUI()
+{
+  if (!bookmark_store_)
+    return;
+  if (!applyBookmarksBar)
+    return;
+
+  std::string tree = bookmark_store_->SerializeTree(bookmark_store_->bookmarks_bar_id());
+  if (tree.empty())
+    tree = "{}";
+  std::string payload = std::string("{\"visible\":") + (show_bookmark_bar_ ? "true" : "false") + ",\"tree\":" + tree + "}";
+  RefPtr<JSContext> lock(view()->LockJSContext());
+  applyBookmarksBar({String(payload.c_str())});
+}
+
+void UI::ToggleBookmarkBar(bool visible)
+{
+  show_bookmark_bar_ = visible;
+  SyncBookmarkBarToUI();
+}
+
+void UI::UpdateBookmarkStarForActiveTab()
+{
+  UpdateBookmarkStarForURL(ActiveTabURLString());
+}
+
+void UI::UpdateBookmarkStarForURL(const std::string &url)
+{
+  last_active_url_ = url;
+  EnsureBookmarkStore();
+  bool is_bookmarked = false;
+  if (bookmark_store_ && !url.empty())
+  {
+    is_bookmarked = bookmark_store_->IsUrlBookmarked(url);
+  }
+  if (setBookmarkStarState)
+  {
+    RefPtr<JSContext> lock(view()->LockJSContext());
+    setBookmarkStarState({is_bookmarked ? 1.0 : 0.0});
+  }
+}
+
+std::string UI::ActiveTabURLString() const
+{
+  if (ActiveTabIsDRM())
+  {
+    auto it = drm_tab_urls_.find(active_tab_id_);
+    if (it != drm_tab_urls_.end())
+      return it->second;
+  }
+  auto it = tabs_.find(active_tab_id_);
+  if (it != tabs_.end() && it->second && it->second->view())
+  {
+    auto utf8 = it->second->view()->url().utf8();
+    if (utf8.data())
+      return utf8.data();
+  }
+  return last_active_url_;
+}
+
+std::string UI::ActiveTabTitleString() const
+{
+  if (ActiveTabIsDRM())
+  {
+    auto it = drm_tab_titles_.find(active_tab_id_);
+    if (it != drm_tab_titles_.end())
+      return it->second;
+  }
+  auto it = tabs_.find(active_tab_id_);
+  if (it != tabs_.end() && it->second && it->second->view())
+  {
+    auto utf8 = it->second->view()->title().utf8();
+    if (utf8.data())
+      return utf8.data();
+  }
+  return std::string();
+}
+
+ultralight::JSValue UI::OnGetBookmarksSnapshot(const JSObject &, const JSArgs &)
+{
+  EnsureBookmarkStore();
+  if (!bookmark_store_)
+    return ultralight::JSValue(String("{}"));
+  std::string bar = bookmark_store_->SerializeTree(bookmark_store_->bookmarks_bar_id());
+  std::string other = bookmark_store_->SerializeTree(bookmark_store_->other_bookmarks_id());
+  if (bar.empty())
+    bar = "{}";
+  if (other.empty())
+    other = "{}";
+  std::string payload = std::string("{\"bar\":") + bar + ",\"other\":" + other + "}";
+  return ultralight::JSValue(String(payload.c_str()));
+}
+
+ultralight::JSValue UI::OnGetBookmarkFolders(const JSObject &, const JSArgs &)
+{
+  EnsureBookmarkStore();
+  if (!bookmark_store_)
+    return ultralight::JSValue(String("[]"));
+  std::string json = bookmark_store_->SerializeFoldersList();
+  return ultralight::JSValue(String(json.c_str()));
+}
+
+ultralight::JSValue UI::OnGetActiveBookmarkInfo(const JSObject &, const JSArgs &)
+{
+  EnsureBookmarkStore();
+  std::string url = ActiveTabURLString();
+  std::string title = ActiveTabTitleString();
+  bool is_bookmarked = false;
+  uint64_t bookmark_id = 0;
+  uint64_t parent_id = bookmark_store_ ? bookmark_store_->bookmarks_bar_id() : 0;
+  if (bookmark_store_ && !url.empty())
+  {
+    is_bookmarked = bookmark_store_->IsUrlBookmarked(url, &bookmark_id);
+    if (is_bookmarked)
+    {
+      const auto *node = bookmark_store_->GetNode(bookmark_id);
+      if (node)
+      {
+        parent_id = node->parent_id;
+        if (!node->title.empty())
+          title = node->title;
+      }
+    }
+  }
+
+  std::ostringstream ss;
+  ss << "{\"url\":\"" << util::EscapeJsonString(url) << "\",";
+  ss << "\"title\":\"" << util::EscapeJsonString(title) << "\",";
+  ss << "\"isBookmarked\":" << (is_bookmarked ? "true" : "false") << ',';
+  ss << "\"bookmarkId\":" << (is_bookmarked ? bookmark_id : 0) << ',';
+  ss << "\"parentId\":" << parent_id;
+  ss << "}";
+  return ultralight::JSValue(String(ss.str().c_str()));
+}
+
+void UI::OnBookmarkCreate(const JSObject &, const JSArgs &args)
+{
+  EnsureBookmarkStore();
+  if (!bookmark_store_ || args.size() < 3)
+    return;
+  if (!args[0].IsString() || !args[1].IsString())
+    return;
+  ultralight::String title_ul = args[0].ToString();
+  ultralight::String url_ul = args[1].ToString();
+  auto title_utf8 = title_ul.utf8();
+  auto url_utf8 = url_ul.utf8();
+  uint64_t parent_id = static_cast<uint64_t>(args[2].ToNumber());
+  size_t index = std::numeric_limits<size_t>::max();
+  if (args.size() >= 4 && args[3].IsNumber())
+  {
+    double raw = args[3].ToNumber();
+    if (raw < 0)
+      raw = 0;
+    index = static_cast<size_t>(raw);
+  }
+  bookmark_store_->AddBookmark(title_utf8.data() ? title_utf8.data() : "",
+                               url_utf8.data() ? url_utf8.data() : "",
+                               parent_id, index);
+}
+
+void UI::OnBookmarkUpdate(const JSObject &, const JSArgs &args)
+{
+  EnsureBookmarkStore();
+  if (!bookmark_store_ || args.size() < 3)
+    return;
+  uint64_t id = static_cast<uint64_t>(args[0].ToNumber());
+  ultralight::String title_ul = args[1].ToString();
+  ultralight::String url_ul = args[2].ToString();
+  auto title_utf8 = title_ul.utf8();
+  auto url_utf8 = url_ul.utf8();
+  bookmark_store_->UpdateBookmark(id,
+                                  title_utf8.data() ? title_utf8.data() : "",
+                                  url_utf8.data() ? url_utf8.data() : "");
+}
+
+void UI::OnBookmarkCreateFolder(const JSObject &, const JSArgs &args)
+{
+  EnsureBookmarkStore();
+  if (!bookmark_store_)
+    return;
+
+  std::string title;
+  if (!args.empty() && args[0].IsString())
+  {
+    ultralight::String t = args[0].ToString();
+    auto utf8 = t.utf8();
+    if (utf8.data())
+      title = utf8.data();
+  }
+
+  uint64_t parent_id = bookmark_store_->bookmarks_bar_id();
+  if (args.size() >= 2 && args[1].IsNumber())
+    parent_id = static_cast<uint64_t>(args[1].ToNumber());
+
+  size_t index = std::numeric_limits<size_t>::max();
+  if (args.size() >= 3 && args[2].IsNumber())
+  {
+    double raw = args[2].ToNumber();
+    if (raw < 0)
+      raw = 0;
+    index = static_cast<size_t>(raw);
+  }
+
+  bookmark_store_->AddFolder(title, parent_id, index);
+}
+
+void UI::OnBookmarkUpdateFolder(const JSObject &, const JSArgs &args)
+{
+  EnsureBookmarkStore();
+  if (!bookmark_store_ || args.size() < 2)
+    return;
+  uint64_t id = static_cast<uint64_t>(args[0].ToNumber());
+  ultralight::String title_ul = args[1].ToString();
+  auto title_utf8 = title_ul.utf8();
+  bookmark_store_->UpdateFolder(id, title_utf8.data() ? title_utf8.data() : "");
+}
+
+void UI::OnBookmarkMove(const JSObject &, const JSArgs &args)
+{
+  EnsureBookmarkStore();
+  if (!bookmark_store_ || args.size() < 3)
+    return;
+  uint64_t id = static_cast<uint64_t>(args[0].ToNumber());
+  uint64_t parent_id = static_cast<uint64_t>(args[1].ToNumber());
+  double idx = args[2].ToNumber();
+  if (idx < 0)
+    idx = 0;
+  bookmark_store_->MoveNode(id, parent_id, static_cast<size_t>(idx));
+}
+
+void UI::OnBookmarkDelete(const JSObject &, const JSArgs &args)
+{
+  EnsureBookmarkStore();
+  if (!bookmark_store_ || args.empty())
+    return;
+  uint64_t id = static_cast<uint64_t>(args[0].ToNumber());
+  bookmark_store_->RemoveNode(id);
+}
+
+void UI::OnToggleBookmarkBarCommand(const JSObject &, const JSArgs &)
+{
+  HandleSettingMutation("show_bookmarks_bar", !settings_.show_bookmarks_bar);
+}
+
+void UI::OnShowBookmarkManager(const JSObject &, const JSArgs &)
+{
+  HideMenuOverlay();
+  RefPtr<View> child = CreateNewTabForChildView(String("file:///bookmarks.html"));
+  if (child)
+    child->LoadURL("file:///bookmarks.html");
+}
+
+void UI::OnToggleBookmarkForActiveTab(const JSObject &, const JSArgs &)
+{
+  EnsureBookmarkStore();
+  std::string url = ActiveTabURLString();
+  if (url.empty())
+    return;
+  std::string title = ActiveTabTitleString();
+  uint64_t bookmark_id = 0;
+  uint64_t parent_id = bookmark_store_ ? bookmark_store_->bookmarks_bar_id() : 0;
+  bool is_bookmarked = bookmark_store_ && bookmark_store_->IsUrlBookmarked(url, &bookmark_id);
+  if (is_bookmarked)
+  {
+    const auto *node = bookmark_store_->GetNode(bookmark_id);
+    if (node)
+    {
+      title = node->title;
+      parent_id = node->parent_id;
+    }
+  }
+
+  std::ostringstream ss;
+  ss << "{\"mode\":\"" << (is_bookmarked ? "edit" : "create") << "\",";
+  ss << "\"url\":\"" << util::EscapeJsonString(url) << "\",";
+  ss << "\"title\":\"" << util::EscapeJsonString(title) << "\",";
+  ss << "\"bookmarkId\":" << (is_bookmarked ? bookmark_id : 0) << ',';
+  ss << "\"parentId\":" << parent_id;
+  ss << "}";
+
+  std::string payload = ss.str();
+  if (overlay_ && overlay_->view())
+  {
+    std::string script = std::string("(function(p){ if(window.openBookmarkDialog) window.openBookmarkDialog(JSON.parse(p)); })(\"") +
+                         util::EscapeJsStringLiteral(payload) + "\");";
+    overlay_->view()->EvaluateScript(String(script.c_str()), nullptr);
+  }
 }
 
 void UI::OnDownloadsOverlayToggle(const JSObject &, const JSArgs &)
@@ -2537,6 +2915,7 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
   show_download_badge_ = settings_.show_download_badge;
   auto_open_download_panel_ = settings_.auto_open_download_panel;
   // ask_download_location would be checked when download starts
+  ToggleBookmarkBar(settings_.show_bookmarks_bar);
 
   // Performance
   // smooth_scrolling, hardware_acceleration, local_storage, database
@@ -4046,6 +4425,7 @@ bool UI::BrowserSettings::operator==(const BrowserSettings &other) const
          show_download_badge == other.show_download_badge &&
          auto_open_download_panel == other.auto_open_download_panel &&
          ask_download_location == other.ask_download_location &&
+         show_bookmarks_bar == other.show_bookmarks_bar &&
          smooth_scrolling == other.smooth_scrolling &&
          hardware_acceleration == other.hardware_acceleration &&
          enable_local_storage == other.enable_local_storage &&

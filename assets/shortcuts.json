@@ -4,5 +4,8 @@
   "Ctrl+H": "open-history",
   "Ctrl+J": "open-downloads",
   "Ctrl+L": "focus-address",
-  "Ctrl+,": "open-settings"
+  "Ctrl+,": "open-settings",
+  "Ctrl+D": "bookmark-page",
+  "Ctrl+Shift+B": "toggle-bookmark-bar",
+  "Ctrl+Shift+O": "open-bookmark-manager"
 }
