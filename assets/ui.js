@@ -28,6 +28,22 @@ function updateURL(url) {
 	document.getElementById('address').value = url;
 }
 
+function setTabDrmState(tabId, isDrm) {
+	const tab = document.querySelector(".chrome-tab[data-tab-id='" + tabId + "']");
+	if (!tab) return;
+	const isBadgeVisible = !!isDrm;
+	tab.classList.toggle('is-drm-tab', isBadgeVisible);
+	const badge = tab.querySelector('.chrome-tab-badge');
+	if (!badge) return;
+	if (isBadgeVisible) {
+		badge.textContent = '[DRM]';
+		badge.title = 'This tab is using the secure DRM WebView';
+	} else {
+		badge.textContent = '';
+		badge.removeAttribute('title');
+	}
+}
+
 function focusAddressBar() {
 	let address = document.getElementById('address');
 	address.focus();

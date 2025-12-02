@@ -1,11 +1,20 @@
 #pragma once
 #include <AppCore/AppCore.h>
 #include "Tab.h"
+#include "drm/DRMSettings.h"
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
 #include <filesystem>
+#include <deque>
+#include <optional>
+
+namespace drm
+{
+  class DRMWebViewManager;
+  class DRMWebViewTab;
+}
 
 using ultralight::JSArgs;
 using ultralight::JSFunction;
@@ -83,6 +92,9 @@ public:
     // When false, user must press "Save Changes" in the Settings UI.
     bool auto_save_settings = true;
 
+    // DRM WebView subsystem toggle
+    bool enable_drm_webview = true;
+
     bool operator==(const BrowserSettings &other) const;
     bool operator!=(const BrowserSettings &other) const { return !(*this == other); }
   };
@@ -138,6 +150,8 @@ public:
   void OnUpdateSetting(const JSObject &obj, const JSArgs &args);
   ultralight::JSValue OnRestoreSettingsDefaults(const JSObject &obj, const JSArgs &args);
   void OnSaveSettings(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnGetDrmStatus(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnInstallDrmDependencies(const JSObject &obj, const JSArgs &args);
   // Reload the main chrome UI overlay (ui.html) so layout-dependent
   // settings such as compact tabs take effect immediately.
   void OnReloadChromeUI(const JSObject &obj, const JSArgs &args);
@@ -168,6 +182,7 @@ protected:
   void SetCanGoForward(bool can_go_forward);
   void SetURL(const String &url);
   void SetCursor(Cursor cursor);
+  std::string BuildDrmStatusPayload();
   void AdjustUIHeight(uint32_t new_height);
   void ShowMenuOverlay();
   void HideMenuOverlay();
@@ -238,7 +253,9 @@ protected:
   double GetOriginScore(const std::string &origin);
   void PruneFaviconDiskCacheToLimit();
 
-  Tab *active_tab() { return tabs_.empty() ? nullptr : tabs_[active_tab_id_].get(); }
+  Tab *active_tab();
+  drm::DRMWebViewTab *active_drm_tab();
+  bool ActiveTabIsDRM() const;
 
   RefPtr<View> view() { return overlay_->view(); }
 
@@ -270,6 +287,9 @@ protected:
   ultralight::String pending_sugg_json_;
 
   std::map<uint64_t, std::unique_ptr<Tab>> tabs_;
+  std::map<uint64_t, std::unique_ptr<drm::DRMWebViewTab>> drm_tabs_;
+  std::map<uint64_t, std::string> drm_tab_titles_;
+  std::map<uint64_t, std::string> drm_tab_urls_;
   uint64_t active_tab_id_ = 0;
   // Track the most recently active non-settings tab so we can reload it
   // when the settings tab is active and requests a reload.
@@ -302,6 +322,7 @@ protected:
   JSFunction focusAddressBar;
   JSFunction isAddressBarFocused;
   JSFunction updateAdblockEnabled;
+  JSFunction setTabDrmState;
   JSFunction applySettings;
   JSFunction applySettingsPanel;
   // Context menu setup function in overlay view
@@ -353,6 +374,25 @@ protected:
   BrowserSettings saved_settings_;
   bool settings_dirty_ = false;
   std::string settings_storage_path_;
+
+  drm::DRMSettings drm_settings_;
+  std::unique_ptr<drm::DRMWebViewManager> drm_manager_;
+  bool drm_install_running_ = false;
+  bool drm_dependencies_installed_cached_ = false;
+  std::optional<bool> drm_last_install_result_;
+  std::deque<std::string> drm_log_lines_;
+
+  void EnsureDrmManager();
+  bool MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_initiated);
+  void HandleDrmTitleChanged(uint64_t tab_id, const std::string &title);
+  void HandleDrmUrlChanged(uint64_t tab_id, const std::string &url);
+  void HandleDrmLoading(uint64_t tab_id, bool is_loading);
+  void HandleDrmNavigationState(uint64_t tab_id, bool can_back, bool can_forward);
+  void AppendDrmLog(const std::string &line);
+  Tab *GetUltralightTab(uint64_t id);
+  drm::DRMWebViewTab *GetDrmTab(uint64_t id);
+  void HideDrmTab(uint64_t id);
+  void UpdateDrmBadge(uint64_t id, bool is_drm);
 
   friend class Tab;
   friend class SettingsManager;

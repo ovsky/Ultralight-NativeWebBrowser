@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.8)
-project(UltralightWebBrowser LANGUAGES CXX)
+if(APPLE)
+	project(UltralightWebBrowser LANGUAGES CXX OBJCXX)
+	set(CMAKE_OBJCXX_STANDARD 17)
+	set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
+else()
+	project(UltralightWebBrowser LANGUAGES CXX)
+endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -19,6 +25,7 @@ endif()
 
 include_directories(
 	"${CMAKE_CURRENT_SOURCE_DIR}"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src"
 	"${ULTRALIGHT_SDK_ROOT}/include"
 )
 
@@ -70,11 +77,66 @@ set(SOURCES
 	"src/UI.cpp"
   "src/Utils.cpp"
   "src/Settings.cpp"
+	"src/drm/DRMSettings.h"
+	"src/drm/DRMSettings.cpp"
+	"src/drm/DRMDependencyManager.h"
+	"src/drm/DRMDependencyManager.cpp"
+	"src/drm/DRMWebViewTab.h"
+	"src/drm/DRMWebViewTab.cpp"
+	"src/drm/DRMWebViewManager.h"
+	"src/drm/DRMWebViewManager.cpp"
 	"src/main.cpp"
 	"${CMAKE_CURRENT_BINARY_DIR}/browser.rc"
 )
 
+if(WIN32)
+	list(APPEND SOURCES
+		"src/drm/DRMDependencyManager_windows.cpp"
+		"src/drm/DRMWebViewTab_windows.cpp")
+elseif(APPLE)
+	list(APPEND SOURCES
+		"src/drm/DRMDependencyManager_mac.cpp"
+		"src/drm/DRMWebViewTab_mac.mm")
+elseif(UNIX)
+	list(APPEND SOURCES
+		"src/drm/DRMDependencyManager_linux.cpp"
+		"src/drm/DRMWebViewTab_linux.cpp")
+endif()
+
 add_app(Ultralight-WebBrowser ${SOURCES})
+
+# On Linux, DRM webview support depends on GTK and WebKit2GTK.
+# We require these packages in CI and link them when present.
+if(UNIX AND NOT APPLE)
+	find_package(PkgConfig REQUIRED)
+	pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
+	# Prefer WebKit2GTK 4.1 (Ubuntu 24.04 default), but fall back to 4.0
+	pkg_check_modules(WEBKIT2_41 QUIET webkit2gtk-4.1)
+	if(NOT WEBKIT2_41_FOUND)
+		pkg_check_modules(WEBKIT2 REQUIRED webkit2gtk-4.0)
+	else()
+		set(WEBKIT2_FOUND TRUE)
+		set(WEBKIT2_INCLUDE_DIRS ${WEBKIT2_41_INCLUDE_DIRS})
+		set(WEBKIT2_LIBRARIES ${WEBKIT2_41_LIBRARIES})
+	endif()
+	message(STATUS "Building DRM Linux WebView using GTK3/WebKit2GTK")
+	target_include_directories(Ultralight-WebBrowser PRIVATE ${GTK3_INCLUDE_DIRS} ${WEBKIT2_INCLUDE_DIRS})
+	target_link_libraries(Ultralight-WebBrowser PRIVATE ${GTK3_LIBRARIES} ${WEBKIT2_LIBRARIES})
+endif()
+
+# On macOS, DRM webview support requires Cocoa and WebKit frameworks.
+if(APPLE)
+	find_library(COCOA_FRAMEWORK Cocoa REQUIRED)
+	find_library(WEBKIT_FRAMEWORK WebKit REQUIRED)
+	find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
+	message(STATUS "Building DRM macOS WebView using Cocoa/WebKit frameworks")
+	target_link_libraries(Ultralight-WebBrowser PRIVATE
+		${COCOA_FRAMEWORK}
+		${WEBKIT_FRAMEWORK}
+		${FOUNDATION_FRAMEWORK}
+		"-framework AppKit"
+	)
+endif()
 
  # Unit test for utils
  enable_testing()
@@ -84,6 +146,15 @@ add_app(Ultralight-WebBrowser ${SOURCES})
  # (GNU) which cannot link MSVC-generated .lib import libraries. In that
  # case skip adding the test to avoid linker errors.
  if(NOT (WIN32 AND NOT MSVC))
+	 include(FetchContent)
+	 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+	 FetchContent_Declare(
+	 	 googletest
+	 	 GIT_REPOSITORY https://github.com/google/googletest.git
+	 	 GIT_TAG v1.14.0
+	 )
+	 FetchContent_MakeAvailable(googletest)
+
 	 add_executable(UtilsTest tests/UtilsTest.cpp src/Utils.cpp)
 	 find_library(APP_CORE_LIB NAMES AppCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
 	 find_library(ULTRALIGHT_LIB NAMES Ultralight PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
@@ -93,6 +164,12 @@ add_app(Ultralight-WebBrowser ${SOURCES})
 		 target_link_libraries(UtilsTest PRIVATE ${APP_CORE_LIB} ${ULTRALIGHT_LIB} ${ULTRALIGHT_CORE_LIB} ${WEB_CORE_LIB})
 	 endif()
 	 add_test(NAME UtilsTest COMMAND UtilsTest)
+
+	 add_executable(DRMSettingsTest
+	 	tests/DRMSettingsTest.cpp
+	 	src/drm/DRMSettings.cpp)
+	 target_link_libraries(DRMSettingsTest PRIVATE GTest::gtest_main)
+	 add_test(NAME DRMSettingsTest COMMAND DRMSettingsTest)
  else()
 	 message(STATUS "Skipping UtilsTest on Windows when not using MSVC (to avoid linking MSVC .lib with MinGW)")
  endif()

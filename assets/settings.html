@@ -73,6 +73,33 @@
             font-weight: 400;
         }
 
+        /* Settings search */
+        .settings-search {
+            margin-top: 12px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .settings-search input {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-soft);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        .settings-search .clear-btn {
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border-soft);
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
         #settings-container {
             padding: 20px 30px 30px 30px;
             max-height: calc(100vh - 280px);
@@ -264,6 +291,117 @@
             line-height: 1.5;
         }
 
+        .drm-panel {
+            margin: 20px 30px 0 30px;
+            padding: 20px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+        }
+
+        .drm-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .drm-header h2 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border-soft);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+        }
+
+        .status-chip.good {
+            color: #16a34a;
+            border-color: rgba(22, 163, 74, 0.4);
+            background: rgba(22, 163, 74, 0.12);
+        }
+
+        .status-chip.bad {
+            color: #f97316;
+            border-color: rgba(249, 115, 22, 0.4);
+            background: rgba(249, 115, 22, 0.1);
+        }
+
+        .drm-status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .drm-status-grid .label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-tertiary);
+        }
+
+        .drm-status-grid .value {
+            font-size: 13px;
+            color: var(--text-primary);
+        }
+
+        .value.mono {
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 11px;
+            word-break: break-all;
+        }
+
+        .site-pill-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .site-pill {
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .site-pill.empty {
+            opacity: 0.6;
+            font-style: italic;
+        }
+
+        .drm-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .drm-log {
+            background: #111;
+            border: 1px solid var(--border-soft);
+            border-radius: 8px;
+            padding: 12px;
+            color: #d1d5db;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 11px;
+            max-height: 220px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
         .ua-row {
             margin-top: 16px;
             padding: 14px 18px;
@@ -330,10 +468,50 @@
         <header>
             <h1>Settings</h1>
             <p class="subtitle">Configure your browser preferences</p>
+            <div class="settings-search">
+                <input id="settings-search" type="search" placeholder="Search settings (name, key, description)..."
+                    aria-label="Search settings">
+                <button id="settings-search-clear" class="clear-btn" title="Clear search">Clear</button>
+            </div>
         </header>
         <div id="settings-container">
             <div class="loading">Loading settings...</div>
         </div>
+        <section id="drm-panel" class="drm-panel">
+            <div class="drm-header">
+                <div>
+                    <h2>DRM WebView</h2>
+                    <p class="subtitle">Use the native OS WebView for DRM-protected streaming sites and manage runtime
+                        dependencies.</p>
+                </div>
+                <span id="drm-enabled-chip" class="status-chip bad">Disabled</span>
+            </div>
+            <div class="drm-status-grid">
+                <div>
+                    <div class="label">Runtime</div>
+                    <div id="drm-runtime-name" class="value">Detecting...</div>
+                </div>
+                <div>
+                    <div class="label">Runtime Status</div>
+                    <div id="drm-runtime-status" class="value status-chip">Unknown</div>
+                </div>
+                <div>
+                    <div class="label">Config File</div>
+                    <div id="drm-settings-path" class="value mono">Not created yet</div>
+                </div>
+            </div>
+            <div>
+                <div class="label">Monitored Sites</div>
+                <div id="drm-site-list" class="site-pill-row">
+                    <span class="site-pill empty">Loading...</span>
+                </div>
+            </div>
+            <div class="drm-actions">
+                <button id="drm-install-button" class="btn-primary">Install Runtime</button>
+                <button id="drm-refresh-button" class="btn-secondary">Refresh Status</button>
+            </div>
+            <pre id="drm-log" class="drm-log">Requesting DRM status...</pre>
+        </section>
         <!-- Custom User Agent section lives at the very bottom of settings -->
         <div id="ua-section" class="ua-row">
             <div class="ua-label">Target User Agent String</div>
@@ -388,6 +566,11 @@
                     { key: 'do_not_track', name: 'Do Not Track', description: 'Send DNT header' }
                 ]
             },
+            drm: {
+                title: 'DRM WebView', settings: [
+                    { key: 'enable_drm_webview', name: 'Enable DRM WebView', description: 'Switch DRM sites to native WebView (requires runtime install)' }
+                ]
+            },
             suggestions: {
                 title: 'Address Bar', settings: [
                     { key: 'enable_suggestions', name: 'Show Suggestions', description: 'Display history and popular sites' },
@@ -435,12 +618,39 @@
 
         let currentSettings = {}, originalSettings = {}, isDirty = false;
         let targetUserAgent = '', originalTargetUserAgent = '';
+        const drmElements = {};
+        let drmStatusSnapshot = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             log('Page loaded');
+            cacheDrmElements();
+            loadDrmStatus();
             loadSettings();
             document.getElementById('btn-save').addEventListener('click', saveSettings);
             document.getElementById('btn-restore').addEventListener('click', restoreDefaults);
+            // Search box wiring
+            const searchEl = document.getElementById('settings-search');
+            const clearBtn = document.getElementById('settings-search-clear');
+            let searchTimer = null;
+            if (searchEl) {
+                searchEl.addEventListener('input', (e) => {
+                    if (searchTimer) clearTimeout(searchTimer);
+                    const val = (e.target.value || '').trim();
+                    searchTimer = setTimeout(() => {
+                        applySettingsSearch(val);
+                    }, 160);
+                });
+            }
+            if (clearBtn) {
+                clearBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (searchEl) {
+                        searchEl.value = '';
+                        applySettingsSearch('');
+                        searchEl.focus();
+                    }
+                });
+            }
         });
 
         function loadSettings() {
@@ -479,6 +689,7 @@
                     renderSettings();
                     hydrateUserAgentEditor();
                     updateDirtyState();
+                    loadDrmStatus(true);
                 }
             } catch (error) {
                 log('ERROR: ' + error.message);
@@ -488,14 +699,22 @@
         function renderSettings() {
             const container = document.getElementById('settings-container');
             container.innerHTML = '';
+            const query = (window.__settingsSearchTerm || '').trim().toLowerCase();
+            let anyRendered = false;
             Object.keys(settingsDefinitions).forEach(groupKey => {
                 const group = settingsDefinitions[groupKey];
+                // Filter group's settings by search query
+                const matchedSettings = (query.length === 0) ? group.settings : group.settings.filter(s => {
+                    const hay = ((s.name || '') + ' ' + (s.description || '') + ' ' + (s.key || '')).toLowerCase();
+                    return hay.indexOf(query) !== -1;
+                });
+                if (!matchedSettings.length) return; // skip group if none match
                 const groupDiv = document.createElement('div');
                 groupDiv.className = 'settings-group';
                 const title = document.createElement('h2');
                 title.textContent = group.title;
                 groupDiv.appendChild(title);
-                group.settings.forEach(setting => {
+                matchedSettings.forEach(setting => {
                     const itemDiv = document.createElement('div');
                     itemDiv.className = 'setting-item';
                     const infoDiv = document.createElement('div');
@@ -595,6 +814,7 @@
                         renderSettings();
                         hydrateUserAgentEditor();
                         updateDirtyState();
+                        loadDrmStatus(true);
                         log('Restored');
                     }
                 } catch (error) {
@@ -622,6 +842,119 @@
                     window.OnSaveSettings();
                 }
             };
+        }
+
+        // Search helpers
+        function applySettingsSearch(term) {
+            window.__settingsSearchTerm = (term || '').toString();
+            renderSettings();
+        }
+
+
+        function cacheDrmElements() {
+            drmElements.panel = document.getElementById('drm-panel');
+            if (!drmElements.panel) return;
+            drmElements.enabledChip = document.getElementById('drm-enabled-chip');
+            drmElements.runtimeName = document.getElementById('drm-runtime-name');
+            drmElements.runtimeStatus = document.getElementById('drm-runtime-status');
+            drmElements.settingsPath = document.getElementById('drm-settings-path');
+            drmElements.siteList = document.getElementById('drm-site-list');
+            drmElements.installButton = document.getElementById('drm-install-button');
+            drmElements.refreshButton = document.getElementById('drm-refresh-button');
+            drmElements.log = document.getElementById('drm-log');
+            if (drmElements.installButton) {
+                drmElements.installButton.addEventListener('click', triggerDrmInstall);
+            }
+            if (drmElements.refreshButton) {
+                drmElements.refreshButton.addEventListener('click', () => loadDrmStatus(true));
+            }
+        }
+
+        function triggerDrmInstall() {
+            if (typeof window.InstallDrmDependencies !== 'function') {
+                log('InstallDrmDependencies bridge not ready.');
+                return;
+            }
+            try {
+                const result = window.InstallDrmDependencies();
+                log('InstallDrmDependencies invoked (result=' + result + ')');
+            } catch (error) {
+                log('ERROR: ' + error.message);
+            }
+            if (drmElements.installButton) {
+                drmElements.installButton.disabled = true;
+            }
+            setTimeout(() => loadDrmStatus(true), 400);
+        }
+
+        function loadDrmStatus(isRetry = false) {
+            if (!drmElements.panel)
+                return;
+            if (typeof window.GetDrmStatus !== 'function') {
+                if (!isRetry)
+                    log('DRM status bridge not ready, retrying...');
+                setTimeout(() => loadDrmStatus(true), 500);
+                return;
+            }
+            try {
+                const payload = window.GetDrmStatus();
+                drmStatusSnapshot = typeof payload === 'string' ? JSON.parse(payload) : payload;
+                renderDrmPanel();
+            } catch (error) {
+                log('ERROR reading DRM status: ' + error.message);
+            }
+        }
+
+        function updateStatusChip(chip, enabled) {
+            if (!chip) return;
+            chip.textContent = enabled ? 'Enabled' : 'Disabled';
+            chip.classList.toggle('good', !!enabled);
+            chip.classList.toggle('bad', !enabled);
+        }
+
+        function renderDrmPanel() {
+            if (!drmElements.panel || !drmStatusSnapshot)
+                return;
+            const status = drmStatusSnapshot;
+            updateStatusChip(drmElements.enabledChip, !!status.enabled);
+            if (drmElements.runtimeName)
+                drmElements.runtimeName.textContent = status.dependency_name || 'Unavailable';
+            if (drmElements.runtimeStatus) {
+                drmElements.runtimeStatus.textContent = status.installed ? 'Installed' : 'Missing';
+                drmElements.runtimeStatus.classList.toggle('good', !!status.installed);
+                drmElements.runtimeStatus.classList.toggle('bad', !status.installed);
+            }
+            if (drmElements.settingsPath)
+                drmElements.settingsPath.textContent = status.settings_file || 'Not created yet';
+            if (drmElements.installButton) {
+                drmElements.installButton.disabled = !!status.installing;
+                drmElements.installButton.textContent = status.installing ? 'Installing...' : (status.installed ? 'Reinstall Runtime' : 'Install Runtime');
+            }
+            if (drmElements.siteList) {
+                const container = drmElements.siteList;
+                container.innerHTML = '';
+                if (Array.isArray(status.site_rules) && status.site_rules.length) {
+                    status.site_rules.forEach(rule => {
+                        const pill = document.createElement('span');
+                        pill.className = 'site-pill';
+                        pill.textContent = rule && rule.host ? rule.host : 'unknown';
+                        container.appendChild(pill);
+                    });
+                } else {
+                    const pill = document.createElement('span');
+                    pill.className = 'site-pill empty';
+                    pill.textContent = 'No DRM site rules configured';
+                    container.appendChild(pill);
+                }
+            }
+            if (drmElements.log) {
+                if (Array.isArray(status.log) && status.log.length) {
+                    drmElements.log.textContent = status.log.join('\n');
+                } else {
+                    drmElements.log.textContent = 'No DRM log entries yet.';
+                }
+                drmElements.log.scrollTop = drmElements.log.scrollHeight;
+            }
         }
     </script>
 </body>
