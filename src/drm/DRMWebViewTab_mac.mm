@@ -1,10 +1,12 @@
 #if defined(__APPLE__)
 
-// Ensure C++ types are available.
-#include "drm/DRMWebViewTab.h"
-
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
+
+// Ensure C++ types are available after Obj-C imports.
+#include "drm/DRMWebViewTab.h"
+#include <string>
+#include <memory>
 
 // Forward-declare the C++ DRMWebViewTabMac for use in Obj-C
 // and define Objective-C types at true global scope.
