@@ -1,13 +1,22 @@
 # .github/workflows/build-all-arm.yml
-# Orchestrates all ARM64 builds (macOS arm64, Linux arm64)
+#
+# OPTIMIZED: Orchestrates all ARM64 builds with maximum parallelization
 
 name: Build - All ARM64
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 on:
   workflow_dispatch:
     inputs:
       sdk_url:
-        description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
+        description: "Override ULTRALIGHT_SDK_URL"
         required: false
         type: string
       version:
@@ -19,16 +28,12 @@ on:
         required: false
         type: string
       package_format:
-        description: "Package format(s) for macOS/Linux (eg. TGZ;DMG or TGZ;DEB;RPM)"
+        description: "Package format(s) for macOS/Linux"
         required: false
         type: string
-  # No pull_request here; only the full orchestrator should run on PR
-
-permissions:
-  contents: read
-  actions: write
 
 jobs:
+  # All ARM64 builds run in parallel
   macos-arm64:
     uses: ./.github/workflows/build-macos-arm64.yml
     secrets: inherit

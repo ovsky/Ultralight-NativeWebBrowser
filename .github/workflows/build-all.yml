@@ -1,10 +1,23 @@
+# .github/workflows/build-all.yml
+#
+# OPTIMIZED: Orchestrates all platform builds with maximum parallelization
+# All platform builds run concurrently for fastest overall completion
+
 name: Build - All (x64 + ARM64)
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 on:
   workflow_dispatch:
     inputs:
       sdk_url:
-        description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
+        description: "Override ULTRALIGHT_SDK_URL"
         required: false
         type: string
       version:
@@ -16,26 +29,23 @@ on:
         required: false
         type: string
       package_format:
-        description: "Package format(s) for macOS/Linux (eg. TGZ;DMG or TGZ;DEB;RPM)"
+        description: "Package format(s) for macOS/Linux"
         required: false
         type: string
       create_installer:
-        description: "Create Windows installer via CPack (NSIS) when true"
+        description: "Create Windows installer via CPack (NSIS)"
         required: false
         type: boolean
         default: false
       development_build:
-        description: "Development build (keeps intermediate packages, verbose logs)"
+        description: "Development build (verbose logs)"
         required: false
         type: boolean
         default: false
   pull_request:
 
-permissions:
-  contents: read
-  actions: write
-
 jobs:
+  # All builds run in parallel for maximum speed
   windows:
     uses: ./.github/workflows/build-windows.yml
     secrets: inherit
@@ -44,7 +54,6 @@ jobs:
       version: ${{ inputs.version || github.event.inputs.version }}
       webbrowser_version: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version }}
       development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
-      # create installer by default on PRs, otherwise obey input
       create_installer: ${{ inputs.create_installer || github.event_name == 'pull_request' }}
 
   macos-x64:

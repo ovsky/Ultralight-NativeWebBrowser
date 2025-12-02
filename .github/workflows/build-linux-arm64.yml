@@ -1,13 +1,23 @@
 # .github/workflows/build-linux-arm64.yml
-# Dedicated ARM64 build on Linux using qemu via run-on-arch-action.
+#
+# OPTIMIZED: Fast Linux ARM64 build using QEMU with caching
+# Note: ARM64 emulation is slower, but caching helps significantly
 
 name: Build - Linux (ARM64)
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 on:
   workflow_dispatch:
     inputs:
       sdk_url:
-        description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
+        description: "Override ULTRALIGHT_SDK_URL"
         required: false
         type: string
       version:
@@ -19,35 +29,30 @@ on:
         required: false
         type: string
       package_format:
-        description: "Package format(s) to produce via CPack (eg. TGZ only for ARM64 here)"
+        description: "Package format(s) (eg. TGZ)"
         required: false
         type: string
       development_build:
-        description: "Development build (keeps intermediate packages, verbose logs)"
+        description: "Development build (verbose logs)"
         required: false
         type: boolean
         default: false
   workflow_call:
     inputs:
       sdk_url:
-        description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
         required: false
         type: string
       version:
-        description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
         required: false
         type: string
       webbrowser_version:
-        description: "Override build version name (default 'dev')"
         required: false
         type: string
       package_format:
-        description: "Package format(s) to produce via CPack (eg. TGZ, DEB, RPM or multi 'TGZ;DEB;RPM')"
         required: false
         default: "TGZ;DEB;RPM"
         type: string
       development_build:
-        description: "Development build (keeps intermediate packages, verbose logs)"
         required: false
         type: boolean
         default: false
@@ -55,121 +60,117 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: write
     env:
       ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url || github.event.inputs.sdk_url }}
       ULTRALIGHT_VERSION: ${{ inputs.version || github.event.inputs.version }}
+
     steps:
-      - name: 1. Checkout Code (with submodules)
+      - name: "1. Checkout Code (shallow)"
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 1
 
-      - name: 2. Build and Package (ARM64 emulated)
+      # ===== CACHING FOR SPEED =====
+      - name: "2. Cache SDK"
+        id: cache-sdk
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/sdk-cache
+          key: linux-arm64-sdk-${{ hashFiles('data/include/Ultralight/Defines.h') }}-v2
+          restore-keys: |
+            linux-arm64-sdk-
+
+      - name: "2.1 Cache ccache (ARM64)"
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: linux-arm64-ccache-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            linux-arm64-ccache-${{ github.ref }}-
+            linux-arm64-ccache-
+
+      - name: "3. Build (ARM64 emulated)"
         id: arm64_build
         uses: uraimo/run-on-arch-action@v2
         with:
           arch: aarch64
           distro: ubuntu22.04
           githubToken: ${{ github.token }}
+          dockerRunArgs: |
+            --volume "${{ runner.temp }}/sdk-cache:/sdk-cache"
+            --volume "${{ github.workspace }}/.ccache:/root/.ccache"
           install: |
             apt-get update
-              DEBIAN_FRONTEND=noninteractive apt-get install -y \
-                git curl zip unzip cmake build-essential pkg-config \
-                p7zip-full \
-                libgtk-3-dev libwebkit2gtk-4.1-dev libnss3-dev libgdk-pixbuf2.0-dev libxtst-dev libxss-dev libdbus-glib-1-dev libcurl4-openssl-dev
+            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+              git curl zip unzip cmake ninja-build build-essential pkg-config ccache \
+              p7zip-full \
+              libgtk-3-dev libwebkit2gtk-4.1-dev libnss3-dev libgdk-pixbuf2.0-dev \
+              libxtst-dev libxss-dev libdbus-glib-1-dev libcurl4-openssl-dev
           run: |
             set -euo pipefail
             cd "$GITHUB_WORKSPACE"
-            # Configure git in container too
-            git config --global core.longpaths true
-            git config --global core.autocrlf false
             export WEBBROWSER_VERSION="${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}"
-            export DEVELOPMENT_BUILD="${{ inputs.development_build || github.event.inputs.development_build || 'false' }}"
-            echo "== ARM64: Detect ULTRALIGHT_SDK_URL from base-sdk =="
-            API="https://api.github.com/repos/${{ github.repository }}/contents/sdks?ref=base-sdk"
-            RESP=$(curl -fLs -H "Accept: application/vnd.github+json" "$API" || true)
-            URL=""; VER=""
-            if [ -n "$RESP" ]; then
-              NAMES=$(printf "%s" "$RESP" | grep -oE '"name"\s*:\s*"[^"]+"' | sed -E 's/.*"name"\s*:\s*"([^"]+)".*/\1/')
-              for f in $NAMES; do
-                case "$f" in ultralight*-sdk-*-linux-arm64.7z)
-                  v=$(echo "$f" | sed -E 's/^.*-([0-9]+\.[0-9]+\.[0-9]+)-linux-.*$/\1/')
-                  URL="https://raw.githubusercontent.com/${{ github.repository }}/base-sdk/sdks/$f"; VER="$v"; break;;
-                esac
-              done
-            fi
-            if [ -z "$URL" ]; then
-              HEADER="data/include/Ultralight/Defines.h"
-              VER=$(sed -n 's/^#define[[:space:]]\+ULTRALIGHT_VERSION[[:space:]]\+"\([^"]\+\)".*/\1/p' "$HEADER" | head -n1 || true)
-              [ -z "$VER" ] && VER="1.4.0"
-              URL="https://raw.githubusercontent.com/${{ github.repository }}/base-sdk/sdks/ultralight-free-sdk-$VER-linux-arm64.7z"
-            fi
-            echo "Using SDK URL: $URL (version=$VER)"
-            echo "== ARM64: Fetch and extract SDK =="
-            mkdir -p "$RUNNER_TEMP/sdk-extract"
-            curl -fL "$URL" -o "$RUNNER_TEMP/ultralight-sdk.7z"
-            7z x -y -o"$RUNNER_TEMP/sdk-extract" "$RUNNER_TEMP/ultralight-sdk.7z"
-            ROOT=""
-            # Prefer a directory that has include and either lib or bin (Ultralight sometimes ships .so in bin)
-            while IFS= read -r -d '' dir; do
-              if [ -d "$dir/include" ] && { [ -d "$dir/lib" ] || [ -d "$dir/bin" ]; }; then
-                ROOT="$dir"; break
+            export CCACHE_DIR=/root/.ccache
+            export PATH="/usr/lib/ccache:$PATH"
+            
+            # Check for cached SDK
+            if [ -d "/sdk-cache/sdk/include" ] && [ -d "/sdk-cache/sdk/lib" ]; then
+              echo "Using cached SDK"
+              ROOT="/sdk-cache/sdk"
+            else
+              echo "Downloading SDK..."
+              API="https://api.github.com/repos/${{ github.repository }}/contents/sdks?ref=base-sdk"
+              RESP=$(curl -fLs -H "Accept: application/vnd.github+json" "$API" || true)
+              URL=""; VER=""
+              if [ -n "$RESP" ]; then
+                NAMES=$(printf "%s" "$RESP" | grep -oE '"name"\s*:\s*"[^"]+"' | sed -E 's/.*"name"\s*:\s*"([^"]+)".*/\1/')
+                for f in $NAMES; do
+                  case "$f" in ultralight*-sdk-*-linux-arm64.7z)
+                    v=$(echo "$f" | sed -E 's/^.*-([0-9]+\.[0-9]+\.[0-9]+)-linux-.*$/\1/')
+                    URL="https://raw.githubusercontent.com/${{ github.repository }}/base-sdk/sdks/$f"; VER="$v"; break
+                  ;; esac
+                done
               fi
-            done < <(find "$RUNNER_TEMP/sdk-extract" -mindepth 1 -maxdepth 4 -type d -print0)
-            if [ -z "$ROOT" ]; then
-              # Fallback: derive from include/Ultralight path
-              INC_PARENT=$(find "$RUNNER_TEMP/sdk-extract" -type d -path '*/include/Ultralight' -print -quit 2>/dev/null | xargs -I{} dirname {} | xargs -I{} dirname {}) || true
-              if [ -n "$INC_PARENT" ] && [ -d "$INC_PARENT/include" ] && { [ -d "$INC_PARENT/lib" ] || [ -d "$INC_PARENT/bin" ]; }; then
-                ROOT="$INC_PARENT"
-              fi
+              [ -z "$URL" ] && URL="https://raw.githubusercontent.com/${{ github.repository }}/base-sdk/sdks/ultralight-free-sdk-1.4.0-linux-arm64.7z"
+              
+              mkdir -p /sdk-cache/extract
+              curl -fL "$URL" -o /tmp/ultralight-sdk.7z
+              7z x -y -o"/sdk-cache/extract" /tmp/ultralight-sdk.7z
+              ROOT=""
+              while IFS= read -r -d '' dir; do
+                if [ -d "$dir/include" ] && { [ -d "$dir/lib" ] || [ -d "$dir/bin" ]; }; then ROOT="$dir"; break; fi
+              done < <(find /sdk-cache/extract -mindepth 1 -maxdepth 4 -type d -print0)
+              [ -z "$ROOT" ] && { echo "SDK extraction failed"; exit 1; }
+              mv "$ROOT" /sdk-cache/sdk
+              ROOT="/sdk-cache/sdk"
             fi
-            if [ -z "$ROOT" ]; then
-              echo "::error::ARM64 SDK root not found after extraction";
-              echo "Extraction tree (depth 3):"; find "$RUNNER_TEMP/sdk-extract" -maxdepth 3 -type d -print | sed 's/^/  /'
-              exit 1
-            fi
-            echo "Found SDK at: $ROOT"; ls -la "$ROOT/lib" || true
-            echo "== ARM64: Configure & Build =="
-            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ROOT" -DBUILD_TESTING=OFF -DAUTO_INSTALL_CURL=ON -DWEBBROWSER_VERSION="$WEBBROWSER_VERSION"
-            cmake --build build --parallel
-            echo "== ARM64: Package (TGZ) =="
+            
+            echo "Configuring with Ninja..."
+            cmake -S . -B build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DULTRALIGHT_SDK_ROOT="$ROOT" \
+              -DBUILD_TESTING=OFF \
+              -DAUTO_INSTALL_CURL=ON \
+              -DWEBBROWSER_VERSION="$WEBBROWSER_VERSION" \
+              -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            
+            echo "Building..."
+            cmake --build build --parallel $(nproc)
+            
+            echo "Packaging..."
             cpack --config build/CPackConfig.cmake -C Release -G TGZ -D CPACK_OUTPUT_FILE_PREFIX="$GITHUB_WORKSPACE/build"
-            # Rename package to final name
-            outdir="$GITHUB_WORKSPACE/build"
-            version="$WEBBROWSER_VERSION"
-            for file in "$outdir"/*.tar.gz; do
+            
+            # Rename package
+            for file in "$GITHUB_WORKSPACE/build"/*.tar.gz; do
               [ -f "$file" ] || continue
-              finalname="Ultralight-WebBrowser-${version}-Linux-arm64.tar.gz"
-              bname=$(basename "$file")
-              if [ "$bname" = "$finalname" ]; then
-                echo "Skipping rename for $bname (already final name)"
-              else
-                echo "Renaming: $bname -> $finalname"
-                mv "$file" "$outdir/$finalname"
-              fi
+              mv "$file" "$GITHUB_WORKSPACE/build/Ultralight-WebBrowser-${WEBBROWSER_VERSION}-Linux-arm64.tar.gz"
             done
-            # Upload final package
-            if [ "$DEVELOPMENT_BUILD" = "true" ]; then
-              echo "Uploading intermediate packages (development build)"
-              mkdir -p "$GITHUB_WORKSPACE/intermediate"
-              cp -r "$outdir/_CPack_Packages" "$GITHUB_WORKSPACE/intermediate/" || true
-            fi
 
-      - name: 3. Upload ARM64 Final Package
+      - name: "4. Upload Package"
         uses: actions/upload-artifact@v4
         with:
           name: Ultralight-WebBrowser-${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}-Linux-arm64
           path: build/Ultralight-WebBrowser-*-Linux-arm64.tar.gz
-          if-no-files-found: warn
-
-      - name: 4. Upload ARM64 Intermediate Packages (Development Only)
-        if: inputs.development_build == true || github.event.inputs.development_build == 'true'
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: Ultralight-WebBrowser-${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}-Linux-arm64-Intermediate
-          path: intermediate/_CPack_Packages/
           if-no-files-found: warn
