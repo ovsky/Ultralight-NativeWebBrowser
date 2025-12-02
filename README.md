@@ -1,90 +1,85 @@
-# Ultralight Web Browser ✨
-> Ultra‑fast / Ultra‑light / Ultra‑portable
+<div align="center">
 
-[![Build - All (x64 + ARM64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-all.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-all.yml?query=branch%3Adev)
-[![Build - Linux (x64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux.yml?query=branch%3Adev)
-[![Build - Linux (ARM64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux-arm64.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-linux-arm64.yml?query=branch%3Adev)
-[![Build - macOS (x64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos.yml?query=branch%3Adev)
-[![Build - macOS (ARM64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos-arm64.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-macos-arm64.yml?query=branch%3Adev)
-[![Build - Windows (x64)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-windows.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-windows.yml?query=branch%3Adev)
+<img src="https://github.com/ultralight-ux/Ultralight/raw/master/media/logo.png" width="180" alt="Ultralight Logo">
+
+# Ultralight Web Browser
+
+### ⚡ Ultra‑fast · 🪶 Ultra‑light · 🚀 Ultra‑portable
+
+[![Build Status](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-all.yml/badge.svg?branch=dev)](https://github.com/ovsky/Ultralight-WebBrowser/actions/workflows/build-all.yml?query=branch%3Adev)
+[![Release](https://img.shields.io/github/v/release/ovsky/Ultralight-WebBrowser?include_prereleases&label=release&color=blue)](https://github.com/ovsky/Ultralight-WebBrowser/releases)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
+
+**A native C++ browser focused on minimal overhead, instant startup, and resource efficiency**
+
+*No multi‑process bloat · No background daemons · No gigabytes of RAM*
+
+[📦 Download](https://github.com/ovsky/Ultralight-WebBrowser/releases) · [✨ Features](#-features) · [🔧 Build](#-build-from-source) · [📚 Documentation](#-developer-documentation)
+
+</div>
+---
 
 <p align="center">
-  <img src="https://github.com/ultralight-ux/Ultralight/raw/master/media/logo.png" width="200" alt="Ultralight Logo">
+  <img src="https://github.com/user-attachments/assets/fe2c4609-6930-483c-9fa3-eab64664b539" width="100%" alt="Ultralight Browser Screenshot">
 </p>
 
-<strong>A native C++ proof‑of‑concept browser focused on minimal overhead, cold‑start speed, and resource efficiency.</strong><br/>
-No multi‑process bloat, no background daemons, no gigabytes of RAM for a handful of tabs—just a lean renderer + native UI.
-
-> Download: [Ultralight Web → Browser Releases Page](https://github.com/ovsky/Ultralight-WebBrowser/releases) | Status: Development / Experimental / Educational
 ---
 
-<img width="1366" height="768" alt="ultralight-downloads" src="https://github.com/user-attachments/assets/fe2c4609-6930-483c-9fa3-eab64664b539" />
+## 🎯 Why Choose Ultralight?
 
----
+<table>
+<tr>
+<td width="50%" valign="top">
 
-## 🧭 Table of Contents
-1. [Why Ultralight?](#-why-ultralight-ditch-the-bloat)
-2. [Project Philosophy & Goals](#-project-philosophy--goals)
-3. [Supported Platforms & Architectures](#-supported-platforms--architectures)
-4. [Get the App](#-get-the-app)
-5. [Installation](#-installation)
-6. [Features](#-features)
-7. [Recent Updates](#-recent-updates)
-8. [Tech Stack](#-tech-stack)
-9. [Build From Source](#-build-from-source)
-10. [ARM64 Build Notes](#-arm64-build-notes)
-11. [JavaScript Bridge API](#-javascript-bridge-api-window__ul)
-12. [Create Packages Locally](#-create-packages-locally-optional)
-13. [CI / Automation](#-ci--automation)
-14. [Roadmap](#-roadmap--ideas)
-15. [Troubleshooting](#-troubleshooting)
-16. [Contributing](#-contributing)
-17. [Security & Privacy](#-security--privacy)
-18. [License](#-license)
-19. [Acknowledgements](#-acknowledgements)
-20. [Disclaimer](#-disclaimer)
+### ⚡ Performance First
 
----
+Traditional browsers embed full Chromium instances—powerful but **heavy**. Ultralight takes a different approach: lightweight GPU rendering + native shell = **dramatically smaller footprint** and **instant startup**.
 
-## 🚀 Why Ultralight? Ditch the Bloat
-Traditional browsers (and desktop web stacks like Electron / CEF) embed full, sandboxed operating systems (Chromium). They are powerful—but heavy. This project explores how far you can go by combining a lightweight GPU renderer with a native shell for a dramatically smaller footprint and near‑instant startup.
+**Key Benefits:**
+- 🚀 **< 1 second** cold start
+- 🧠 **~50 MB** memory usage
+- 📦 **~40 MB** disk footprint
+- ⚡ **6× faster** rendering
+- 🔋 Lower CPU/battery usage
 
-<p align="center">
-  <img src="https://ultralig.ht/media/base-memory-usage.webp" width="600" alt="Memory Comparison">
-</p>
+</td>
+<td width="50%" valign="top">
 
-Result: lower memory pressure, near‑instant cold starts, smaller footprint, simple embedding, and much more.
+### 📊 vs Electron/CEF
+
+| Metric | Ultralight | Electron |
+|:-------|:----------:|:--------:|
+| **Startup** | < 1s | 3–5s |
+| **Memory** | ~50 MB | 500+ MB |
+| **Disk Size** | ~40 MB | 1+ GB |
+| **Processes** | Single | Multiple |
+| **Architecture** | Native C++ | Node.js + Chromium |
+
+<img src="https://ultralig.ht/media/base-memory-usage.webp" width="100%" alt="Memory Comparison">
+
+</td>
+</tr>
+</table>
 
 ---
 
-## 🎯 Project Philosophy & Goals
-| Feature | Ultralight (This Project) | Electron / CEF |
-|--------|---------------------------|----------------|
-| Performance | ⚡ Up to 6× faster in simple page render ops | Chromium baseline CEF |
-| Memory Usage | 🧠 ~1/10 RAM (no multi-process sandbox) | High (multi-process JS + GPU + Extensions) |
-| Startup | 🚀 < 1s typical | 3–5s cold start |
-| Disk Footprint | 📦 ~30–50 MB packaged | 1+ GB (runtime + Cache) |
-| Rendering | 🎨 Lightweight GPU | Full Chromium CEF Stack |
-| Architecture | 🧱 Native C++ + pixel buffer compositing | Node.js + Chromium + Interop Bridge |
+## 🖥️ Platform Support
 
-Goals:
-- Showcase minimal native browser shell design.
-- Provide reference for Ultralight SDK Browser.
-- Preliminary lightweight content / ad-block / tracking-block.
-- Highlight performance vs conventional heavy frameworks.
+<div align="center">
 
----
+| Platform | Architecture | Status | Package Formats |
+|:--------:|:------------:|:------:|:---------------:|
+| 🪟 **Windows 10/11+** | x64 | ✅ Full Support | ZIP, NSIS Installer |
+| 🍎 **macOS 12+** | x64 | ✅ Full Support | TGZ, DMG |
+| 🍎 **macOS 12+** | ARM64 (Apple Silicon) | ✅ Full Support | TGZ, DMG |
+| 🐧 **Linux** | x64 | ✅ Full Support | TGZ, DEB, RPM |
+| 🐧 **Linux** | ARM64 | ✅ Full Support | TGZ, DEB, RPM |
+| 🪟 **Windows** | ARM64 | 🔜 Coming Soon | — |
 
-## 🖥️ Supported Platforms & Architectures
-| Platform | Architectures | CI Artifacts | Notes |
-|----------|---------------|--------------|-------|
-| Windows 10/11+ | x64 | Portable ZIP, optional NSIS installer | ARM64 SDK not yet published by Ultralight |
-| macOS 12+ | x64, arm64 | TGZ, optional DMG | ARM64 auto‑detected when runner host is ARM64 |
-| Linux (Ubuntu/Fedora etc.) | x64, arm64 | TGZ / DEB / RPM | ARM64 requires aarch64 runner; workflow automatically includes detection & fallback |
+</div>
 
-ARM64 archives are probed automatically when available in the `base-sdk` branch (eg: `ultralight-free-sdk-<ver>-linux-arm64.7z`, `...-mac-arm64.7z`). Current public CI uses x64 runners; arm64 builds may require:
-- Self‑hosted runner (Apple Silicon / aarch64 Linux)
-- Future strategy matrix addition (see CI section)
+> **Note:** ARM64 builds are automatically detected in CI. Windows ARM64 support awaits SDK release from Ultralight.
 
 ---
 
