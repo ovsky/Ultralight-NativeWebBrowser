@@ -1,6 +1,7 @@
 #pragma once
 #include <AppCore/AppCore.h>
 #include <Ultralight/Listener.h>
+#include <string>
 
 class UI;
 using namespace ultralight;
@@ -12,7 +13,8 @@ class Tab : public ViewListener,
             public LoadListener
 {
 public:
-  Tab(UI *ui, uint64_t id, uint32_t width, uint32_t height, int x, int y);
+  Tab(UI *ui, uint64_t id, uint32_t width, uint32_t height, int x, int y,
+      const std::string &user_agent = "");
   ~Tab();
 
   void set_ready_to_close(bool ready) { ready_to_close_ = ready; }

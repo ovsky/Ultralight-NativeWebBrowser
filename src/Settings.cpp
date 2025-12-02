@@ -36,6 +36,48 @@ namespace
       return false;
     return fallback;
   }
+
+  std::string ParseStringLenient(const std::string &buffer, const std::string &key, const std::string &fallback)
+  {
+    if (key.empty())
+      return fallback;
+    std::string needle = std::string("\"") + key + "\"";
+    auto pos = buffer.find(needle);
+    if (pos == std::string::npos)
+      return fallback;
+    pos = buffer.find(':', pos + needle.size());
+    if (pos == std::string::npos)
+      return fallback;
+    ++pos;
+    while (pos < buffer.size() && std::isspace(static_cast<unsigned char>(buffer[pos])))
+      ++pos;
+    if (pos >= buffer.size() || buffer[pos] != '"')
+      return fallback;
+    ++pos; // skip opening quote
+    std::string result;
+    while (pos < buffer.size() && buffer[pos] != '"')
+    {
+      if (buffer[pos] == '\\' && pos + 1 < buffer.size())
+      {
+        ++pos;
+        switch (buffer[pos])
+        {
+        case 'n': result += '\n'; break;
+        case 'r': result += '\r'; break;
+        case 't': result += '\t'; break;
+        case '"': result += '"'; break;
+        case '\\': result += '\\'; break;
+        default: result += buffer[pos]; break;
+        }
+      }
+      else
+      {
+        result += buffer[pos];
+      }
+      ++pos;
+    }
+    return result;
+  }
 }
 
 void SettingsManager::EnsureDataDirectoryExists()
@@ -102,6 +144,8 @@ bool SettingsManager::LoadSettingsFromDisk(UI &ui)
       bool fallback = ui.settings_.*(desc.member);
       ui.settings_.*(desc.member) = ParseBoolLenient(content, desc.key, fallback);
     }
+    // Parse string settings
+    ui.settings_.custom_user_agent = ParseStringLenient(content, "custom_user_agent", "");
     ui.settings_storage_path_ = (migrated ? legacy_path.string() : primary_path.string());
   }
   else
@@ -134,6 +178,7 @@ bool SettingsManager::SaveSettingsToDisk(UI &ui)
   std::ostringstream doc;
   doc << "{\n";
   doc << "  \"values\": " << ui.BuildSettingsJSON() << ",\n";
+  doc << "  \"custom_user_agent\": \"" << util::EscapeJsonString(ui.settings_.custom_user_agent) << "\",\n";
   doc << "  \"meta\": {\n";
   doc << "    \"updated_at\": \"" << util::ToIso8601UTC(std::chrono::system_clock::now()) << "\",\n";
   doc << "    \"dirty\": false,\n";

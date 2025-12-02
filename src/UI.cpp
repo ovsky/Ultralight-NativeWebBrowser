@@ -1866,7 +1866,7 @@ void UI::CreateNewTab()
   int tab_height = window->height() - ui_height_;
   if (tab_height < 1)
     tab_height = 1;
-  tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_);
+  tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_);
   // Load local static start page
   const char *kStartPage = "file:///static-sties/google-static.html";
   tabs_[id]->view()->LoadURL(kStartPage);
@@ -1885,7 +1885,7 @@ RefPtr<View> UI::CreateNewTabForChildView(const String &url)
   int tab_height = window->height() - ui_height_;
   if (tab_height < 1)
     tab_height = 1;
-  tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_);
+  tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_);
 
   {
     RefPtr<JSContext> lock(view()->LockJSContext());
@@ -3016,7 +3016,8 @@ std::string UI::BuildSettingsPayload(bool snapshot_is_baseline) const
   ss << "\"values\": " << BuildSettingsJSON() << ",";
   // Expose the effective user agent string as a separate field so the
   // Settings page can always display the UA that will actually be used.
-  ss << "\"target_user_agent\": \"" << util::EscapeJsonString(active_user_agent_) << "\",";
+  // Also expose the raw custom_user_agent for the input field when use_custom_user_agent is enabled.
+  ss << "\"target_user_agent\": \"" << util::EscapeJsonString(settings_.custom_user_agent.empty() ? active_user_agent_ : settings_.custom_user_agent) << "\",";
   ss << "\"meta\": {";
   ss << "\"updated_at\": \"" << util::ToIso8601UTC(std::chrono::system_clock::now()) << "\",";
   ss << "\"dirty\": " << (settings_dirty_ ? "true" : "false") << ",";
@@ -4377,7 +4378,11 @@ bool UI::BrowserSettings::operator==(const BrowserSettings &other) const
          high_contrast_ui == other.high_contrast_ui &&
          enable_caret_browsing == other.enable_caret_browsing &&
          enable_remote_inspector == other.enable_remote_inspector &&
-         show_performance_overlay == other.show_performance_overlay;
+         show_performance_overlay == other.show_performance_overlay &&
+         use_custom_user_agent == other.use_custom_user_agent &&
+         custom_user_agent == other.custom_user_agent &&
+         auto_save_settings == other.auto_save_settings &&
+         enable_drm_webview == other.enable_drm_webview;
 }
 
 std::filesystem::path UI::SettingsDirectory()

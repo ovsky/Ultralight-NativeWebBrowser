@@ -10,13 +10,34 @@
 
 #define INSPECTOR_DRAG_HANDLE_HEIGHT 10
 
-Tab::Tab(UI *ui, uint64_t id, uint32_t width, uint32_t height, int x, int y)
+Tab::Tab(UI *ui, uint64_t id, uint32_t width, uint32_t height, int x, int y,
+         const std::string &user_agent)
     : ui_(ui), id_(id), container_width_(width), container_height_(height)
 {
-  overlay_ = Overlay::Create(ui->window_, width, height, x, y);
-  view()->set_view_listener(this);
-  view()->set_load_listener(this);
-  view()->set_download_listener(ui->download_manager());
+  // Create a ViewConfig with the user agent - always set one
+  ultralight::ViewConfig cfg;
+  cfg.initial_device_scale = ui->window_->scale();
+  
+  // Always set a user agent - use provided one or fall back to a Chromium-like default
+  if (!user_agent.empty())
+  {
+    cfg.user_agent = String(user_agent.c_str());
+  }
+  else
+  {
+    // Fallback default user agent with Chrome and Safari identifiers
+    cfg.user_agent = String("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36");
+  }
+
+  // Create the view with the custom config
+  auto renderer = App::instance()->renderer();
+  auto view = renderer->CreateView(width, height, cfg, nullptr);
+
+  // Create overlay wrapping the view
+  overlay_ = Overlay::Create(ui->window_, view, x, y);
+  this->view()->set_view_listener(this);
+  this->view()->set_load_listener(this);
+  this->view()->set_download_listener(ui->download_manager());
 }
 
 Tab::~Tab()
