@@ -536,6 +536,10 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
   InitializeExtensions();
 
   adblock_enabled_cached_ = adblock_ ? adblock_->enabled() : adblock_enabled_cached_;
+
+  // Pre-warm WebView2 environment in background for faster DRM tab creation
+  if (settings_.enable_drm_webview)
+    drm::PrewarmWebViewEnvironment();
 }
 
 Tab *UI::active_tab()
@@ -609,6 +613,8 @@ void UI::EnsureDrmManager()
     return;
   void *native = window_ ? window_->native_handle() : nullptr;
   drm_manager_ = std::make_unique<drm::DRMWebViewManager>(native);
+  // Pre-warm the WebView environment to reduce first-load lag
+  drm::PrewarmWebViewEnvironment();
 }
 
 bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_initiated)
@@ -672,10 +678,27 @@ bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_init
   }
 
   drm_tab_urls_[tab_id] = url;
+  drm_tab_titles_[tab_id] = "Loading DRM System...";  // Show loading message initially
   if (ultra_tab)
     ultra_tab->Hide();
   drm_it->second->Show();
   UpdateDrmBadge(tab_id, true);
+  
+  // Update tab title to show loading state
+  {
+    RefPtr<JSContext> lock(view()->LockJSContext());
+    if (updateTab)
+    {
+      ultralight::String title_str("Loading DRM System...");
+      ultralight::String url_str(url.c_str());
+      updateTab({tab_id, title_str, GetFaviconURL(url_str), false});
+    }
+  }
+  
+  // Set loading state immediately
+  if (tab_id == active_tab_id_)
+    SetLoading(true);
+  
   drm_it->second->LoadURL(url);
   return true;
 }
