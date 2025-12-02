@@ -463,13 +463,14 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
   // Bind a native JS callback that the page can call when right-click occurs (main frame only)
   if (is_main_frame)
   {
+    auto url_utf8 = url.utf8();
+
     RefPtr<JSContext> ctx = caller->LockJSContext();
     SetJSContext(ctx->ctx());
     JSObject global = JSGlobalObject();
     global["NativeOpenContextMenu"] = BindJSCallback(&Tab::OnOpenContextMenu);
 
     // Check if this is the settings page
-    auto url_utf8 = url.utf8();
     bool is_settings_page = url_utf8.data() && std::strstr(url_utf8.data(), "settings.html") != nullptr;
     bool is_extensions_page = url_utf8.data() && std::strstr(url_utf8.data(), "extensions.html") != nullptr;
 
