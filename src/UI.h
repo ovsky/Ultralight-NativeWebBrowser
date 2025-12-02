@@ -178,6 +178,7 @@ public:
 
   RefPtr<Window> window() { return window_; }
   DownloadManager *download_manager() { return download_manager_.get(); }
+  AdBlocker *network_blocker() { return adblock_; }
 
 protected:
   static std::filesystem::path SettingsDirectory();
