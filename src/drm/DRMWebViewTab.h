@@ -38,6 +38,7 @@ namespace drm
         virtual void Reload() = 0;
         virtual void Stop() = 0;
         virtual void Focus() = 0;
+        virtual void Blur() = 0;  // Remove focus from WebView
         virtual void Resize(uint32_t width, uint32_t height, uint32_t offset_x, uint32_t offset_y) = 0;
         virtual void Show() = 0;
         virtual void Hide() = 0;

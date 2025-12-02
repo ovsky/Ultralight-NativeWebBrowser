@@ -70,6 +70,13 @@ namespace drm
                 gtk_widget_grab_focus(web_view_);
         }
 
+        void Blur() override
+        {
+            // Remove focus from WebView by focusing parent
+            if (parent_window_)
+                gtk_window_present(GTK_WINDOW(parent_window_));
+        }
+
         void Resize(uint32_t width, uint32_t height, uint32_t offset_x, uint32_t offset_y) override
         {
             if (!container_)
