@@ -141,6 +141,19 @@ namespace drm
             }
         }
 
+        void DetachFromParent() override
+        {
+            // On Linux/GTK, hiding and moving off-screen is sufficient
+            // GTK doesn't intercept keyboard like WebView2 does on Windows
+            Hide();
+        }
+
+        void ReattachToParent() override
+        {
+            // Restore visibility if it was visible before
+            // This is a no-op on Linux since Hide/Show handle everything
+        }
+
         std::string GetTitle() const override { return current_title_; }
         std::string GetURL() const override { return current_url_; }
         bool CanGoBack() const override { return web_view_ && webkit_web_view_can_go_back(WEBKIT_WEB_VIEW(web_view_)); }
