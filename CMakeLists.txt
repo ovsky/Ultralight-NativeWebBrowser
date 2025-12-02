@@ -124,6 +124,20 @@ if(UNIX AND NOT APPLE)
 	target_link_libraries(Ultralight-WebBrowser PRIVATE ${GTK3_LIBRARIES} ${WEBKIT2_LIBRARIES})
 endif()
 
+# On macOS, DRM webview support requires Cocoa and WebKit frameworks.
+if(APPLE)
+	find_library(COCOA_FRAMEWORK Cocoa REQUIRED)
+	find_library(WEBKIT_FRAMEWORK WebKit REQUIRED)
+	find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
+	message(STATUS "Building DRM macOS WebView using Cocoa/WebKit frameworks")
+	target_link_libraries(Ultralight-WebBrowser PRIVATE
+		${COCOA_FRAMEWORK}
+		${WEBKIT_FRAMEWORK}
+		${FOUNDATION_FRAMEWORK}
+		"-framework AppKit"
+	)
+endif()
+
  # Unit test for utils
  enable_testing()
 
