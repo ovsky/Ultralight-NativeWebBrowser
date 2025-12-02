@@ -620,9 +620,19 @@ void UI::EnsureDrmManager()
 bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_initiated)
 {
   if (!settings_.enable_drm_webview)
+  {
+    // DRM webview is disabled in settings
     return false;
+  }
   if (!drm_settings_.IsDRMRequired(url))
+  {
+    // URL is not a DRM site
     return false;
+  }
+
+  // URL matched a DRM site - open in WebView2
+  AppendDrmLog("Opening DRM tab for: " + url);
+
   EnsureDrmManager();
   if (!drm_manager_)
     return false;
@@ -663,11 +673,13 @@ bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_init
   auto drm_it = drm_tabs_.find(tab_id);
   if (drm_it == drm_tabs_.end() || !drm_it->second)
   {
+    // Create new DRM tab
     drm_tabs_[tab_id] = drm_manager_->CreateTab(tab_id, config, callbacks);
     drm_it = drm_tabs_.find(tab_id);
   }
   else
   {
+    // DRM tab already exists - just resize and navigate
     drm_it->second->Resize(config.width, config.height, config.offset_x, config.offset_y);
   }
 
@@ -678,27 +690,34 @@ bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_init
   }
 
   drm_tab_urls_[tab_id] = url;
-  drm_tab_titles_[tab_id] = "Loading DRM System...";  // Show loading message initially
+  drm_tab_titles_[tab_id] = "Loading DRM System...";
   if (ultra_tab)
     ultra_tab->Hide();
   drm_it->second->Show();
   UpdateDrmBadge(tab_id, true);
-  
-  // Update tab title to show loading state
+
+  // Update tab UI to show loading state
   {
     RefPtr<JSContext> lock(view()->LockJSContext());
     if (updateTab)
     {
       ultralight::String title_str("Loading DRM System...");
       ultralight::String url_str(url.c_str());
-      updateTab({tab_id, title_str, GetFaviconURL(url_str), false});
+      updateTab({tab_id, title_str, GetFaviconURL(url_str), true});  // true = loading
+    }
+    // Update URL bar
+    if (tab_id == active_tab_id_)
+    {
+      ultralight::String url_str(url.c_str());
+      SetURL(url_str);
     }
   }
-  
+
   // Set loading state immediately
   if (tab_id == active_tab_id_)
     SetLoading(true);
-  
+
+  // Navigate to URL (this handles pending URL if WebView isn't ready yet)
   drm_it->second->LoadURL(url);
   return true;
 }
@@ -1530,9 +1549,11 @@ void UI::OnRequestChangeURL(const JSObject &obj, const JSArgs &args)
     if (url_data.data())
       url_utf8 = url_data.data();
 
+    // Check if this is a DRM site
     if (MaybeOpenDrmTab(active_tab_id_, url_utf8, true))
       return;
 
+    // Not a DRM site - close any existing DRM tab and show Ultralight tab
     HideDrmTab(active_tab_id_);
     if (!tabs_.empty())
     {
@@ -1558,9 +1579,11 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
     // Record immediately so History UI updates quickly (dedup inside RecordHistory)
     RecordHistory(url, String(""));
 
+    // Check if this is a DRM site
     if (MaybeOpenDrmTab(active_tab_id_, url_utf8, true))
       return;
 
+    // Not a DRM site - close any existing DRM tab and show Ultralight tab
     HideDrmTab(active_tab_id_);
     if (!tabs_.empty())
     {
@@ -1939,6 +1962,11 @@ void UI::UpdateTabTitle(uint64_t id, const ultralight::String &title)
 
 void UI::UpdateTabURL(uint64_t id, const ultralight::String &url)
 {
+  // If this tab already has an active DRM view, ignore URL updates from the Ultralight tab
+  // (they may come from about:blank or other intermediate states)
+  if (GetDrmTab(id) != nullptr)
+    return;
+
   std::string url_utf8;
   auto utf8 = url.utf8();
   if (utf8.data())
@@ -1948,7 +1976,8 @@ void UI::UpdateTabURL(uint64_t id, const ultralight::String &url)
   {
     if (MaybeOpenDrmTab(id, url_utf8, false))
       return;
-    HideDrmTab(id);
+    // Only hide DRM tab if we're navigating away from a DRM site
+    // (this shouldn't happen since we check above, but keep for safety)
   }
 
   if (id == active_tab_id_ && !tabs_.empty())
@@ -2935,6 +2964,7 @@ std::string UI::BuildDefaultChromiumUserAgent() const
 
   // Pretend to be the latest stable Chromium build; this string should
   // be bumped periodically as Chromium versions advance.
+  // Note: Using Chrome 142 which is the latest version.
   std::string ua = "Mozilla/5.0 (";
   ua += platform;
   ua += ") AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36";
