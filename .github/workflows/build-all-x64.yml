@@ -9,7 +9,7 @@ permissions:
   actions: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: build-all-x64-${{ github.ref }}
   cancel-in-progress: true
 
 on:
