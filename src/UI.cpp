@@ -532,6 +532,9 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
   // Load history from disk
   LoadHistoryFromDisk();
 
+  // Initialize extension system
+  InitializeExtensions();
+
   adblock_enabled_cached_ = adblock_ ? adblock_->enabled() : adblock_enabled_cached_;
 }
 
@@ -944,6 +947,17 @@ bool UI::RunShortcutAction(const std::string &action)
     ShowDownloadsOverlay();
     return true;
   }
+  if (action == "open-extensions")
+  {
+    // Open Extensions in a new tab
+    RefPtr<View> child = CreateNewTabForChildView(String("file:///extensions.html"));
+    if (child)
+    {
+      child->LoadURL("file:///extensions.html");
+      return true;
+    }
+    return false;
+  }
   if (action == "open-settings")
   {
     // Open Settings in a NEW tab (like Ctrl+H opens history)
@@ -1151,8 +1165,9 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   bool is_sugg_view = url_utf8.data() && std::strstr(url_utf8.data(), "suggestions.html") != nullptr;
   bool is_downloads_overlay_view = url_utf8.data() && std::strstr(url_utf8.data(), "downloads-panel.html") != nullptr;
   bool is_settings_page_view = url_utf8.data() && std::strstr(url_utf8.data(), "settings.html") != nullptr;
+  bool is_extensions_page_view = url_utf8.data() && std::strstr(url_utf8.data(), "extensions.html") != nullptr;
 
-  if (!is_menu_view && !is_ctx_view && !is_sugg_view && !is_downloads_overlay_view && !is_settings_page_view)
+  if (!is_menu_view && !is_ctx_view && !is_sugg_view && !is_downloads_overlay_view && !is_settings_page_view && !is_extensions_page_view)
   {
     // Only main UI view has these functions
     updateBack = global["updateBack"];
@@ -1228,6 +1243,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnAddressBarNavigate"] = BindJSCallback(&UI::OnAddressBarNavigate);
   global["OnOpenHistoryNewTab"] = BindJSCallback(&UI::OnOpenHistoryNewTab);
   global["OnOpenDownloadsNewTab"] = BindJSCallback(&UI::OnOpenDownloadsNewTab);
+  global["OnOpenExtensionsNewTab"] = BindJSCallback(&UI::OnOpenExtensionsNewTab);
   global["GetDownloadsSnapshot"] = BindJSCallbackWithRetval(&UI::OnDownloadsOverlayGet);
   global["ClearDownloadsSnapshot"] = BindJSCallback(&UI::OnDownloadsOverlayClear);
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
@@ -1266,7 +1282,20 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     }
   }
 
-  if (!is_menu_view && !is_ctx_view && !is_sugg_view && !is_downloads_overlay_view && !is_settings_page_view)
+  if (is_extensions_page_view)
+  {
+    // Extensions page is loaded - bind extension management callbacks
+    global["GetExtensions"] = BindJSCallbackWithRetval(&UI::OnGetExtensions);
+    global["OnToggleExtension"] = BindJSCallback(&UI::OnToggleExtension);
+    global["OnReloadExtension"] = BindJSCallback(&UI::OnReloadExtension);
+    global["OnReloadAllExtensions"] = BindJSCallback(&UI::OnReloadAllExtensions);
+    global["OnDeleteExtension"] = BindJSCallback(&UI::OnDeleteExtension);
+    global["OnLoadExtension"] = BindJSCallback(&UI::OnLoadExtension);
+    global["OnCreateExtension"] = BindJSCallback(&UI::OnCreateExtension);
+    global["OnOpenExtensionsFolder"] = BindJSCallback(&UI::OnOpenExtensionsFolder);
+  }
+
+  if (!is_menu_view && !is_ctx_view && !is_sugg_view && !is_downloads_overlay_view && !is_settings_page_view && !is_extensions_page_view)
   {
     SyncAdblockStateToUI();
     SyncSettingsStateToUI(true);
@@ -1534,6 +1563,300 @@ void UI::OnOpenDownloadsNewTab(const JSObject &obj, const JSArgs &args)
   RefPtr<View> child = CreateNewTabForChildView(String("file:///downloads.html"));
   if (child)
     child->LoadURL("file:///downloads.html");
+}
+
+void UI::OnOpenExtensionsNewTab(const JSObject &obj, const JSArgs &args)
+{
+  RefPtr<View> child = CreateNewTabForChildView(String("file:///extensions.html"));
+  if (child)
+    child->LoadURL("file:///extensions.html");
+}
+
+// ============================================================================
+// Extension System Implementation
+// ============================================================================
+
+void UI::InitializeExtensions()
+{
+  std::string ext_dir = GetExtensionsDirectory();
+  extensions::ExtensionManager::Instance().Initialize(ext_dir);
+}
+
+std::string UI::GetExtensionsDirectory() const
+{
+  namespace fs = std::filesystem;
+  fs::path dir = SettingsDirectory() / "extensions";
+  if (!fs::exists(dir))
+  {
+    std::error_code ec;
+    fs::create_directories(dir, ec);
+  }
+  return dir.string();
+}
+
+std::string UI::BuildExtensionsPayload() const
+{
+  const auto &extensions = extensions::ExtensionManager::Instance().GetExtensions();
+  std::string ext_dir = GetExtensionsDirectory();
+
+  std::ostringstream ss;
+  ss << "{\"extensions\":[";
+  bool first = true;
+  for (const auto &ext : extensions)
+  {
+    if (!first)
+      ss << ",";
+    first = false;
+
+    ss << "{";
+    ss << "\"id\":\"" << ext.id << "\",";
+    ss << "\"name\":\"";
+    // Escape name for JSON
+    for (char c : ext.name)
+    {
+      if (c == '"')
+        ss << "\\\"";
+      else if (c == '\\')
+        ss << "\\\\";
+      else if (c == '\n')
+        ss << "\\n";
+      else
+        ss << c;
+    }
+    ss << "\",";
+    ss << "\"description\":\"";
+    for (char c : ext.description)
+    {
+      if (c == '"')
+        ss << "\\\"";
+      else if (c == '\\')
+        ss << "\\\\";
+      else if (c == '\n')
+        ss << "\\n";
+      else
+        ss << c;
+    }
+    ss << "\",";
+    ss << "\"version\":\"" << ext.version << "\",";
+    ss << "\"author\":\"";
+    for (char c : ext.author)
+    {
+      if (c == '"')
+        ss << "\\\"";
+      else if (c == '\\')
+        ss << "\\\\";
+      else
+        ss << c;
+    }
+    ss << "\",";
+    ss << "\"enabled\":" << (ext.enabled ? "true" : "false") << ",";
+    ss << "\"manifest_path\":\"";
+    std::string base_path_str = ext.base_path.string();
+    for (char c : base_path_str)
+    {
+      if (c == '"')
+        ss << "\\\"";
+      else if (c == '\\')
+        ss << "\\\\";
+      else
+        ss << c;
+    }
+    ss << "\",";
+
+    // Match patterns
+    ss << "\"match_patterns\":[";
+    bool first_pattern = true;
+    for (const auto &p : ext.match_patterns)
+    {
+      if (!first_pattern)
+        ss << ",";
+      first_pattern = false;
+      ss << "\"" << p << "\"";
+    }
+    ss << "],";
+
+    // Permissions (empty for now since Extension struct doesn't have permissions)
+    ss << "\"permissions\":[]";
+
+    ss << "}";
+  }
+  ss << "],\"extensions_path\":\"";
+  for (char c : ext_dir)
+  {
+    if (c == '\\')
+      ss << "\\\\";
+    else if (c == '"')
+      ss << "\\\"";
+    else
+      ss << c;
+  }
+  ss << "\"}";
+  return ss.str();
+}
+
+ultralight::JSValue UI::OnGetExtensions(const JSObject &obj, const JSArgs &args)
+{
+  std::string payload = BuildExtensionsPayload();
+  return JSValue(String(payload.c_str()));
+}
+
+void UI::OnToggleExtension(const JSObject &obj, const JSArgs &args)
+{
+  if (args.size() < 2)
+    return;
+  ultralight::String id_ul = args[0].ToString();
+  auto id_str = id_ul.utf8();
+  std::string id = id_str.data() ? id_str.data() : "";
+  bool enabled = args[1].ToBoolean();
+
+  extensions::ExtensionManager::Instance().SetExtensionEnabled(id, enabled);
+}
+
+void UI::OnReloadExtension(const JSObject &obj, const JSArgs &args)
+{
+  if (args.empty())
+    return;
+  ultralight::String id_ul = args[0].ToString();
+  auto id_str = id_ul.utf8();
+  std::string id = id_str.data() ? id_str.data() : "";
+  // Reload a specific extension by unloading and reloading it
+  auto* ext = extensions::ExtensionManager::Instance().GetExtension(id);
+  if (ext) {
+    std::filesystem::path ext_path = ext->base_path;
+    extensions::ExtensionManager::Instance().UnloadExtension(id);
+    extensions::ExtensionManager::Instance().LoadExtension(ext_path);
+  }
+}
+
+void UI::OnReloadAllExtensions(const JSObject &obj, const JSArgs &args)
+{
+  extensions::ExtensionManager::Instance().ReloadAll();
+}
+
+void UI::OnDeleteExtension(const JSObject &obj, const JSArgs &args)
+{
+  if (args.empty())
+    return;
+  ultralight::String id_ul = args[0].ToString();
+  auto id_str = id_ul.utf8();
+  std::string id = id_str.data() ? id_str.data() : "";
+  extensions::ExtensionManager::Instance().DeleteExtension(id);
+}
+
+void UI::OnLoadExtension(const JSObject &obj, const JSArgs &args)
+{
+  if (args.empty())
+    return;
+  ultralight::String path_ul = args[0].ToString();
+  auto path_str = path_ul.utf8();
+  std::string path = path_str.data() ? path_str.data() : "";
+  extensions::ExtensionManager::Instance().LoadExtension(path);
+}
+
+void UI::OnCreateExtension(const JSObject &obj, const JSArgs &args)
+{
+  if (args.empty())
+    return;
+  ultralight::String json_ul = args[0].ToString();
+  auto json_str = json_ul.utf8();
+  std::string json_data = json_str.data() ? json_str.data() : "";
+
+  // Parse the JSON to extract id, name, description, match_pattern, script
+  // Simple parsing (not full JSON parser)
+  auto extract_value = [&json_data](const std::string &key) -> std::string
+  {
+    std::string search_key = "\"" + key + "\":\"";
+    size_t pos = json_data.find(search_key);
+    if (pos == std::string::npos)
+      return "";
+    pos += search_key.length();
+    std::string result;
+    while (pos < json_data.length() && json_data[pos] != '"')
+    {
+      if (json_data[pos] == '\\' && pos + 1 < json_data.length())
+      {
+        pos++;
+        if (json_data[pos] == 'n')
+          result += '\n';
+        else if (json_data[pos] == 't')
+          result += '\t';
+        else
+          result += json_data[pos];
+      }
+      else
+      {
+        result += json_data[pos];
+      }
+      pos++;
+    }
+    return result;
+  };
+
+  std::string id = extract_value("id");
+  std::string name = extract_value("name");
+  std::string description = extract_value("description");
+  std::string match_pattern = extract_value("match_pattern");
+  std::string script = extract_value("script");
+
+  if (id.empty() || script.empty())
+    return;
+
+  // Create extension directory and files manually
+  namespace fs = std::filesystem;
+  fs::path ext_base = fs::path(GetExtensionsDirectory()) / id;
+  if (!fs::exists(ext_base))
+  {
+    std::error_code ec;
+    fs::create_directories(ext_base, ec);
+    if (ec)
+      return;
+  }
+
+  // Create manifest.json
+  std::ofstream manifest_file(ext_base / "manifest.json");
+  if (manifest_file.is_open())
+  {
+    manifest_file << "{\n";
+    manifest_file << "  \"id\": \"" << id << "\",\n";
+    manifest_file << "  \"name\": \"" << (name.empty() ? id : name) << "\",\n";
+    manifest_file << "  \"description\": \"" << description << "\",\n";
+    manifest_file << "  \"version\": \"1.0.0\",\n";
+    manifest_file << "  \"content_scripts\": [\n";
+    manifest_file << "    {\n";
+    manifest_file << "      \"matches\": [\"" << (match_pattern.empty() ? "*://*/*" : match_pattern) << "\"],\n";
+    manifest_file << "      \"js\": [\"content.js\"]\n";
+    manifest_file << "    }\n";
+    manifest_file << "  ]\n";
+    manifest_file << "}\n";
+    manifest_file.close();
+  }
+
+  // Create content.js with the script
+  std::ofstream script_file(ext_base / "content.js");
+  if (script_file.is_open())
+  {
+    script_file << script;
+    script_file.close();
+  }
+
+  // Load the newly created extension
+  extensions::ExtensionManager::Instance().LoadExtension(ext_base);
+}
+
+void UI::OnOpenExtensionsFolder(const JSObject &obj, const JSArgs &args)
+{
+  std::string ext_dir = GetExtensionsDirectory();
+#ifdef _WIN32
+  // Use ShellExecute to open folder
+  std::wstring wide_path(ext_dir.begin(), ext_dir.end());
+  ShellExecuteW(NULL, L"explore", wide_path.c_str(), NULL, NULL, SW_SHOWNORMAL);
+#elif defined(__APPLE__)
+  std::string cmd = "open \"" + ext_dir + "\"";
+  system(cmd.c_str());
+#else
+  std::string cmd = "xdg-open \"" + ext_dir + "\"";
+  system(cmd.c_str());
+#endif
 }
 
 void UI::CreateNewTab()

@@ -2,6 +2,7 @@
 #include <AppCore/AppCore.h>
 #include "Tab.h"
 #include "drm/DRMSettings.h"
+#include "ExtensionManager.h"
 #include <map>
 #include <memory>
 #include <string>
@@ -164,6 +165,17 @@ public:
   void OnSuggestOpen(const JSObject &obj, const JSArgs &args);
   void OnSuggestClose(const JSObject &obj, const JSArgs &args);
 
+  // Extension system callbacks
+  void OnOpenExtensionsNewTab(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnGetExtensions(const JSObject &obj, const JSArgs &args);
+  void OnToggleExtension(const JSObject &obj, const JSArgs &args);
+  void OnReloadExtension(const JSObject &obj, const JSArgs &args);
+  void OnReloadAllExtensions(const JSObject &obj, const JSArgs &args);
+  void OnDeleteExtension(const JSObject &obj, const JSArgs &args);
+  void OnLoadExtension(const JSObject &obj, const JSArgs &args);
+  void OnCreateExtension(const JSObject &obj, const JSArgs &args);
+  void OnOpenExtensionsFolder(const JSObject &obj, const JSArgs &args);
+
   RefPtr<Window> window() { return window_; }
   DownloadManager *download_manager() { return download_manager_.get(); }
 
@@ -252,6 +264,11 @@ protected:
   static std::string Base64Decode(const std::string &in);
   double GetOriginScore(const std::string &origin);
   void PruneFaviconDiskCacheToLimit();
+
+  // Extension system helpers
+  void InitializeExtensions();
+  std::string BuildExtensionsPayload() const;
+  std::string GetExtensionsDirectory() const;
 
   Tab *active_tab();
   drm::DRMWebViewTab *active_drm_tab();
