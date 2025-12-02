@@ -208,8 +208,25 @@ namespace drm
 
         void Close() override
         {
+            // CRITICAL: Hide the WebView2 immediately and forcefully before closing
+            desired_visible_ = false;
+            if (controller_)
+            {
+                // Move off-screen and hide BEFORE closing to prevent visual artifacts
+                RECT offscreen = {-10000, -10000, -9000, -9000};
+                controller_->put_Bounds(offscreen);
+                controller_->put_IsVisible(FALSE);
+                
+                // Reparent WebView2 away from main window to ensure it doesn't render
+                // This is critical because controller_->Close() is asynchronous
+                controller_->put_ParentWindow(NULL);
+            }
+            
             if (webview_)
             {
+                // Navigate to blank to stop any rendering
+                webview_->Navigate(L"about:blank");
+                
                 if (title_handler_registered_)
                     webview_->remove_DocumentTitleChanged(title_token_);
                 if (source_handler_registered_)
@@ -226,6 +243,27 @@ namespace drm
             }
             webview_.Reset();
             environment_.Reset();
+        }
+
+        void DetachFromParent() override
+        {
+            // Temporarily remove WebView2 from window hierarchy to prevent keyboard interception
+            if (controller_)
+            {
+                controller_->put_ParentWindow(NULL);
+                controller_->put_IsVisible(FALSE);
+            }
+        }
+
+        void ReattachToParent() override
+        {
+            // Restore WebView2 to window hierarchy
+            if (controller_ && parent_hwnd_)
+            {
+                controller_->put_ParentWindow(parent_hwnd_);
+                if (desired_visible_)
+                    controller_->put_IsVisible(TRUE);
+            }
         }
 
         std::string GetTitle() const override { return current_title_; }
@@ -445,6 +483,8 @@ namespace drm
         void Show() override {}
         void Hide() override {}
         void Close() override {}
+        void DetachFromParent() override {}
+        void ReattachToParent() override {}
         std::string GetTitle() const override { return "DRM WebView"; }
         std::string GetURL() const override { return std::string(); }
         bool CanGoBack() const override { return false; }

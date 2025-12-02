@@ -792,10 +792,18 @@ void UI::HandleDrmLoading(uint64_t tab_id, bool is_loading)
         drm_it->second->Show();
     }
     
-    // Hide the Ultralight loading page
+    // Pre-load solid background in Ultralight tab so it's ready when overlays open (no lag)
+    // The background has a fast fade-in animation for smooth visual transition
     auto tab_it = tabs_.find(tab_id);
     if (tab_it != tabs_.end() && tab_it->second)
+    {
+      tab_it->second->view()->LoadHTML(R"(<!DOCTYPE html><html><head><style>
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden}
+body{background:#1a1a2e;animation:fadeIn 0.15s ease-out}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+</style></head><body></body></html>)");
       tab_it->second->Hide();
+    }
   }
 }
 
@@ -1059,6 +1067,21 @@ bool UI::RunShortcutAction(const std::string &action)
 
 bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
 {
+  // CRITICAL: If clicking in UI area (toolbar) on a DRM tab, detach WebView2 immediately
+  // This prevents WebView2 from intercepting keyboard input to address bar
+  if (evt.type == MouseEvent::kType_MouseDown && evt.y <= ui_height_)
+  {
+    auto drm_it = drm_tabs_.find(active_tab_id_);
+    if (drm_it != drm_tabs_.end() && drm_it->second)
+    {
+      drm_it->second->DetachFromParent();
+      // Show solid background
+      auto tab_it = tabs_.find(active_tab_id_);
+      if (tab_it != tabs_.end() && tab_it->second)
+        tab_it->second->Show();
+    }
+  }
+  
   // If menu overlay is active, route mouse events to it and consume
   if (menu_overlay_ && menu_overlay_->view())
   {
@@ -1624,6 +1647,17 @@ void UI::OnRequestChangeURL(const JSObject &obj, const JSArgs &args)
 
 void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
 {
+  // DEBUG: Log that we got here
+  std::ofstream debug("debug_navigate.txt", std::ios::app);
+  debug << "OnAddressBarNavigate called with " << args.size() << " args\n";
+  if (args.size() > 0) {
+    ultralight::String url = args[0];
+    auto url_data = url.utf8();
+    if (url_data.data())
+      debug << "URL: " << url_data.data() << "\n";
+  }
+  debug.close();
+  
   if (args.size() == 1)
   {
     ultralight::String url = args[0];
@@ -1631,33 +1665,76 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
     auto url_data = url.utf8();
     if (url_data.data())
       url_utf8 = url_data.data();
+    
     // Record immediately so History UI updates quickly (dedup inside RecordHistory)
     RecordHistory(url, String(""));
 
-    // If currently on a DRM site, always close it and navigate in standard tab
-    // This simplifies URL changes on DRM sites
-    auto drm_it = drm_tabs_.find(active_tab_id_);
-    if (drm_it != drm_tabs_.end() && drm_it->second)
-    {
-      // Close the DRM tab first
-      HideDrmTab(active_tab_id_);
-    }
-
     // Check if the new URL is a DRM site
-    if (MaybeOpenDrmTab(active_tab_id_, url_utf8, true))
-      return;
+    bool new_url_is_drm = drm_settings_.IsDRMRequired(url_utf8);
 
-    // Not a DRM site - ensure Ultralight tab is shown and navigate
-    HideAllDrmTabs();
-    if (!tabs_.empty())
+    // Check if currently on a DRM site
+    auto drm_it = drm_tabs_.find(active_tab_id_);
+    bool is_on_drm = (drm_it != drm_tabs_.end() && drm_it->second);
+    
+    if (is_on_drm && new_url_is_drm)
     {
-      auto &tab = tabs_[active_tab_id_];
-      if (tab)
+      // DRM -> DRM: Simple navigation within WebView2
+      drm_it->second->LoadURL(url_utf8);
+      drm_tab_urls_[active_tab_id_] = url_utf8;
+      SetURL(url);
+      return;
+    }
+    
+    if (is_on_drm && !new_url_is_drm)
+    {
+      // DRM -> Non-DRM: Close DRM tab, convert to standard Ultralight tab
+      uint64_t tab_id = active_tab_id_;
+      
+      // Close and remove DRM WebView2
+      drm_it->second->Close();
+      drm_tabs_.erase(tab_id);
+      drm_tab_urls_.erase(tab_id);
+      drm_tab_titles_.erase(tab_id);
+      
+      // Update UI to remove DRM badge
+      UpdateDrmBadge(tab_id, false);
+      
+      // Navigate the Ultralight tab to the new URL
+      auto tab_it = tabs_.find(tab_id);
+      if (tab_it != tabs_.end() && tab_it->second)
       {
-        tab->Show();
-        tab->view()->Focus();  // Ensure focus returns to Ultralight
-        tab->view()->LoadURL(url);
+        tab_it->second->Show();
+        tab_it->second->view()->Focus();
+        tab_it->second->view()->LoadURL(url);
+        
+        // Update UI immediately
+        SetURL(url);
+        SetLoading(true);
       }
+      return;
+    }
+    
+    if (!is_on_drm && new_url_is_drm)
+    {
+      // Non-DRM -> DRM: Convert existing tab to DRM tab
+      uint64_t tab_id = active_tab_id_;
+      
+      // Create DRM tab (this will handle loading page display)
+      if (MaybeOpenDrmTab(tab_id, url_utf8, true))
+      {
+        // Update UI to add DRM badge
+        UpdateDrmBadge(tab_id, true);
+      }
+      return;
+    }
+    
+    // Non-DRM -> Non-DRM: Standard navigation
+    auto tab_it = tabs_.find(active_tab_id_);
+    if (tab_it != tabs_.end() && tab_it->second)
+    {
+      tab_it->second->view()->LoadURL(url);
+      tab_it->second->Show();
+      tab_it->second->view()->Focus();
     }
   }
 }
@@ -2455,13 +2532,10 @@ void UI::ShowDownloadsOverlay()
   if (drm_it != drm_tabs_.end() && drm_it->second)
   {
     drm_it->second->Hide();
-    // Show Ultralight tab with solid background to cover any residual rendering
+    // Show the pre-loaded solid background Ultralight tab
     auto tab_it = tabs_.find(active_tab_id_);
     if (tab_it != tabs_.end() && tab_it->second)
-    {
-      tab_it->second->view()->LoadHTML(R"(<html><head><style>html,body{margin:0;padding:0;background:#1a1a2e;width:100%;height:100%}</style></head><body></body></html>)");
-      tab_it->second->Show();  // Show it so the solid background covers everything
-    }
+      tab_it->second->Show();
   }
 
   ultralight::ViewConfig cfg;
@@ -3311,13 +3385,10 @@ void UI::ShowMenuOverlay()
   if (drm_it != drm_tabs_.end() && drm_it->second)
   {
     drm_it->second->Hide();
-    // Show Ultralight tab with solid background to cover any residual rendering
+    // Show the pre-loaded solid background Ultralight tab
     auto tab_it = tabs_.find(active_tab_id_);
     if (tab_it != tabs_.end() && tab_it->second)
-    {
-      tab_it->second->view()->LoadHTML(R"(<html><head><style>html,body{margin:0;padding:0;background:#1a1a2e;width:100%;height:100%}</style></head><body></body></html>)");
-      tab_it->second->Show();  // Show it so the solid background covers everything
-    }
+      tab_it->second->Show();
   }
 
   // Create a transparent View so only the dropdown is visible over content
@@ -3382,13 +3453,10 @@ void UI::ShowContextMenuOverlay(int x, int y, const ultralight::String &json_inf
   if (drm_it != drm_tabs_.end() && drm_it->second)
   {
     drm_it->second->Hide();
-    // Show Ultralight tab with solid background to cover any residual rendering
+    // Show the pre-loaded solid background Ultralight tab
     auto tab_it = tabs_.find(active_tab_id_);
     if (tab_it != tabs_.end() && tab_it->second)
-    {
-      tab_it->second->view()->LoadHTML(R"(<html><head><style>html,body{margin:0;padding:0;background:#1a1a2e;width:100%;height:100%}</style></head><body></body></html>)");
-      tab_it->second->Show();  // Show it so the solid background covers everything
-    }
+      tab_it->second->Show();
   }
 
   ultralight::ViewConfig cfg;

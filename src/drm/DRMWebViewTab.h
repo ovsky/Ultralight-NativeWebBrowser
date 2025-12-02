@@ -43,6 +43,8 @@ namespace drm
         virtual void Show() = 0;
         virtual void Hide() = 0;
         virtual void Close() = 0;
+        virtual void DetachFromParent() = 0;  // Remove from window hierarchy to prevent key interception
+        virtual void ReattachToParent() = 0;  // Restore to window hierarchy
         virtual std::string GetTitle() const = 0;
         virtual std::string GetURL() const = 0;
         virtual bool CanGoBack() const = 0;
