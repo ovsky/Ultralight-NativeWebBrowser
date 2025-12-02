@@ -1,11 +1,10 @@
 #include "drm/DRMWebViewTab.h"
 
-// Guard Obj-C++ implementation so it is only compiled
-// when building for Apple platforms. Some non-Apple CI
-// toolchains may still parse this file, so keep the
-// preprocessor guard as the very first thing after
-// includes to ensure @interface/@implementation remain
-// in global scope of a skipped translation unit.
+// Guard Obj-C++ implementation so it is only compiled when
+// targeting Apple platforms. Keep the preprocessor guard as
+// the very first thing after includes so that any non-Apple
+// compiler will skip the entire translation unit before it
+// sees Objective-C declarations.
 #if defined(__APPLE__)
 
 #import <Cocoa/Cocoa.h>
@@ -35,6 +34,10 @@ namespace
 
 class DRMWebViewTabMac;
 
+// Keep Objective-C declarations at true global scope in this
+// translation unit (inside the APPLE guard but outside all
+// C++ namespaces/classes) to satisfy clang's requirement that
+// @interface/@implementation appear in global scope.
 @interface DRMWebViewObserver : NSObject <WKNavigationDelegate>
 @property(nonatomic, assign) DRMWebViewTabMac *owner;
 @end
