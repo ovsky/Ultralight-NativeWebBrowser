@@ -1,9 +1,15 @@
 #if defined(__APPLE__)
 
-#include "drm/DRMWebViewTab.h"
-
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
+
+// Forward-declare the C++ DRMWebViewTabMac for use in Obj-C
+// and define Objective-C types at true global scope.
+class DRMWebViewTabMac;
+
+@interface DRMWebViewObserver : NSObject <WKNavigationDelegate>
+@property(nonatomic, assign) DRMWebViewTabMac *owner;
+@end
 
 namespace drm
 {
@@ -26,16 +32,6 @@ namespace
     return [NSURLRequest requestWithURL:nsURL];
   }
 }
-
-class DRMWebViewTabMac;
-
-// Keep Objective-C declarations at true global scope in this
-// translation unit (inside the APPLE guard but outside all
-// C++ namespaces/classes) to satisfy clang's requirement that
-// @interface/@implementation appear in global scope.
-@interface DRMWebViewObserver : NSObject <WKNavigationDelegate>
-@property(nonatomic, assign) DRMWebViewTabMac *owner;
-@end
 
 class DRMWebViewTabMac : public DRMWebViewTab
 {
