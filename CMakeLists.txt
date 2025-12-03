@@ -304,6 +304,18 @@ if(WIN32)
 		set(CPACK_NSIS_MUI_ICON "${APP_ICON_ICO}")
 		set(CPACK_NSIS_MUI_UNIICON "${APP_ICON_ICO}")
 	endif()
+	
+	# Configure Start Menu shortcuts to point to the correct executable
+	set(CPACK_NSIS_INSTALLED_ICON_NAME "${INSTALL_DIR_NAME}\\\\Ultralight-WebBrowser.exe")
+	set(CPACK_NSIS_CREATE_ICONS_EXTRA "
+		CreateShortCut \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Ultralight Web Browser.lnk\\\" \\\"$INSTDIR\\\\${INSTALL_DIR_NAME}\\\\Ultralight-WebBrowser.exe\\\" \\\"\\\" \\\"$INSTDIR\\\\${INSTALL_DIR_NAME}\\\\Ultralight-WebBrowser.exe\\\" 0
+	")
+	set(CPACK_NSIS_DELETE_ICONS_EXTRA "
+		Delete \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Ultralight Web Browser.lnk\\\"
+	")
+	set(CPACK_NSIS_MENU_LINKS
+		"${INSTALL_DIR_NAME}/Ultralight-WebBrowser.exe" "Ultralight Web Browser"
+	)
 else()
 	if(NOT DEFINED CPACK_GENERATOR)
 		set(CPACK_GENERATOR "TGZ")
