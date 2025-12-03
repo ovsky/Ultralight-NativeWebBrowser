@@ -15,7 +15,7 @@ TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
 # Initialize summary
 cat > "$BUILD_DIR/$OUTPUT_FILE" << EOF
-# 🚀 Ultralight WebBrowser Build Summary
+# 🚀 Ultralight WebBrowser Build Summary - $PLATFORM $ARCHITECTURE
 
 **Platform:** $PLATFORM  
 **Architecture:** $ARCHITECTURE  
@@ -62,11 +62,28 @@ EOF
 if [ -f "$BUILD_DIR/CMakeCache.txt" ]; then
     echo "### CMake Settings" >> "$BUILD_DIR/$OUTPUT_FILE"
     echo "" >> "$BUILD_DIR/$OUTPUT_FILE"
-    echo '```text' >> "$BUILD_DIR/$OUTPUT_FILE"
+    echo "| Setting | Value |" >> "$BUILD_DIR/$OUTPUT_FILE"
+    echo "|---------|-------|" >> "$BUILD_DIR/$OUTPUT_FILE"
     
-    grep -E "^(CMAKE_BUILD_TYPE|CMAKE_CXX_COMPILER_ID|CMAKE_CXX_COMPILER_VERSION|CMAKE_GENERATOR|BUILD_TESTING|CREATE_INSTALLER)" "$BUILD_DIR/CMakeCache.txt" || true >> "$BUILD_DIR/$OUTPUT_FILE"
+    # Extract and format CMake settings
+    BUILD_TYPE=$(grep "^CMAKE_BUILD_TYPE:" "$BUILD_DIR/CMakeCache.txt" 2>/dev/null | cut -d'=' -f2 || echo "N/A")
+    COMPILER_ID=$(grep "^CMAKE_CXX_COMPILER_ID:" "$BUILD_DIR/CMakeCache.txt" 2>/dev/null | cut -d'=' -f2 || echo "N/A")
+    COMPILER_VER=$(grep "^CMAKE_CXX_COMPILER_VERSION:" "$BUILD_DIR/CMakeCache.txt" 2>/dev/null | cut -d'=' -f2 || echo "N/A")
+    GENERATOR=$(grep "^CMAKE_GENERATOR:" "$BUILD_DIR/CMakeCache.txt" 2>/dev/null | cut -d'=' -f2 || echo "N/A")
+    BUILD_TESTING=$(grep "^BUILD_TESTING:" "$BUILD_DIR/CMakeCache.txt" 2>/dev/null | cut -d'=' -f2 || echo "OFF")
+    CREATE_INSTALLER=$(grep "^CREATE_INSTALLER:" "$BUILD_DIR/CMakeCache.txt" 2>/dev/null | cut -d'=' -f2 || echo "N/A")
     
-    echo '```' >> "$BUILD_DIR/$OUTPUT_FILE"
+    echo "| Build Type | \`$BUILD_TYPE\` |" >> "$BUILD_DIR/$OUTPUT_FILE"
+    echo "| Compiler | $COMPILER_ID $COMPILER_VER |" >> "$BUILD_DIR/$OUTPUT_FILE"
+    echo "| Generator | $GENERATOR |" >> "$BUILD_DIR/$OUTPUT_FILE"
+    echo "| Build Testing | $BUILD_TESTING |" >> "$BUILD_DIR/$OUTPUT_FILE"
+    echo "| Create Installer | $CREATE_INSTALLER |" >> "$BUILD_DIR/$OUTPUT_FILE"
+    
+    echo "" >> "$BUILD_DIR/$OUTPUT_FILE"
+else
+    echo "### CMake Settings" >> "$BUILD_DIR/$OUTPUT_FILE"
+    echo "" >> "$BUILD_DIR/$OUTPUT_FILE"
+    echo "ℹ️ CMake cache not available" >> "$BUILD_DIR/$OUTPUT_FILE"
     echo "" >> "$BUILD_DIR/$OUTPUT_FILE"
 fi
 
@@ -93,7 +110,13 @@ if [ -d "$BUILD_DIR/assets" ]; then
     ASSET_COUNT=$(find "$BUILD_DIR/assets" -type f | wc -l)
     echo "✅ **Assets directory found:** $ASSET_COUNT files" >> "$BUILD_DIR/$OUTPUT_FILE"
 else
-    echo "⚠️ **Assets directory not found**" >> "$BUILD_DIR/$OUTPUT_FILE"
+    # Assets might be bundled in a different location
+    if [ -d "$BUILD_DIR/Release/assets" ]; then
+        ASSET_COUNT=$(find "$BUILD_DIR/Release/assets" -type f | wc -l)
+        echo "✅ **Assets directory found:** $ASSET_COUNT files" >> "$BUILD_DIR/$OUTPUT_FILE"
+    else
+        echo "ℹ️ Assets bundled in package or located elsewhere" >> "$BUILD_DIR/$OUTPUT_FILE"
+    fi
 fi
 
 # Check for shared libraries (Linux)

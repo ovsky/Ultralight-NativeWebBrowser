@@ -37,13 +37,13 @@ $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC"
 
 # Initialize summary content
 $summary = @"
-# 🚀 Ultralight WebBrowser Build Summary
+# 🚀 Ultralight WebBrowser Build Summary - $Platform $Architecture
 
 **Platform:** $Platform  
 **Architecture:** $Architecture  
 **Version:** $Version  
 **Build Date:** $timestamp  
-**Commit:** $CommitSha  
+**Commit:** ``$CommitSha``  
 **Ultralight SDK:** $SdkVersion
 
 ---
@@ -88,27 +88,40 @@ $summary += @"
 $cmakeCacheFile = Join-Path $BuildDir "CMakeCache.txt"
 if (Test-Path $cmakeCacheFile) {
     $summary += "`n### CMake Settings`n`n"
-    $summary += "```text`n"
+    $summary += "| Setting | Value |`n"
+    $summary += "|---------|-------|`n"
     
     # Extract key configuration values
     $configKeys = @(
-        "CMAKE_BUILD_TYPE",
-        "CMAKE_CXX_COMPILER_ID",
-        "CMAKE_CXX_COMPILER_VERSION",
-        "CMAKE_GENERATOR",
-        "BUILD_TESTING",
-        "CREATE_INSTALLER"
+        @{ Key = "CMAKE_BUILD_TYPE"; Label = "Build Type" },
+        @{ Key = "CMAKE_CXX_COMPILER_ID"; Label = "Compiler" },
+        @{ Key = "CMAKE_CXX_COMPILER_VERSION"; Label = "Compiler Version" },
+        @{ Key = "CMAKE_GENERATOR"; Label = "Generator" },
+        @{ Key = "CMAKE_SYSTEM_NAME"; Label = "System" },
+        @{ Key = "CMAKE_SYSTEM_PROCESSOR"; Label = "Processor" }
     )
     
     $cacheContent = Get-Content $cmakeCacheFile
-    foreach ($key in $configKeys) {
-        $match = $cacheContent | Select-String -Pattern "^$key.*=" | Select-Object -First 1
-        if ($match) {
-            $summary += "$match`n"
+    $foundAny = $false
+    foreach ($config in $configKeys) {
+        $match = $cacheContent | Select-String -Pattern "^$($config.Key):.*=(.+)$" | Select-Object -First 1
+        if ($match -and $match.Matches[0].Groups[1].Value) {
+            $value = $match.Matches[0].Groups[1].Value.Trim()
+            if ($value -and $value -ne "") {
+                $summary += "| $($config.Label) | ``$value`` |`n"
+                $foundAny = $true
+            }
         }
     }
     
-    $summary += "```n`n"
+    if (-not $foundAny) {
+        $summary += "| (No CMake settings found) | - |`n"
+    }
+    
+    $summary += "`n"
+} else {
+    $summary += "`n### CMake Settings`n`n"
+    $summary += "ℹ️ CMake cache not available (build may use cached configuration)`n`n"
 }
 
 $summary += @"
@@ -143,7 +156,14 @@ if (Test-Path $assetsDir) {
     $assetCount = (Get-ChildItem -Path $assetsDir -Recurse -File).Count
     $summary += "✅ **Assets directory found:** $assetCount files`n"
 } else {
-    $summary += "⚠️ **Assets directory not found**`n"
+    # Assets might be in Release folder or bundled differently
+    $releaseAssets = Join-Path $BuildDir "Release/assets"
+    if (Test-Path $releaseAssets) {
+        $assetCount = (Get-ChildItem -Path $releaseAssets -Recurse -File).Count
+        $summary += "✅ **Assets directory found:** $assetCount files`n"
+    } else {
+        $summary += "ℹ️ Assets bundled in package or located elsewhere`n"
+    }
 }
 
 # Check for required DLLs (Windows only)

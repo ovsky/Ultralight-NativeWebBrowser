@@ -27,6 +27,11 @@ on:
         required: false
         type: boolean
         default: false
+      clean_build:
+        description: "Clean build (skip all caches for fresh build)"
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       sdk_url:
@@ -51,6 +56,11 @@ on:
         required: false
         type: boolean
         default: false
+      clean_build:
+        description: "Clean build (skip all caches for fresh build)"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -61,6 +71,7 @@ jobs:
       WEBBROWSER_VERSION: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}
       PACKAGE_GENERATORS: ${{ inputs.package_format || github.event.inputs.package_format || 'TGZ;DEB;RPM' }}
       DEVELOPMENT_BUILD: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
+      CLEAN_BUILD: ${{ inputs.clean_build || github.event.inputs.clean_build || 'false' }}
     steps:
       - name: 0. Configure Git (longpaths, autocrlf=false)
         run: |
@@ -71,8 +82,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 1
 
       - name: 1.5 Setup CMake Build Cache
+        if: inputs.clean_build != true
         uses: actions/cache@v4
         with:
           path: |
@@ -90,6 +103,7 @@ jobs:
             ${{ runner.os }}-cmake-
 
       - name: 1.6 Setup SDK Cache
+        if: inputs.clean_build != true
         uses: actions/cache@v4
         with:
           path: |
@@ -100,6 +114,7 @@ jobs:
             ${{ runner.os }}-sdk-
 
       - name: 1.7 Setup APT Cache
+        if: inputs.clean_build != true
         uses: actions/cache@v4
         with:
           path: |
@@ -110,6 +125,7 @@ jobs:
             ${{ runner.os }}-apt-
 
       - name: 1.8 Setup Compiler Cache (ccache)
+        if: inputs.clean_build != true
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: ${{ runner.os }}-ccache-${{ github.sha }}
@@ -117,6 +133,7 @@ jobs:
             ${{ runner.os }}-ccache-
 
       - name: 1.9 Configure Compiler Cache Environment
+        if: inputs.clean_build != true
         shell: bash
         run: |
           echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache" >> $GITHUB_ENV
@@ -282,6 +299,10 @@ jobs:
             echo "Listing selected SDK include and lib:"
             ls -la "$ROOT/include" | head -n 100 || true
             ls -la "$ROOT/lib" || true
+            # Write SDK version to file for build summary
+            mkdir -p build
+            echo "${ULTRALIGHT_VERSION:-Unknown}" > build/ultralight_sdk_version.txt
+            echo "Wrote SDK version to build/ultralight_sdk_version.txt: $(cat build/ultralight_sdk_version.txt)"
           else
             echo "::error::Ultralight Linux SDK not found. Ensure base-sdk branch contains a valid archive or set ULTRALIGHT_SDK_ROOT/ULTRALIGHT_SDK_URL."
             exit 1

@@ -27,6 +27,11 @@ on:
         required: false
         type: boolean
         default: false
+      clean_build:
+        description: "Force clean build without using caches"
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       sdk_url:
@@ -48,6 +53,11 @@ on:
         type: string
       development_build:
         description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
+      clean_build:
+        description: "Force clean build without using caches"
         required: false
         type: boolean
         default: false
@@ -75,6 +85,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 1
 
       - name: 2. Detect ULTRALIGHT_SDK_URL from repo base-sdk branch (macOS)
         id: detect_url
@@ -218,6 +229,10 @@ jobs:
             ls -la "$ROOT/include" | head -n 100 || true
             ls -la "$ROOT/lib" 2>/dev/null || true
             ls -la "$ROOT/bin" 2>/dev/null || true
+            # Write SDK version to file for build summary
+            mkdir -p build
+            echo "${ULTRALIGHT_VERSION:-Unknown}" > build/ultralight_sdk_version.txt
+            echo "Wrote SDK version to build/ultralight_sdk_version.txt: $(cat build/ultralight_sdk_version.txt)"
           else
             echo "::error::Ultralight macOS SDK not found for ARM64."; exit 1
           fi

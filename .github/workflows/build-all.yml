@@ -1,5 +1,8 @@
 name: Build - All (x64 + ARM64)
 
+# Note: No concurrency block here - child workflows have their own concurrency controls
+# Adding concurrency here would cause deadlock with reusable workflow calls
+
 on:
   workflow_dispatch:
     inputs:
@@ -7,18 +10,22 @@ on:
         description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
         required: false
         type: string
+        default: ''
       version:
         description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
         required: false
         type: string
+        default: ''
       webbrowser_version:
         description: "Override build version name (default 'dev')"
         required: false
         type: string
+        default: ''
       package_format:
         description: "Package format(s) for macOS/Linux (eg. TGZ;DMG or TGZ;DEB;RPM)"
         required: false
         type: string
+        default: ''
       create_installer:
         description: "Create Windows installer via CPack (NSIS) when true"
         required: false
@@ -26,6 +33,11 @@ on:
         default: false
       development_build:
         description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
+      clean_build:
+        description: "Clean build (skip all caches for fresh build)"
         required: false
         type: boolean
         default: false
@@ -44,6 +56,7 @@ jobs:
       version: ${{ inputs.version || github.event.inputs.version }}
       webbrowser_version: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version }}
       development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
+      clean_build: ${{ inputs.clean_build || github.event.inputs.clean_build || false }}
       # create installer by default on PRs, otherwise obey input
       create_installer: ${{ inputs.create_installer || github.event_name == 'pull_request' }}
 
@@ -56,6 +69,7 @@ jobs:
       webbrowser_version: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version }}
       package_format: ${{ inputs.package_format || github.event.inputs.package_format }}
       development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
+      clean_build: ${{ inputs.clean_build || github.event.inputs.clean_build || false }}
 
   macos-arm64:
     uses: ./.github/workflows/build-macos-arm64.yml
@@ -66,6 +80,7 @@ jobs:
       webbrowser_version: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version }}
       package_format: ${{ inputs.package_format || github.event.inputs.package_format }}
       development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
+      clean_build: ${{ inputs.clean_build || github.event.inputs.clean_build || false }}
 
   linux-x64:
     uses: ./.github/workflows/build-linux.yml
@@ -76,6 +91,7 @@ jobs:
       webbrowser_version: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version }}
       package_format: ${{ inputs.package_format || github.event.inputs.package_format }}
       development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
+      clean_build: ${{ inputs.clean_build || github.event.inputs.clean_build || false }}
 
   linux-arm64:
     uses: ./.github/workflows/build-linux-arm64.yml
@@ -86,6 +102,7 @@ jobs:
       webbrowser_version: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version }}
       package_format: ${{ inputs.package_format || github.event.inputs.package_format }}
       development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
+      clean_build: ${{ inputs.clean_build || github.event.inputs.clean_build || false }}
 
   summary:
     name: "📊 Build Summary"

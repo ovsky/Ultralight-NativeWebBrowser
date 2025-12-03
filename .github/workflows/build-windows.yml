@@ -11,11 +11,6 @@ permissions:
   contents: read
   actions: write
 
-# Prevent duplicate runs for the same ref
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 on:
   workflow_dispatch:
     inputs:
@@ -37,6 +32,11 @@ on:
         type: boolean
       development_build:
         description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
+      clean_build:
+        description: "Clean build (skip all caches for fresh build)"
         required: false
         type: boolean
         default: false
@@ -64,6 +64,11 @@ on:
         required: false
         type: boolean
         default: false
+      clean_build:
+        description: "Clean build (skip all caches for fresh build)"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   validate_yaml:
@@ -85,7 +90,7 @@ jobs:
 
       - name: Run yamllint on build-windows.yml
         run: |
-          yamllint .github/workflows/build-windows.yml || true
+          yamllint -c .yamllint.yml .github/workflows/build-windows.yml || echo "yamllint completed with warnings"
 
       - name: Sanity-parse with PyYAML
         run: |
@@ -99,6 +104,7 @@ jobs:
       WEBBROWSER_VERSION: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}
       CREATE_INSTALLER: ${{ inputs.create_installer || github.event.inputs.create_installer }}
       DEVELOPMENT_BUILD: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
+      CLEAN_BUILD: ${{ inputs.clean_build || github.event.inputs.clean_build || 'false' }}
 
     steps:
       - name: "0. Configure Git (longpaths, autocrlf=false)"
@@ -111,8 +117,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: "recursive"
+          fetch-depth: 1
 
       - name: "1.5 Setup CMake Build Cache"
+        if: inputs.clean_build != true
         uses: actions/cache@v4
         with:
           path: |
@@ -130,6 +138,7 @@ jobs:
             ${{ runner.os }}-cmake-
 
       - name: "1.6 Setup SDK Cache"
+        if: inputs.clean_build != true
         uses: actions/cache@v4
         with:
           path: |
@@ -140,9 +149,11 @@ jobs:
             ${{ runner.os }}-sdk-
 
       - name: "1.7 Setup Compiler Cache (sccache)"
+        if: inputs.clean_build != true
         uses: mozilla-actions/sccache-action@v0.0.5
 
       - name: "1.8 Configure Compiler Cache Environment"
+        if: inputs.clean_build != true
         shell: pwsh
         run: |
           echo "SCCACHE_DIR=$env:GITHUB_WORKSPACE\.sccache" >> $env:GITHUB_ENV
@@ -301,6 +312,11 @@ jobs:
             Write-Host "Listing selected SDK include and lib:"
             if (Test-Path (Join-Path $root 'include')) { Get-ChildItem -Force (Join-Path $root 'include') | Select-Object -First 50 | Format-List -Property Mode,Length,Name }
             if (Test-Path (Join-Path $root 'lib')) { Get-ChildItem -Force (Join-Path $root 'lib') | Format-List -Property Mode,Length,Name }
+            # Write SDK version to file for build summary
+            if (-not (Test-Path "build")) { New-Item -ItemType Directory -Path "build" -Force | Out-Null }
+            $sdkVer = if ($env:ULTRALIGHT_VERSION) { $env:ULTRALIGHT_VERSION } else { "Unknown" }
+            $sdkVer | Out-File -FilePath "build/ultralight_sdk_version.txt" -Encoding utf8 -NoNewline
+            Write-Host "Wrote SDK version to build/ultralight_sdk_version.txt: $sdkVer"
           } else {
             Write-Error "Ultralight Windows SDK not found. Ensure base-sdk branch contains a valid archive or set ULTRALIGHT_SDK_ROOT/ULTRALIGHT_SDK_URL."; exit 1
           }

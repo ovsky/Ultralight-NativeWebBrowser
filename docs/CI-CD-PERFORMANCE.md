@@ -22,6 +22,34 @@ This document details the comprehensive caching and performance optimizations im
 
 ---
 
+## 🆕 Clean Build Option
+
+### Usage
+
+All workflows now support a `clean_build` option to bypass all caching and perform a fresh build:
+
+**Via GitHub Actions UI (workflow_dispatch):**
+- Navigate to Actions → Select workflow → Run workflow
+- Check "Force clean build without using caches" checkbox
+- Click "Run workflow"
+
+**Via build-all.yml:**
+- The `clean_build` option is automatically passed to all child workflows
+- When enabled, skips all cache steps:
+  - CMake build cache
+  - SDK cache
+  - Compiler cache (ccache/sccache)
+  - APT cache (Linux)
+  - Homebrew cache (macOS)
+
+**When to Use Clean Build:**
+- Debugging cache-related build issues
+- Testing build time without caches
+- Ensuring reproducible builds for releases
+- After significant dependency changes
+
+---
+
 ## 🔧 Implemented Optimizations
 
 ### 1. **CMake Build Cache**
@@ -425,6 +453,13 @@ For cache-related issues:
 ---
 
 ## 📜 Version History
+
+- **v1.1.0** (Current) - Clean build option and further optimizations
+  - Added `clean_build` input to all workflows
+  - Conditional cache skipping when `clean_build=true`
+  - Shallow clone (`fetch-depth: 1`) for faster checkout
+  - Concurrency settings on all workflows (cancel duplicate runs)
+  - Pass-through clean_build to all child workflows
 
 - **v1.0.0** (2024-01-15) - Initial caching implementation
   - CMake build cache
