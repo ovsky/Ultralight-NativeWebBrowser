@@ -321,7 +321,64 @@ jobs:
           echo "Listing resources:"
           ls -la "$src"/assets/resources 2>/dev/null || true
 
-      - name: 8. Package with CPack (Linux)
+      - name: 8. Generate Build Summary Report
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "🚀 Generating comprehensive build summary..."
+          
+          # Get SDK version
+          sdkVersion="${ULTRALIGHT_VERSION:-Unknown}"
+          if [ -f "build/ultralight_sdk_version.txt" ]; then
+            sdkVersion=$(cat "build/ultralight_sdk_version.txt" | tr -d '[:space:]')
+          fi
+          
+          # Make script executable
+          chmod +x scripts/generate-build-summary.sh
+          
+          # Run the build summary script
+          bash scripts/generate-build-summary.sh \
+            "build" \
+            "Linux" \
+            "x64" \
+            "${WEBBROWSER_VERSION}" \
+            "${{ github.sha }}" \
+            "$sdkVersion" \
+            "BUILD-SUMMARY.md"
+          
+          # Create JSON metadata file
+          cat > build/BUILD-METADATA.json << EOF
+          {
+            "platform": "Linux",
+            "architecture": "x64",
+            "version": "${WEBBROWSER_VERSION}",
+            "commit": "${{ github.sha }}",
+            "commitShort": "$(echo '${{ github.sha }}' | cut -c1-7)",
+            "buildDate": "$(date -u +"%Y-%m-%d %H:%M:%S UTC")",
+            "sdkVersion": "$sdkVersion",
+            "repository": "${{ github.repository }}",
+            "runId": "${{ github.run_id }}",
+            "runNumber": "${{ github.run_number }}"
+          }
+          EOF
+          
+          echo "✅ Build summary and metadata generated successfully"
+
+      - name: 8.1 Display Build Summary
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: bash
+        run: |
+          echo "📊 Build Summary:"
+          echo "═══════════════════════════════════════════════════════════"
+          if [ -f "build/BUILD-SUMMARY.md" ]; then
+            cat "build/BUILD-SUMMARY.md"
+          else
+            echo "⚠️ BUILD-SUMMARY.md not found"
+          fi
+          echo "═══════════════════════════════════════════════════════════"
+
+      - name: 8.2 Package with CPack (Linux)
         if: steps.prep_sdk.outputs.present == 'true'
         shell: bash
         run: |
@@ -375,7 +432,7 @@ jobs:
             fi
           done
 
-      - name: 8.2 List package outputs
+      - name: 8.4 List package outputs
         if: steps.prep_sdk.outputs.present == 'true'
         shell: bash
         run: |
@@ -383,7 +440,7 @@ jobs:
           echo "Final packages in build directory:"
           ls -lh "${{ github.workspace }}/build"/Ultralight-WebBrowser-* || true
 
-      - name: 8.3 Upload Final Packages
+      - name: 8.5 Upload Final Packages
         if: steps.prep_sdk.outputs.present == 'true'
         uses: actions/upload-artifact@v4
         with:
@@ -392,9 +449,11 @@ jobs:
             ${{ github.workspace }}/build/Ultralight-WebBrowser-*-Linux-x64.tar.gz
             ${{ github.workspace }}/build/Ultralight-WebBrowser-*-Linux-x64.deb
             ${{ github.workspace }}/build/Ultralight-WebBrowser-*-Linux-x64.rpm
+            ${{ github.workspace }}/build/BUILD-SUMMARY.md
+            ${{ github.workspace }}/build/BUILD-METADATA.json
           if-no-files-found: warn
 
-      - name: 8.4 Upload Intermediate Packages (Development Only)
+      - name: 8.6 Upload Intermediate Packages (Development Only)
         if: steps.prep_sdk.outputs.present == 'true' && env.DEVELOPMENT_BUILD == 'true'
         continue-on-error: true
         uses: actions/upload-artifact@v4
@@ -402,3 +461,15 @@ jobs:
           name: Ultralight-WebBrowser-${{ env.WEBBROWSER_VERSION }}-Linux-x64-Intermediate
           path: ${{ github.workspace }}/build/_CPack_Packages/
           if-no-files-found: warn
+
+      - name: 9. Job Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "📋 Adding build summary to GitHub Actions job summary..."
+          if [ -f "build/BUILD-SUMMARY.md" ]; then
+            cat "build/BUILD-SUMMARY.md" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Summary added to job output"
+          else
+            echo "⚠️ BUILD-SUMMARY.md not found, skipping job summary"
+          fi
