@@ -27,6 +27,11 @@ on:
         required: false
         type: boolean
         default: false
+      clean_build:
+        description: "Clean build (skip all caches for fresh build)"
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       sdk_url:
@@ -48,6 +53,11 @@ on:
         type: string
       development_build:
         description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
+      clean_build:
+        description: "Clean build (skip all caches for fresh build)"
         required: false
         type: boolean
         default: false

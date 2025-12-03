@@ -29,6 +29,11 @@ on:
         required: false
         type: boolean
         default: false
+      clean_build:
+        description: "Clean build (skip all caches for fresh build)"
+        required: false
+        type: boolean
+        default: false
   pull_request:
 
 permissions:
