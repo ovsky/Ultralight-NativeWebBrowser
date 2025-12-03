@@ -90,7 +90,7 @@ jobs:
 
       - name: Run yamllint on build-windows.yml
         run: |
-          yamllint .github/workflows/build-windows.yml || true
+          yamllint -c .yamllint.yml .github/workflows/build-windows.yml
 
       - name: Sanity-parse with PyYAML
         run: |
