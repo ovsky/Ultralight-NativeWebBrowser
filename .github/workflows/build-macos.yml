@@ -95,7 +95,7 @@ jobs:
           fetch-depth: 1
 
       - name: 1.5 Setup CMake Build Cache
-        if: ${{ inputs.clean_build != true && inputs.clean_build != 'true' }}
+        if: inputs.clean_build != true
         uses: actions/cache@v4
         with:
           path: |
@@ -112,7 +112,7 @@ jobs:
             ${{ runner.os }}-cmake-
 
       - name: 1.6 Setup SDK Cache
-        if: ${{ inputs.clean_build != true && inputs.clean_build != 'true' }}
+        if: inputs.clean_build != true
         uses: actions/cache@v4
         with:
           path: |
@@ -123,7 +123,7 @@ jobs:
             ${{ runner.os }}-sdk-
 
       - name: 1.7 Setup Homebrew Cache
-        if: ${{ inputs.clean_build != true && inputs.clean_build != 'true' }}
+        if: inputs.clean_build != true
         uses: actions/cache@v4
         with:
           path: |
@@ -134,7 +134,7 @@ jobs:
             ${{ runner.os }}-brew-
 
       - name: 1.8 Setup Compiler Cache (ccache)
-        if: ${{ inputs.clean_build != true && inputs.clean_build != 'true' }}
+        if: inputs.clean_build != true
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: ${{ runner.os }}-ccache-${{ github.sha }}
@@ -142,7 +142,7 @@ jobs:
             ${{ runner.os }}-ccache-
 
       - name: 1.9 Configure Compiler Cache Environment
-        if: ${{ inputs.clean_build != true && inputs.clean_build != 'true' }}
+        if: inputs.clean_build != true
         shell: bash
         run: |
           echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache" >> $GITHUB_ENV
