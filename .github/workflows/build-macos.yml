@@ -3,11 +3,6 @@
 
 name: Build - macOS (x64)
 
-# Prevent duplicate runs for the same ref
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 on:
   workflow_dispatch:
     inputs:
