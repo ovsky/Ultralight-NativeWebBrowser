@@ -112,6 +112,43 @@ jobs:
         with:
           submodules: "recursive"
 
+      - name: "1.5 Setup CMake Build Cache"
+        uses: actions/cache@v4
+        with:
+          path: |
+            build
+            !build/CMakeFiles
+            !build/Testing
+            !build/_CPack_Packages
+            !build/**/*.exe
+            !build/**/*.dll
+            !build/**/*.zip
+            !build/**/*.7z
+          key: ${{ runner.os }}-cmake-${{ hashFiles('CMakeLists.txt', 'cmake/**') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-cmake-${{ hashFiles('CMakeLists.txt', 'cmake/**') }}-
+            ${{ runner.os }}-cmake-
+
+      - name: "1.6 Setup SDK Cache"
+        uses: actions/cache@v4
+        with:
+          path: |
+            libs/Ultralight
+            ultralight-sdk-*.7z
+          key: ${{ runner.os }}-sdk-${{ env.ULTRALIGHT_VERSION || 'latest' }}
+          restore-keys: |
+            ${{ runner.os }}-sdk-
+
+      - name: "1.7 Setup Compiler Cache (sccache)"
+        uses: mozilla-actions/sccache-action@v0.0.5
+
+      - name: "1.8 Configure Compiler Cache Environment"
+        shell: pwsh
+        run: |
+          echo "SCCACHE_DIR=$env:GITHUB_WORKSPACE\.sccache" >> $env:GITHUB_ENV
+          echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache" >> $env:GITHUB_ENV
+          echo "CMAKE_C_COMPILER_LAUNCHER=sccache" >> $env:GITHUB_ENV
+
       - name: "2. Detect ULTRALIGHT_SDK_URL from repo base-sdk branch (Windows)"
         id: detect_url
         shell: pwsh
@@ -277,6 +314,24 @@ jobs:
       - name: "5. Configure CMake"
         if: steps.prep_sdk.outputs.present == 'true'
         run: |
+          # Skip reconfiguration if CMakeCache.txt exists and is valid
+          if (Test-Path "build/CMakeCache.txt") {
+            Write-Host "CMake cache found, checking if reconfiguration needed..."
+            $cacheValid = $true
+            
+            # Check if SDK root changed
+            $cachedSdkRoot = Get-Content "build/CMakeCache.txt" | Select-String "ULTRALIGHT_SDK_ROOT:.*=" | ForEach-Object { $_ -replace '.*=', '' }
+            if ($cachedSdkRoot -ne $env:ULTRALIGHT_SDK_ROOT) {
+              Write-Host "SDK root changed, reconfiguration needed"
+              $cacheValid = $false
+            }
+            
+            if ($cacheValid) {
+              Write-Host "✅ CMake cache is valid, skipping reconfiguration (saves ~30-60 seconds)"
+              exit 0
+            }
+          }
+          
           # Ensure libcurl is present; if our earlier step installed vcpkg and curl, the toolchain file should be used.
           Write-Host "(CI) libcurl install attempt finished (if available)."
           cmake --version
@@ -485,7 +540,59 @@ jobs:
           Write-Host "Listing DLLs:"; Get-ChildItem -Path (Join-Path $src '*.dll') -ErrorAction SilentlyContinue | Format-List -Property Mode,Length,Name
           Write-Host "Listing resources:"; if (Test-Path (Join-Path $src 'assets/resources')) { Get-ChildItem -Force (Join-Path $src 'assets/resources') | Format-List -Property Mode,Length,Name } else { Write-Host 'assets/resources not found' }
 
-      - name: "7. Upload Final Packages"
+      - name: "7. Generate Build Summary Report"
+        shell: pwsh
+        run: |
+          Write-Host "🚀 Generating comprehensive build summary..."
+          
+          # Get SDK version from environment or detect from files
+          $sdkVersion = if ($env:ULTRALIGHT_VERSION) { $env:ULTRALIGHT_VERSION } else { "Unknown" }
+          if (Test-Path "build/ultralight_sdk_version.txt") {
+            $sdkVersion = Get-Content "build/ultralight_sdk_version.txt" -Raw -ErrorAction SilentlyContinue | Out-String
+            $sdkVersion = $sdkVersion.Trim()
+          }
+          
+          # Run the build summary script
+          pwsh scripts/generate-build-summary.ps1 `
+            -BuildDir "build" `
+            -Platform "Windows" `
+            -Architecture "x64" `
+            -Version "$env:WEBBROWSER_VERSION" `
+            -CommitSha "${{ github.sha }}" `
+            -SdkVersion "$sdkVersion" `
+            -OutputFile "BUILD-SUMMARY.md"
+          
+          # Also create a JSON metadata file for programmatic access
+          $metadata = @{
+            platform = "Windows"
+            architecture = "x64"
+            version = "$env:WEBBROWSER_VERSION"
+            commit = "${{ github.sha }}"
+            commitShort = "${{ github.sha }}".Substring(0, 7)
+            buildDate = (Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
+            sdkVersion = $sdkVersion
+            repository = "${{ github.repository }}"
+            runId = "${{ github.run_id }}"
+            runNumber = "${{ github.run_number }}"
+          }
+          
+          $metadata | ConvertTo-Json -Depth 10 | Out-File -FilePath "build/BUILD-METADATA.json" -Encoding UTF8
+          
+          Write-Host "✅ Build summary and metadata generated successfully"
+
+      - name: "7.5 Display Build Summary"
+        shell: pwsh
+        run: |
+          Write-Host "📊 Build Summary:"
+          Write-Host "═══════════════════════════════════════════════════════════"
+          if (Test-Path "build/BUILD-SUMMARY.md") {
+            Get-Content "build/BUILD-SUMMARY.md"
+          } else {
+            Write-Host "⚠️ BUILD-SUMMARY.md not found"
+          }
+          Write-Host "═══════════════════════════════════════════════════════════"
+
+      - name: "7.8 Upload Final Packages"
         # For multi-config, Visual Studio places outputs in 'build/Release'
         # We use PowerShell's Compress-Archive
         shell: pwsh
@@ -594,7 +701,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ultralight-windows-build
-          path: Ultralight-WebBrowser-*-Windows-Portable.zip
+          path: |
+            Ultralight-WebBrowser-*-Windows-Portable.zip
+            build/BUILD-SUMMARY.md
+            build/BUILD-METADATA.json
           if-no-files-found: warn
 
       - name: "8.1 Upload Installer"
@@ -608,6 +718,8 @@ jobs:
             build\**\*.msi
             build\_CPack_Packages\**\*.exe
             build\_CPack_Packages\**\*.msi
+            build/BUILD-SUMMARY.md
+            build/BUILD-METADATA.json
           if-no-files-found: warn
 
       - name: "8.2 Upload CPack ZIP"
@@ -618,4 +730,29 @@ jobs:
           path: |
             Ultralight-WebBrowser-*-Windows-x64.zip
             build\*.zip
+            build/BUILD-SUMMARY.md
+            build/BUILD-METADATA.json
           if-no-files-found: warn
+
+      - name: "9. Job Summary"
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host "📋 Adding build summary to GitHub Actions job summary..."
+          if (Test-Path "build/BUILD-SUMMARY.md") {
+            Get-Content "build/BUILD-SUMMARY.md" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding UTF8
+            Write-Host "✅ Summary added to job output"
+          } else {
+            Write-Host "⚠️ BUILD-SUMMARY.md not found, skipping job summary"
+          }
+          
+          # Show cache statistics
+          Write-Host ""
+          Write-Host "📊 Cache Statistics:"
+          Write-Host "═══════════════════════════════════════════════════════════"
+          if (Get-Command sccache -ErrorAction SilentlyContinue) {
+            sccache --show-stats
+          } else {
+            Write-Host "sccache not found in PATH"
+          }
+          Write-Host "═══════════════════════════════════════════════════════════"
