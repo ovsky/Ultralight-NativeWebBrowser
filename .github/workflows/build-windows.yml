@@ -109,6 +109,7 @@ jobs:
       WEBBROWSER_VERSION: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}
       CREATE_INSTALLER: ${{ inputs.create_installer || github.event.inputs.create_installer }}
       DEVELOPMENT_BUILD: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
+      CLEAN_BUILD: ${{ inputs.clean_build || github.event.inputs.clean_build || 'false' }}
 
     steps:
       - name: "0. Configure Git (longpaths, autocrlf=false)"
@@ -121,8 +122,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: "recursive"
+          fetch-depth: 1
 
       - name: "1.5 Setup CMake Build Cache"
+        if: ${{ inputs.clean_build != true && inputs.clean_build != 'true' }}
         uses: actions/cache@v4
         with:
           path: |
@@ -140,6 +143,7 @@ jobs:
             ${{ runner.os }}-cmake-
 
       - name: "1.6 Setup SDK Cache"
+        if: ${{ inputs.clean_build != true && inputs.clean_build != 'true' }}
         uses: actions/cache@v4
         with:
           path: |
@@ -150,9 +154,11 @@ jobs:
             ${{ runner.os }}-sdk-
 
       - name: "1.7 Setup Compiler Cache (sccache)"
+        if: ${{ inputs.clean_build != true && inputs.clean_build != 'true' }}
         uses: mozilla-actions/sccache-action@v0.0.5
 
       - name: "1.8 Configure Compiler Cache Environment"
+        if: ${{ inputs.clean_build != true && inputs.clean_build != 'true' }}
         shell: pwsh
         run: |
           echo "SCCACHE_DIR=$env:GITHUB_WORKSPACE\.sccache" >> $env:GITHUB_ENV
