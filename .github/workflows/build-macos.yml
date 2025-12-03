@@ -3,6 +3,11 @@
 
 name: Build - macOS (x64)
 
+# Prevent duplicate runs for the same ref
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
     inputs:
@@ -76,6 +81,7 @@ jobs:
       DEVELOPMENT_BUILD: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
       PACKAGE_GENERATORS: ${{ inputs.package_format || github.event.inputs.package_format || 'TGZ;DMG' }}
       TARGET_ARCH: x64
+      CLEAN_BUILD: ${{ inputs.clean_build || github.event.inputs.clean_build || 'false' }}
     steps:
       - name: 0. Configure Git (longpaths, autocrlf=false)
         run: |
@@ -86,8 +92,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 1
 
       - name: 1.5 Setup CMake Build Cache
+        if: ${{ inputs.clean_build != true && inputs.clean_build != 'true' }}
         uses: actions/cache@v4
         with:
           path: |
@@ -104,6 +112,7 @@ jobs:
             ${{ runner.os }}-cmake-
 
       - name: 1.6 Setup SDK Cache
+        if: ${{ inputs.clean_build != true && inputs.clean_build != 'true' }}
         uses: actions/cache@v4
         with:
           path: |
@@ -114,6 +123,7 @@ jobs:
             ${{ runner.os }}-sdk-
 
       - name: 1.7 Setup Homebrew Cache
+        if: ${{ inputs.clean_build != true && inputs.clean_build != 'true' }}
         uses: actions/cache@v4
         with:
           path: |
@@ -124,6 +134,7 @@ jobs:
             ${{ runner.os }}-brew-
 
       - name: 1.8 Setup Compiler Cache (ccache)
+        if: ${{ inputs.clean_build != true && inputs.clean_build != 'true' }}
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: ${{ runner.os }}-ccache-${{ github.sha }}
@@ -131,6 +142,7 @@ jobs:
             ${{ runner.os }}-ccache-
 
       - name: 1.9 Configure Compiler Cache Environment
+        if: ${{ inputs.clean_build != true && inputs.clean_build != 'true' }}
         shell: bash
         run: |
           echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache" >> $GITHUB_ENV

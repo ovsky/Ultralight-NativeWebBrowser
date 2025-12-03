@@ -3,6 +3,11 @@
 
 name: Build - macOS (ARM64)
 
+# Prevent duplicate runs for the same ref
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
     inputs:
@@ -24,6 +29,11 @@ on:
         type: string
       development_build:
         description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
+      clean_build:
+        description: "Force clean build without using caches"
         required: false
         type: boolean
         default: false
@@ -51,6 +61,11 @@ on:
         required: false
         type: boolean
         default: false
+      clean_build:
+        description: "Force clean build without using caches"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -75,6 +90,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 1
 
       - name: 2. Detect ULTRALIGHT_SDK_URL from repo base-sdk branch (macOS)
         id: detect_url
