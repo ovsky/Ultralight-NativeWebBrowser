@@ -1,5 +1,10 @@
 name: Build - All (x64 + ARM64)
 
+# Prevent duplicate runs for the same ref
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
     inputs:
@@ -51,6 +56,7 @@ jobs:
       development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
       # create installer by default on PRs, otherwise obey input
       create_installer: ${{ inputs.create_installer || github.event_name == 'pull_request' }}
+      clean_build: ${{ inputs.clean_build || github.event.inputs.clean_build || false }}
 
   macos-x64:
     uses: ./.github/workflows/build-macos.yml
@@ -61,6 +67,7 @@ jobs:
       webbrowser_version: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version }}
       package_format: ${{ inputs.package_format || github.event.inputs.package_format }}
       development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
+      clean_build: ${{ inputs.clean_build || github.event.inputs.clean_build || false }}
 
   macos-arm64:
     uses: ./.github/workflows/build-macos-arm64.yml
@@ -71,6 +78,7 @@ jobs:
       webbrowser_version: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version }}
       package_format: ${{ inputs.package_format || github.event.inputs.package_format }}
       development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
+      clean_build: ${{ inputs.clean_build || github.event.inputs.clean_build || false }}
 
   linux-x64:
     uses: ./.github/workflows/build-linux.yml
@@ -81,6 +89,7 @@ jobs:
       webbrowser_version: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version }}
       package_format: ${{ inputs.package_format || github.event.inputs.package_format }}
       development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
+      clean_build: ${{ inputs.clean_build || github.event.inputs.clean_build || false }}
 
   linux-arm64:
     uses: ./.github/workflows/build-linux-arm64.yml
@@ -91,6 +100,7 @@ jobs:
       webbrowser_version: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version }}
       package_format: ${{ inputs.package_format || github.event.inputs.package_format }}
       development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
+      clean_build: ${{ inputs.clean_build || github.event.inputs.clean_build || false }}
 
   summary:
     name: "📊 Build Summary"

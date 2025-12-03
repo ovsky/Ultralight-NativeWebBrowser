@@ -3,6 +3,11 @@
 
 name: Build - All ARM64
 
+# Prevent duplicate runs for the same ref
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
     inputs:
@@ -22,6 +27,11 @@ on:
         description: "Package format(s) for macOS/Linux (eg. TGZ;DMG or TGZ;DEB;RPM)"
         required: false
         type: string
+      clean_build:
+        description: "Force clean build without using caches"
+        required: false
+        type: boolean
+        default: false
   # No pull_request here; only the full orchestrator should run on PR
 
 permissions:
@@ -37,6 +47,7 @@ jobs:
       version: ${{ inputs.version }}
       webbrowser_version: ${{ inputs.webbrowser_version }}
       package_format: ${{ inputs.package_format }}
+      clean_build: ${{ inputs.clean_build || false }}
 
   linux-arm64:
     uses: ./.github/workflows/build-linux-arm64.yml
@@ -46,3 +57,4 @@ jobs:
       version: ${{ inputs.version }}
       webbrowser_version: ${{ inputs.webbrowser_version }}
       package_format: ${{ inputs.package_format }}
+      clean_build: ${{ inputs.clean_build || false }}
