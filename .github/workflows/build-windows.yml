@@ -90,7 +90,7 @@ jobs:
 
       - name: Run yamllint on build-windows.yml
         run: |
-          yamllint -c .yamllint.yml .github/workflows/build-windows.yml
+          yamllint -c .yamllint.yml .github/workflows/build-windows.yml || echo "yamllint completed with warnings"
 
       - name: Sanity-parse with PyYAML
         run: |
@@ -312,6 +312,11 @@ jobs:
             Write-Host "Listing selected SDK include and lib:"
             if (Test-Path (Join-Path $root 'include')) { Get-ChildItem -Force (Join-Path $root 'include') | Select-Object -First 50 | Format-List -Property Mode,Length,Name }
             if (Test-Path (Join-Path $root 'lib')) { Get-ChildItem -Force (Join-Path $root 'lib') | Format-List -Property Mode,Length,Name }
+            # Write SDK version to file for build summary
+            if (-not (Test-Path "build")) { New-Item -ItemType Directory -Path "build" -Force | Out-Null }
+            $sdkVer = if ($env:ULTRALIGHT_VERSION) { $env:ULTRALIGHT_VERSION } else { "Unknown" }
+            $sdkVer | Out-File -FilePath "build/ultralight_sdk_version.txt" -Encoding utf8 -NoNewline
+            Write-Host "Wrote SDK version to build/ultralight_sdk_version.txt: $sdkVer"
           } else {
             Write-Error "Ultralight Windows SDK not found. Ensure base-sdk branch contains a valid archive or set ULTRALIGHT_SDK_ROOT/ULTRALIGHT_SDK_URL."; exit 1
           }

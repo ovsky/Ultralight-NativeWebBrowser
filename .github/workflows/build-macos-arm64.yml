@@ -229,6 +229,10 @@ jobs:
             ls -la "$ROOT/include" | head -n 100 || true
             ls -la "$ROOT/lib" 2>/dev/null || true
             ls -la "$ROOT/bin" 2>/dev/null || true
+            # Write SDK version to file for build summary
+            mkdir -p build
+            echo "${ULTRALIGHT_VERSION:-Unknown}" > build/ultralight_sdk_version.txt
+            echo "Wrote SDK version to build/ultralight_sdk_version.txt: $(cat build/ultralight_sdk_version.txt)"
           else
             echo "::error::Ultralight macOS SDK not found for ARM64."; exit 1
           fi

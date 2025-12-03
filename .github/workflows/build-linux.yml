@@ -299,6 +299,10 @@ jobs:
             echo "Listing selected SDK include and lib:"
             ls -la "$ROOT/include" | head -n 100 || true
             ls -la "$ROOT/lib" || true
+            # Write SDK version to file for build summary
+            mkdir -p build
+            echo "${ULTRALIGHT_VERSION:-Unknown}" > build/ultralight_sdk_version.txt
+            echo "Wrote SDK version to build/ultralight_sdk_version.txt: $(cat build/ultralight_sdk_version.txt)"
           else
             echo "::error::Ultralight Linux SDK not found. Ensure base-sdk branch contains a valid archive or set ULTRALIGHT_SDK_ROOT/ULTRALIGHT_SDK_URL."
             exit 1
