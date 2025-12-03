@@ -54,56 +54,23 @@ jobs:
     uses: ./.github/workflows/build-windows.yml
     secrets: inherit
     with:
-      sdk_url: ${{ github.event.inputs.sdk_url || '' }}
-      version: ${{ github.event.inputs.version || '' }}
-      webbrowser_version: ${{ github.event.inputs.webbrowser_version || '' }}
-      development_build: ${{ github.event.inputs.development_build == 'true' }}
-      create_installer: ${{ github.event.inputs.create_installer == 'true' || github.event_name == 'pull_request' }}
-      clean_build: ${{ github.event.inputs.clean_build == 'true' }}
+      create_installer: ${{ github.event_name == 'pull_request' }}
 
   macos-x64:
     uses: ./.github/workflows/build-macos.yml
     secrets: inherit
-    with:
-      sdk_url: ${{ github.event.inputs.sdk_url || '' }}
-      version: ${{ github.event.inputs.version || '' }}
-      webbrowser_version: ${{ github.event.inputs.webbrowser_version || '' }}
-      package_format: ${{ github.event.inputs.package_format || '' }}
-      development_build: ${{ github.event.inputs.development_build == 'true' }}
-      clean_build: ${{ github.event.inputs.clean_build == 'true' }}
 
   macos-arm64:
     uses: ./.github/workflows/build-macos-arm64.yml
     secrets: inherit
-    with:
-      sdk_url: ${{ github.event.inputs.sdk_url || '' }}
-      version: ${{ github.event.inputs.version || '' }}
-      webbrowser_version: ${{ github.event.inputs.webbrowser_version || '' }}
-      package_format: ${{ github.event.inputs.package_format || '' }}
-      development_build: ${{ github.event.inputs.development_build == 'true' }}
-      clean_build: ${{ github.event.inputs.clean_build == 'true' }}
 
   linux-x64:
     uses: ./.github/workflows/build-linux.yml
     secrets: inherit
-    with:
-      sdk_url: ${{ github.event.inputs.sdk_url || '' }}
-      version: ${{ github.event.inputs.version || '' }}
-      webbrowser_version: ${{ github.event.inputs.webbrowser_version || '' }}
-      package_format: ${{ github.event.inputs.package_format || '' }}
-      development_build: ${{ github.event.inputs.development_build == 'true' }}
-      clean_build: ${{ github.event.inputs.clean_build == 'true' }}
 
   linux-arm64:
     uses: ./.github/workflows/build-linux-arm64.yml
     secrets: inherit
-    with:
-      sdk_url: ${{ github.event.inputs.sdk_url || '' }}
-      version: ${{ github.event.inputs.version || '' }}
-      webbrowser_version: ${{ github.event.inputs.webbrowser_version || '' }}
-      package_format: ${{ github.event.inputs.package_format || '' }}
-      development_build: ${{ github.event.inputs.development_build == 'true' }}
-      clean_build: ${{ github.event.inputs.clean_build == 'true' }}
 
   summary:
     name: "📊 Build Summary"
