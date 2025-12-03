@@ -143,8 +143,9 @@ jobs:
               exit 1
             fi
             echo "Found SDK at: $ROOT"; ls -la "$ROOT/lib" || true
-            # Write SDK version to file for build summary
-            echo "${VER:-Unknown}" > build/ultralight_sdk_version.txt || true
+            # Write SDK version to file for build summary (create build dir if needed)
+            mkdir -p build
+            echo "${VER:-Unknown}" > build/ultralight_sdk_version.txt
             echo "== ARM64: Configure & Build =="
             cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ROOT" -DBUILD_TESTING=OFF -DAUTO_INSTALL_CURL=ON -DWEBBROWSER_VERSION="$WEBBROWSER_VERSION"
             cmake --build build --parallel
