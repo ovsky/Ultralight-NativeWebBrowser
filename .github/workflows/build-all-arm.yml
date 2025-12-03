@@ -3,10 +3,8 @@
 
 name: Build - All ARM64
 
-# Prevent duplicate runs for the same ref
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+# Note: No concurrency block here - child workflows have their own concurrency controls
+# Adding concurrency here would cause deadlock with reusable workflow calls
 
 on:
   workflow_dispatch:
