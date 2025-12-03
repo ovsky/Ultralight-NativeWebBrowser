@@ -140,13 +140,37 @@ if(APPLE)
 	)
 endif()
 
+# On Windows, DRM webview support uses Microsoft WebView2.
+# Download and configure WebView2 SDK via FetchContent.
+if(WIN32 AND MSVC)
+	include(FetchContent)
+	
+	# Download WebView2 SDK from NuGet
+	FetchContent_Declare(
+		webview2
+		URL https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/1.0.2739.15
+		DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+	)
+	FetchContent_MakeAvailable(webview2)
+	
+	# WebView2 headers and libs from NuGet package
+	set(WEBVIEW2_INCLUDE_DIR "${webview2_SOURCE_DIR}/build/native/include")
+	set(WEBVIEW2_LIB_DIR "${webview2_SOURCE_DIR}/build/native/x64")
+	
+	if(EXISTS "${WEBVIEW2_INCLUDE_DIR}/WebView2.h")
+		message(STATUS "Building DRM Windows WebView using Microsoft WebView2 SDK")
+		target_include_directories(Ultralight-WebBrowser PRIVATE ${WEBVIEW2_INCLUDE_DIR})
+		target_link_libraries(Ultralight-WebBrowser PRIVATE "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib")
+	else()
+		message(WARNING "WebView2 SDK download failed or not found. DRM WebView will use stub implementation.")
+	endif()
+endif()
+
  # Unit test for utils
  enable_testing()
 
- # Only build UtilsTest in environments where linking to the Ultralight
- # libraries is supported. On Windows CI we sometimes use the MinGW toolchain
- # (GNU) which cannot link MSVC-generated .lib import libraries. In that
- # case skip adding the test to avoid linker errors.
+ # Only build tests in environments where linking to the Ultralight
+ # libraries is supported.
  if(NOT (WIN32 AND NOT MSVC))
 	 include(FetchContent)
 	 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -157,23 +181,37 @@ endif()
 	 )
 	 FetchContent_MakeAvailable(googletest)
 
-	 add_executable(UtilsTest tests/UtilsTest.cpp src/Utils.cpp)
+	 # UtilsTest requires Ultralight SDK libraries. Only build if SDK libs are found.
 	 find_library(APP_CORE_LIB NAMES AppCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
 	 find_library(ULTRALIGHT_LIB NAMES Ultralight PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
 	 find_library(ULTRALIGHT_CORE_LIB NAMES UltralightCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
 	 find_library(WEB_CORE_LIB NAMES WebCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
-	 if(APP_CORE_LIB)
+	 
+	 if(APP_CORE_LIB AND ULTRALIGHT_LIB)
+		 add_executable(UtilsTest tests/UtilsTest.cpp src/Utils.cpp)
 		 target_link_libraries(UtilsTest PRIVATE ${APP_CORE_LIB} ${ULTRALIGHT_LIB} ${ULTRALIGHT_CORE_LIB} ${WEB_CORE_LIB})
+		 target_include_directories(UtilsTest PRIVATE "${ULTRALIGHT_SDK_ROOT}/include")
+		 # Set RPATH to find SDK libraries at runtime (for Linux/macOS)
+		 if(NOT WIN32)
+			 set_target_properties(UtilsTest PROPERTIES
+				 BUILD_RPATH "${ULTRALIGHT_SDK_ROOT}/lib"
+				 INSTALL_RPATH "${ULTRALIGHT_SDK_ROOT}/lib"
+			 )
+		 endif()
+		 add_test(NAME UtilsTest COMMAND UtilsTest)
+		 message(STATUS "Building UtilsTest with Ultralight SDK libraries")
+	 else()
+		 message(STATUS "Skipping UtilsTest: Ultralight SDK libraries not found")
 	 endif()
-	 add_test(NAME UtilsTest COMMAND UtilsTest)
 
+	 # DRMSettingsTest doesn't need Ultralight libraries - it's standalone
 	 add_executable(DRMSettingsTest
 	 	tests/DRMSettingsTest.cpp
 	 	src/drm/DRMSettings.cpp)
 	 target_link_libraries(DRMSettingsTest PRIVATE GTest::gtest_main)
 	 add_test(NAME DRMSettingsTest COMMAND DRMSettingsTest)
  else()
-	 message(STATUS "Skipping UtilsTest on Windows when not using MSVC (to avoid linking MSVC .lib with MinGW)")
+	 message(STATUS "Skipping tests on Windows when not using MSVC (to avoid linking MSVC .lib with MinGW)")
  endif()
 
 # Install/package settings

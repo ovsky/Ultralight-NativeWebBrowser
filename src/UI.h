@@ -178,6 +178,7 @@ public:
 
   RefPtr<Window> window() { return window_; }
   DownloadManager *download_manager() { return download_manager_.get(); }
+  AdBlocker *network_blocker() { return adblock_; }
 
 protected:
   static std::filesystem::path SettingsDirectory();
@@ -409,6 +410,7 @@ protected:
   Tab *GetUltralightTab(uint64_t id);
   drm::DRMWebViewTab *GetDrmTab(uint64_t id);
   void HideDrmTab(uint64_t id);
+  void HideAllDrmTabs();
   void UpdateDrmBadge(uint64_t id, bool is_drm);
 
   friend class Tab;

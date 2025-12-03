@@ -536,6 +536,10 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
   InitializeExtensions();
 
   adblock_enabled_cached_ = adblock_ ? adblock_->enabled() : adblock_enabled_cached_;
+
+  // Pre-warm WebView2 environment in background for faster DRM tab creation
+  if (settings_.enable_drm_webview)
+    drm::PrewarmWebViewEnvironment();
 }
 
 Tab *UI::active_tab()
@@ -583,16 +587,33 @@ void UI::HideDrmTab(uint64_t id)
   auto it = drm_tabs_.find(id);
   if (it == drm_tabs_.end() || !it->second)
     return;
+  it->second->Blur();  // Release focus before hiding
   it->second->Hide();
   if (id == active_tab_id_)
   {
     auto tab_it = tabs_.find(id);
     if (tab_it != tabs_.end() && tab_it->second)
+    {
       tab_it->second->Show();
+      tab_it->second->view()->Focus();  // Give focus back to Ultralight tab
+    }
   }
   drm_tab_titles_.erase(id);
   drm_tab_urls_.erase(id);
   UpdateDrmBadge(id, false);
+}
+
+void UI::HideAllDrmTabs()
+{
+  // Hide ALL DRM tabs to ensure none interfere with input
+  for (auto &entry : drm_tabs_)
+  {
+    if (entry.second)
+    {
+      entry.second->Blur();
+      entry.second->Hide();
+    }
+  }
 }
 
 void UI::UpdateDrmBadge(uint64_t id, bool is_drm)
@@ -609,14 +630,26 @@ void UI::EnsureDrmManager()
     return;
   void *native = window_ ? window_->native_handle() : nullptr;
   drm_manager_ = std::make_unique<drm::DRMWebViewManager>(native);
+  // Pre-warm the WebView environment to reduce first-load lag
+  drm::PrewarmWebViewEnvironment();
 }
 
 bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_initiated)
 {
   if (!settings_.enable_drm_webview)
+  {
+    // DRM webview is disabled in settings
     return false;
+  }
   if (!drm_settings_.IsDRMRequired(url))
+  {
+    // URL is not a DRM site
     return false;
+  }
+
+  // URL matched a DRM site - open in WebView2
+  AppendDrmLog("Opening DRM tab for: " + url);
+
   EnsureDrmManager();
   if (!drm_manager_)
     return false;
@@ -657,11 +690,13 @@ bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_init
   auto drm_it = drm_tabs_.find(tab_id);
   if (drm_it == drm_tabs_.end() || !drm_it->second)
   {
+    // Create new DRM tab
     drm_tabs_[tab_id] = drm_manager_->CreateTab(tab_id, config, callbacks);
     drm_it = drm_tabs_.find(tab_id);
   }
   else
   {
+    // DRM tab already exists - just resize and navigate
     drm_it->second->Resize(config.width, config.height, config.offset_x, config.offset_y);
   }
 
@@ -672,10 +707,41 @@ bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_init
   }
 
   drm_tab_urls_[tab_id] = url;
+  drm_tab_titles_[tab_id] = "Loading DRM System...";
+  
+  // Show loading page in Ultralight tab while WebView2 initializes
   if (ultra_tab)
-    ultra_tab->Hide();
-  drm_it->second->Show();
+  {
+    ultra_tab->view()->LoadURL("file:///drm_loading.html");
+    ultra_tab->Show();  // Keep showing the loading page
+  }
+  // DON'T show WebView2 yet - it will be shown when it starts loading
+  // This ensures the loading page is visible while WebView2 initializes
+  drm_it->second->Hide();
   UpdateDrmBadge(tab_id, true);
+
+  // Update tab UI to show loading state
+  {
+    RefPtr<JSContext> lock(view()->LockJSContext());
+    if (updateTab)
+    {
+      ultralight::String title_str("Loading DRM System...");
+      ultralight::String url_str(url.c_str());
+      updateTab({tab_id, title_str, GetFaviconURL(url_str), true});  // true = loading
+    }
+    // Update URL bar
+    if (tab_id == active_tab_id_)
+    {
+      ultralight::String url_str(url.c_str());
+      SetURL(url_str);
+    }
+  }
+
+  // Set loading state immediately
+  if (tab_id == active_tab_id_)
+    SetLoading(true);
+
+  // Navigate to URL (this handles pending URL if WebView isn't ready yet)
   drm_it->second->LoadURL(url);
   return true;
 }
@@ -712,6 +778,33 @@ void UI::HandleDrmLoading(uint64_t tab_id, bool is_loading)
 {
   if (tab_id == active_tab_id_)
     SetLoading(is_loading);
+  
+  // When WebView2 starts loading content, show it and hide the Ultralight loading page
+  if (is_loading)
+  {
+    // Show the DRM tab now that it's actually loading, but only if no overlays are open
+    // Note: suggestions_overlay_ is excluded because it doesn't hide the DRM tab
+    auto drm_it = drm_tabs_.find(tab_id);
+    if (drm_it != drm_tabs_.end() && drm_it->second)
+    {
+      // Only show if this is the active tab and no overlays are covering the content
+      if (tab_id == active_tab_id_ && !menu_overlay_ && !downloads_overlay_ && !context_menu_overlay_)
+        drm_it->second->Show();
+    }
+    
+    // Pre-load solid background in Ultralight tab so it's ready when overlays open (no lag)
+    // The background has a fast fade-in animation for smooth visual transition
+    auto tab_it = tabs_.find(tab_id);
+    if (tab_it != tabs_.end() && tab_it->second)
+    {
+      tab_it->second->view()->LoadHTML(R"(<!DOCTYPE html><html><head><style>
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden}
+body{background:#1a1a2e;animation:fadeIn 0.15s ease-out}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+</style></head><body></body></html>)");
+      tab_it->second->Hide();
+    }
+  }
 }
 
 void UI::HandleDrmNavigationState(uint64_t tab_id, bool can_back, bool can_forward)
@@ -974,6 +1067,21 @@ bool UI::RunShortcutAction(const std::string &action)
 
 bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
 {
+  // CRITICAL: If clicking in UI area (toolbar) on a DRM tab, detach WebView2 immediately
+  // This prevents WebView2 from intercepting keyboard input to address bar
+  if (evt.type == MouseEvent::kType_MouseDown && evt.y <= ui_height_)
+  {
+    auto drm_it = drm_tabs_.find(active_tab_id_);
+    if (drm_it != drm_tabs_.end() && drm_it->second)
+    {
+      drm_it->second->DetachFromParent();
+      // Show solid background
+      auto tab_it = tabs_.find(active_tab_id_);
+      if (tab_it != tabs_.end() && tab_it->second)
+        tab_it->second->Show();
+    }
+  }
+  
   // If menu overlay is active, route mouse events to it and consume
   if (menu_overlay_ && menu_overlay_->view())
   {
@@ -1051,6 +1159,9 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
     {
       address_bar_is_focused_ = true;
       view()->Focus();
+      // If a DRM tab is active, blur it so keyboard input goes to Ultralight UI
+      if (auto drm_tab = active_drm_tab())
+        drm_tab->Blur();
     }
     view()->FireMouseEvent(evt);
     return false;
@@ -1068,6 +1179,11 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
     if (active_tab())
     {
       active_tab()->view()->Focus();
+    }
+    // If DRM tab is active, focus it when clicking in the content area
+    else if (auto drm_tab = active_drm_tab())
+    {
+      drm_tab->Focus();
     }
   }
   if (active_tab() && active_tab()->IsInspectorShowing())
@@ -1449,10 +1565,11 @@ void UI::OnActiveTabChange(const JSObject &obj, const JSArgs &args)
     if (!tab)
       return;
 
-    bool previous_was_drm = ActiveTabIsDRM();
-    if (previous_was_drm)
-      HideDrmTab(active_tab_id_);
-    else if (tabs_.count(active_tab_id_) && tabs_[active_tab_id_])
+    // Always hide all DRM tabs first to ensure clean state
+    HideAllDrmTabs();
+    
+    // Hide the previous Ultralight tab if it wasn't DRM
+    if (tabs_.count(active_tab_id_) && tabs_[active_tab_id_])
       tabs_[active_tab_id_]->Hide();
 
     if (tabs_[active_tab_id_]->ready_to_close())
@@ -1477,6 +1594,7 @@ void UI::OnActiveTabChange(const JSObject &obj, const JSArgs &args)
     if (drm_tab)
     {
       drm_tab->Show();
+      drm_tab->Focus();  // Give focus to DRM tab
       auto title_it = drm_tab_titles_.find(active_tab_id_);
       auto url_it = drm_tab_urls_.find(active_tab_id_);
       if (url_it != drm_tab_urls_.end())
@@ -1488,6 +1606,7 @@ void UI::OnActiveTabChange(const JSObject &obj, const JSArgs &args)
     else
     {
       tabs_[active_tab_id_]->Show();
+      tabs_[active_tab_id_]->view()->Focus();  // Give focus to Ultralight tab
       auto tab_view = tabs_[active_tab_id_]->view();
       SetLoading(tab_view->is_loading());
       SetCanGoBack(tab_view->CanGoBack());
@@ -1507,16 +1626,19 @@ void UI::OnRequestChangeURL(const JSObject &obj, const JSArgs &args)
     if (url_data.data())
       url_utf8 = url_data.data();
 
+    // Check if this is a DRM site
     if (MaybeOpenDrmTab(active_tab_id_, url_utf8, true))
       return;
 
-    HideDrmTab(active_tab_id_);
+    // Not a DRM site - close any existing DRM tab and show Ultralight tab
+    HideAllDrmTabs();
     if (!tabs_.empty())
     {
       auto &tab = tabs_[active_tab_id_];
       if (tab)
       {
         tab->Show();
+        tab->view()->Focus();  // Ensure focus returns to Ultralight
         tab->view()->LoadURL(url);
       }
     }
@@ -1525,6 +1647,17 @@ void UI::OnRequestChangeURL(const JSObject &obj, const JSArgs &args)
 
 void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
 {
+  // DEBUG: Log that we got here
+  std::ofstream debug("debug_navigate.txt", std::ios::app);
+  debug << "OnAddressBarNavigate called with " << args.size() << " args\n";
+  if (args.size() > 0) {
+    ultralight::String url = args[0];
+    auto url_data = url.utf8();
+    if (url_data.data())
+      debug << "URL: " << url_data.data() << "\n";
+  }
+  debug.close();
+  
   if (args.size() == 1)
   {
     ultralight::String url = args[0];
@@ -1532,21 +1665,76 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
     auto url_data = url.utf8();
     if (url_data.data())
       url_utf8 = url_data.data();
+    
     // Record immediately so History UI updates quickly (dedup inside RecordHistory)
     RecordHistory(url, String(""));
 
-    if (MaybeOpenDrmTab(active_tab_id_, url_utf8, true))
-      return;
+    // Check if the new URL is a DRM site
+    bool new_url_is_drm = drm_settings_.IsDRMRequired(url_utf8);
 
-    HideDrmTab(active_tab_id_);
-    if (!tabs_.empty())
+    // Check if currently on a DRM site
+    auto drm_it = drm_tabs_.find(active_tab_id_);
+    bool is_on_drm = (drm_it != drm_tabs_.end() && drm_it->second);
+    
+    if (is_on_drm && new_url_is_drm)
     {
-      auto &tab = tabs_[active_tab_id_];
-      if (tab)
+      // DRM -> DRM: Simple navigation within WebView2
+      drm_it->second->LoadURL(url_utf8);
+      drm_tab_urls_[active_tab_id_] = url_utf8;
+      SetURL(url);
+      return;
+    }
+    
+    if (is_on_drm && !new_url_is_drm)
+    {
+      // DRM -> Non-DRM: Close DRM tab, convert to standard Ultralight tab
+      uint64_t tab_id = active_tab_id_;
+      
+      // Close and remove DRM WebView2
+      drm_it->second->Close();
+      drm_tabs_.erase(tab_id);
+      drm_tab_urls_.erase(tab_id);
+      drm_tab_titles_.erase(tab_id);
+      
+      // Update UI to remove DRM badge
+      UpdateDrmBadge(tab_id, false);
+      
+      // Navigate the Ultralight tab to the new URL
+      auto tab_it = tabs_.find(tab_id);
+      if (tab_it != tabs_.end() && tab_it->second)
       {
-        tab->Show();
-        tab->view()->LoadURL(url);
+        tab_it->second->Show();
+        tab_it->second->view()->Focus();
+        tab_it->second->view()->LoadURL(url);
+        
+        // Update UI immediately
+        SetURL(url);
+        SetLoading(true);
       }
+      return;
+    }
+    
+    if (!is_on_drm && new_url_is_drm)
+    {
+      // Non-DRM -> DRM: Convert existing tab to DRM tab
+      uint64_t tab_id = active_tab_id_;
+      
+      // Create DRM tab (this will handle loading page display)
+      if (MaybeOpenDrmTab(tab_id, url_utf8, true))
+      {
+        // Update UI to add DRM badge
+        UpdateDrmBadge(tab_id, true);
+      }
+      return;
+    }
+    
+    // Non-DRM -> Non-DRM: Standard navigation
+    auto tab_it = tabs_.find(active_tab_id_);
+    if (tab_it != tabs_.end() && tab_it->second)
+    {
+      tab_it->second->view()->LoadURL(url);
+      tab_it->second->Show();
+      tab_it->second->view()->Focus();
     }
   }
 }
@@ -1861,12 +2049,15 @@ void UI::OnOpenExtensionsFolder(const JSObject &obj, const JSArgs &args)
 
 void UI::CreateNewTab()
 {
+  // Hide all DRM tabs when creating a new standard tab
+  HideAllDrmTabs();
+  
   uint64_t id = tab_id_counter_++;
   RefPtr<Window> window = window_;
   int tab_height = window->height() - ui_height_;
   if (tab_height < 1)
     tab_height = 1;
-  tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_);
+  tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_);
   // Load local static start page
   const char *kStartPage = "file:///static-sties/google-static.html";
   tabs_[id]->view()->LoadURL(kStartPage);
@@ -1880,12 +2071,15 @@ void UI::CreateNewTab()
 
 RefPtr<View> UI::CreateNewTabForChildView(const String &url)
 {
+  // Hide all DRM tabs when creating a new standard tab
+  HideAllDrmTabs();
+  
   uint64_t id = tab_id_counter_++;
   RefPtr<Window> window = window_;
   int tab_height = window->height() - ui_height_;
   if (tab_height < 1)
     tab_height = 1;
-  tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_);
+  tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_);
 
   {
     RefPtr<JSContext> lock(view()->LockJSContext());
@@ -1916,6 +2110,11 @@ void UI::UpdateTabTitle(uint64_t id, const ultralight::String &title)
 
 void UI::UpdateTabURL(uint64_t id, const ultralight::String &url)
 {
+  // If this tab already has an active DRM view, ignore URL updates from the Ultralight tab
+  // (they may come from about:blank or other intermediate states)
+  if (GetDrmTab(id) != nullptr)
+    return;
+
   std::string url_utf8;
   auto utf8 = url.utf8();
   if (utf8.data())
@@ -1925,7 +2124,8 @@ void UI::UpdateTabURL(uint64_t id, const ultralight::String &url)
   {
     if (MaybeOpenDrmTab(id, url_utf8, false))
       return;
-    HideDrmTab(id);
+    // Only hide DRM tab if we're navigating away from a DRM site
+    // (this shouldn't happen since we check above, but keep for safety)
   }
 
   if (id == active_tab_id_ && !tabs_.empty())
@@ -2327,6 +2527,17 @@ void UI::ShowDownloadsOverlay()
 
   downloads_overlay_user_dismissed_ = false;
 
+  // Hide active DRM WebView2 tab so overlay appears on top
+  auto drm_it = drm_tabs_.find(active_tab_id_);
+  if (drm_it != drm_tabs_.end() && drm_it->second)
+  {
+    drm_it->second->Hide();
+    // Show the pre-loaded solid background Ultralight tab
+    auto tab_it = tabs_.find(active_tab_id_);
+    if (tab_it != tabs_.end() && tab_it->second)
+      tab_it->second->Show();
+  }
+
   ultralight::ViewConfig cfg;
   cfg.is_transparent = true;
   cfg.initial_device_scale = window_->scale();
@@ -2373,6 +2584,15 @@ void UI::HideDownloadsOverlay()
   }
 
   downloads_overlay_ = nullptr;
+
+  // Restore active DRM WebView2 tab if no other overlays are open
+  // Note: suggestions_overlay_ is excluded because it doesn't hide the DRM tab
+  if (!menu_overlay_ && !context_menu_overlay_)
+  {
+    auto drm_it = drm_tabs_.find(active_tab_id_);
+    if (drm_it != drm_tabs_.end() && drm_it->second)
+      drm_it->second->Show();
+  }
 }
 
 void UI::LayoutDownloadsOverlay()
@@ -2912,6 +3132,7 @@ std::string UI::BuildDefaultChromiumUserAgent() const
 
   // Pretend to be the latest stable Chromium build; this string should
   // be bumped periodically as Chromium versions advance.
+  // Note: Using Chrome 142 which is the latest version.
   std::string ua = "Mozilla/5.0 (";
   ua += platform;
   ua += ") AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36";
@@ -3016,7 +3237,8 @@ std::string UI::BuildSettingsPayload(bool snapshot_is_baseline) const
   ss << "\"values\": " << BuildSettingsJSON() << ",";
   // Expose the effective user agent string as a separate field so the
   // Settings page can always display the UA that will actually be used.
-  ss << "\"target_user_agent\": \"" << util::EscapeJsonString(active_user_agent_) << "\",";
+  // Also expose the raw custom_user_agent for the input field when use_custom_user_agent is enabled.
+  ss << "\"target_user_agent\": \"" << util::EscapeJsonString(settings_.custom_user_agent.empty() ? active_user_agent_ : settings_.custom_user_agent) << "\",";
   ss << "\"meta\": {";
   ss << "\"updated_at\": \"" << util::ToIso8601UTC(std::chrono::system_clock::now()) << "\",";
   ss << "\"dirty\": " << (settings_dirty_ ? "true" : "false") << ",";
@@ -3158,6 +3380,17 @@ void UI::ShowMenuOverlay()
   if (menu_overlay_)
     return;
 
+  // Hide active DRM WebView2 tab so overlay appears on top
+  auto drm_it = drm_tabs_.find(active_tab_id_);
+  if (drm_it != drm_tabs_.end() && drm_it->second)
+  {
+    drm_it->second->Hide();
+    // Show the pre-loaded solid background Ultralight tab
+    auto tab_it = tabs_.find(active_tab_id_);
+    if (tab_it != tabs_.end() && tab_it->second)
+      tab_it->second->Show();
+  }
+
   // Create a transparent View so only the dropdown is visible over content
   ultralight::ViewConfig cfg;
   cfg.is_transparent = true;
@@ -3189,14 +3422,41 @@ void UI::HideMenuOverlay()
     overlay_->Focus();
   menu_overlay_->view()->set_load_listener(nullptr);
   menu_overlay_ = nullptr;
+
+  // Restore active DRM WebView2 tab if no other overlays are open
+  // Note: suggestions_overlay_ is excluded because it doesn't hide the DRM tab
+  if (!downloads_overlay_ && !context_menu_overlay_)
+  {
+    auto drm_it = drm_tabs_.find(active_tab_id_);
+    if (drm_it != drm_tabs_.end() && drm_it->second)
+      drm_it->second->Show();
+  }
 }
 
 void UI::ShowContextMenuOverlay(int x, int y, const ultralight::String &json_info)
 {
-  // Recreate view each time for simplicity
+  // Recreate view each time for simplicity - but don't restore DRM tab during recreation
   if (context_menu_overlay_)
   {
-    HideContextMenuOverlay();
+    // Just destroy the old overlay without restoring DRM tab
+    context_menu_overlay_->Hide();
+    context_menu_overlay_->Unfocus();
+    if (overlay_)
+      overlay_->Focus();
+    context_menu_overlay_->view()->set_load_listener(nullptr);
+    context_menu_overlay_ = nullptr;
+    pending_ctx_info_json_ = "";
+  }
+
+  // Hide active DRM WebView2 tab so overlay appears on top
+  auto drm_it = drm_tabs_.find(active_tab_id_);
+  if (drm_it != drm_tabs_.end() && drm_it->second)
+  {
+    drm_it->second->Hide();
+    // Show the pre-loaded solid background Ultralight tab
+    auto tab_it = tabs_.find(active_tab_id_);
+    if (tab_it != tabs_.end() && tab_it->second)
+      tab_it->second->Show();
   }
 
   ultralight::ViewConfig cfg;
@@ -3231,6 +3491,15 @@ void UI::HideContextMenuOverlay()
   context_menu_overlay_->view()->set_load_listener(nullptr);
   context_menu_overlay_ = nullptr;
   pending_ctx_info_json_ = "";
+
+  // Restore active DRM WebView2 tab if no other overlays are open
+  // Note: suggestions_overlay_ is excluded because it doesn't hide the DRM tab
+  if (!menu_overlay_ && !downloads_overlay_)
+  {
+    auto drm_it = drm_tabs_.find(active_tab_id_);
+    if (drm_it != drm_tabs_.end() && drm_it->second)
+      drm_it->second->Show();
+  }
 }
 
 void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
@@ -4238,9 +4507,20 @@ void UI::LoadSuggestionsFaviconsFlag()
 
 void UI::ShowSuggestionsOverlay(int x, int y, int width, const ultralight::String &json_items)
 {
-  // Recreate each time for simplicity
+  // Recreate each time for simplicity - but don't restore DRM tab during recreation
   if (suggestions_overlay_)
-    HideSuggestionsOverlay();
+  {
+    // Just destroy the old overlay without restoring DRM tab
+    suggestions_overlay_->Hide();
+    suggestions_overlay_->Unfocus();
+    suggestions_overlay_->view()->set_load_listener(nullptr);
+    suggestions_overlay_ = nullptr;
+    pending_sugg_json_ = "";
+  }
+
+  // NOTE: Don't hide DRM tab for suggestions - it's a small dropdown that appears
+  // in the URL bar area, not covering the main content. Hiding/showing DRM tab
+  // causes flickering and input issues.
 
   ultralight::ViewConfig cfg;
   cfg.is_transparent = true;
@@ -4271,6 +4551,7 @@ void UI::HideSuggestionsOverlay()
   suggestions_overlay_->view()->set_load_listener(nullptr);
   suggestions_overlay_ = nullptr;
   pending_sugg_json_ = "";
+  // NOTE: Don't restore DRM tab here - suggestions don't hide it in the first place
 }
 
 void UI::OnOpenSuggestionsOverlay(const JSObject &obj, const JSArgs &args)
@@ -4377,7 +4658,11 @@ bool UI::BrowserSettings::operator==(const BrowserSettings &other) const
          high_contrast_ui == other.high_contrast_ui &&
          enable_caret_browsing == other.enable_caret_browsing &&
          enable_remote_inspector == other.enable_remote_inspector &&
-         show_performance_overlay == other.show_performance_overlay;
+         show_performance_overlay == other.show_performance_overlay &&
+         use_custom_user_agent == other.use_custom_user_agent &&
+         custom_user_agent == other.custom_user_agent &&
+         auto_save_settings == other.auto_save_settings &&
+         enable_drm_webview == other.enable_drm_webview;
 }
 
 std::filesystem::path UI::SettingsDirectory()

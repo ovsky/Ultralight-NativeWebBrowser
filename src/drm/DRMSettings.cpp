@@ -82,10 +82,11 @@ namespace drm
         void MergeCatalog(std::map<std::string, SiteRule> &target,
                           const std::map<std::string, SiteRule> &catalog)
         {
+            // Always include all catalog entries (catalog takes precedence)
+            // This ensures new sites added to the catalog are picked up
             for (const auto &entry : catalog)
             {
-                if (target.find(entry.first) == target.end())
-                    target[entry.first] = entry.second;
+                target[entry.first] = entry.second;
             }
         }
     }

@@ -1,5 +1,11 @@
 {
   "drm_sites": {
+    "facebook.com": { "force": true },
+    "messenger.com": { "force": true },
+    "fbcdn.net": { "force": true },
+    "fbsbx.com": { "force": true },
+    "instagram.com": { "force": true },
+    "cdninstagram.com": { "force": true },
     "netflix.com": { "force": true },
     "nflxvideo.net": { "force": true },
     "nflximg.net": { "force": true },

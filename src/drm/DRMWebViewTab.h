@@ -38,10 +38,13 @@ namespace drm
         virtual void Reload() = 0;
         virtual void Stop() = 0;
         virtual void Focus() = 0;
+        virtual void Blur() = 0;  // Remove focus from WebView
         virtual void Resize(uint32_t width, uint32_t height, uint32_t offset_x, uint32_t offset_y) = 0;
         virtual void Show() = 0;
         virtual void Hide() = 0;
         virtual void Close() = 0;
+        virtual void DetachFromParent() = 0;  // Remove from window hierarchy to prevent key interception
+        virtual void ReattachToParent() = 0;  // Restore to window hierarchy
         virtual std::string GetTitle() const = 0;
         virtual std::string GetURL() const = 0;
         virtual bool CanGoBack() const = 0;
@@ -56,5 +59,8 @@ namespace drm
     std::unique_ptr<DRMWebViewTab> CreatePlatformWebViewTab(uint64_t id,
                                                             const DRMWebViewConfig &config,
                                                             DRMWebViewCallbacks callbacks);
+
+    // Pre-initialize the WebView environment to reduce first-load lag
+    void PrewarmWebViewEnvironment();
 
 } // namespace drm

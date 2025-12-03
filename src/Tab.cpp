@@ -3,6 +3,7 @@
 #include "Utils.h"
 #include "DownloadManager.h"
 #include "ExtensionManager.h"
+#include "AdBlocker.h"
 #include <iostream>
 #include <string>
 #include <cstdio>
@@ -10,13 +11,47 @@
 
 #define INSPECTOR_DRAG_HANDLE_HEIGHT 10
 
-Tab::Tab(UI *ui, uint64_t id, uint32_t width, uint32_t height, int x, int y)
+Tab::Tab(UI *ui, uint64_t id, uint32_t width, uint32_t height, int x, int y,
+         const std::string &user_agent)
     : ui_(ui), id_(id), container_width_(width), container_height_(height)
 {
-  overlay_ = Overlay::Create(ui->window_, width, height, x, y);
-  view()->set_view_listener(this);
-  view()->set_load_listener(this);
-  view()->set_download_listener(ui->download_manager());
+  // Create a ViewConfig with the user agent - always set one
+  ultralight::ViewConfig cfg;
+  cfg.initial_device_scale = ui->window_->scale();
+  
+  // Match acceleration/display settings with main UI view to avoid GPU driver issues
+  if (ui->overlay_ && ui->overlay_->view())
+  {
+    cfg.is_accelerated = ui->overlay_->view()->is_accelerated();
+    cfg.display_id = ui->overlay_->view()->display_id();
+  }
+  
+  // Always set a user agent - use provided one or fall back to a Chromium-like default
+  if (!user_agent.empty())
+  {
+    cfg.user_agent = String(user_agent.c_str());
+  }
+  else
+  {
+    // Fallback default user agent with Chrome and Safari identifiers
+    // Using Chrome 131 which is a real stable version (as of late 2024/early 2025)
+    cfg.user_agent = String("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
+  }
+
+  // Create the view with the custom config
+  auto renderer = App::instance()->renderer();
+  auto view = renderer->CreateView(width, height, cfg, nullptr);
+
+  // Create overlay wrapping the view
+  overlay_ = Overlay::Create(ui->window_, view, x, y);
+  this->view()->set_view_listener(this);
+  this->view()->set_load_listener(this);
+  this->view()->set_download_listener(ui->download_manager());
+  // Connect the network listener for ad/tracker blocking (if available)
+  if (ui->network_blocker())
+  {
+    this->view()->set_network_listener(ui->network_blocker());
+  }
 }
 
 Tab::~Tab()
@@ -24,6 +59,7 @@ Tab::~Tab()
   view()->set_view_listener(nullptr);
   view()->set_load_listener(nullptr);
   view()->set_download_listener(nullptr);
+  view()->set_network_listener(nullptr);
 }
 
 void Tab::Show()
@@ -184,15 +220,29 @@ void Tab::OnChangeCursor(View *caller, Cursor cursor)
 
 void Tab::OnAddConsoleMessage(View *caller, const ConsoleMessage &msg)
 {
+  // Log console messages to stderr for debugging
+  String smsg = msg.message();
+  auto u = smsg.utf8();
+  std::string m = u.data() ? u.data() : "";
+  auto src = msg.source_id().utf8();
+  std::string source = src.data() ? src.data() : "";
+  
+  const char* level_str = "LOG";
+  switch (msg.level()) {
+    case kMessageLevel_Warning: level_str = "WARN"; break;
+    case kMessageLevel_Error: level_str = "ERROR"; break;
+    case kMessageLevel_Debug: level_str = "DEBUG"; break;
+    case kMessageLevel_Info: level_str = "INFO"; break;
+    default: break;
+  }
+  std::fprintf(stderr, "[CONSOLE:%s] %s (line %u, %s)\n", level_str, m.c_str(), msg.line_number(), source.c_str());
+
   // Forward console messages to Quick Inspector if visible
   if (inspector_overlay_ && !inspector_overlay_->is_hidden())
   {
     auto iv = inspector_overlay_->view();
     if (iv)
     {
-      String smsg = msg.message();
-      auto u = smsg.utf8();
-      std::string m = u.data() ? u.data() : "";
       // Minimal escaping for safe JS string literal
       std::string js = std::string("(function(m){ if(window.__qi && __qi.onConsole){ __qi.onConsole({message:m}); } })(\"") + util::EscapeJsStringLiteral(m) + "\")";
       iv->EvaluateScript(String(js.c_str()), nullptr);
@@ -264,6 +314,148 @@ void Tab::OnUpdateHistory(View *caller)
   ui_->UpdateTabNavigation(id_, caller->is_loading(), caller->CanGoBack(), caller->CanGoForward());
 }
 
+void Tab::OnWindowObjectReady(View *caller, uint64_t frame_id, bool is_main_frame, const String &url)
+{
+  // Inject Web Crypto API polyfill and XHR fixes if needed
+  // This is needed for sites like Facebook that use SubtleCrypto for authentication
+  if (is_main_frame)
+  {
+    // First inject XHR fix to ensure credentials are sent with requests
+    // This helps with same-origin requests that might fail due to CORS quirks
+    const char* xhrFix = R"JS(
+(function() {
+  'use strict';
+  // Patch XMLHttpRequest to always include credentials for same-origin requests
+  var originalXHROpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
+    var result = originalXHROpen.apply(this, arguments);
+    // Enable credentials for same-origin requests
+    try {
+      var urlObj = new URL(url, window.location.origin);
+      if (urlObj.origin === window.location.origin) {
+        this.withCredentials = true;
+      }
+    } catch(e) {
+      // If URL parsing fails, try enabling credentials anyway for relative URLs
+      if (url && !url.startsWith('http')) {
+        this.withCredentials = true;
+      }
+    }
+    return result;
+  };
+  
+  // Also patch fetch to include credentials
+  var originalFetch = window.fetch;
+  window.fetch = function(input, init) {
+    init = init || {};
+    // Default to same-origin credentials if not specified
+    if (!init.credentials) {
+      init.credentials = 'same-origin';
+    }
+    return originalFetch.call(this, input, init);
+  };
+  
+  console.log('[Ultralight] XHR/Fetch credentials fix loaded');
+})();
+)JS";
+    caller->EvaluateScript(String(xhrFix), nullptr);
+
+    // Check if crypto.subtle exists and provide a basic polyfill if not
+    // Note: This is a minimal polyfill - real crypto operations may not work correctly
+    // but it prevents "undefined is not an object" errors
+    const char* cryptoPolyfill = R"JS(
+(function() {
+  'use strict';
+  if (typeof window.crypto === 'undefined') {
+    window.crypto = {};
+  }
+  if (typeof window.crypto.subtle === 'undefined') {
+    // Minimal SubtleCrypto polyfill to prevent errors
+    // This won't provide real cryptographic security but allows pages to load
+    window.crypto.subtle = {
+      generateKey: function(algorithm, extractable, keyUsages) {
+        return Promise.resolve({
+          algorithm: algorithm,
+          extractable: extractable,
+          usages: keyUsages,
+          type: 'secret'
+        });
+      },
+      encrypt: function(algorithm, key, data) {
+        // Return data as-is (no real encryption)
+        return Promise.resolve(data);
+      },
+      decrypt: function(algorithm, key, data) {
+        return Promise.resolve(data);
+      },
+      sign: function(algorithm, key, data) {
+        // Return a mock signature
+        var arr = new Uint8Array(32);
+        for (var i = 0; i < 32; i++) arr[i] = Math.floor(Math.random() * 256);
+        return Promise.resolve(arr.buffer);
+      },
+      verify: function(algorithm, key, signature, data) {
+        return Promise.resolve(true);
+      },
+      digest: function(algorithm, data) {
+        // Return a mock hash
+        var arr = new Uint8Array(32);
+        for (var i = 0; i < 32; i++) arr[i] = Math.floor(Math.random() * 256);
+        return Promise.resolve(arr.buffer);
+      },
+      importKey: function(format, keyData, algorithm, extractable, keyUsages) {
+        return Promise.resolve({
+          algorithm: algorithm,
+          extractable: extractable,
+          usages: keyUsages,
+          type: 'secret'
+        });
+      },
+      exportKey: function(format, key) {
+        return Promise.resolve(new ArrayBuffer(32));
+      },
+      deriveBits: function(algorithm, baseKey, length) {
+        var arr = new Uint8Array(length / 8);
+        for (var i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256);
+        return Promise.resolve(arr.buffer);
+      },
+      deriveKey: function(algorithm, baseKey, derivedKeyAlgorithm, extractable, keyUsages) {
+        return Promise.resolve({
+          algorithm: derivedKeyAlgorithm,
+          extractable: extractable,
+          usages: keyUsages,
+          type: 'secret'
+        });
+      },
+      wrapKey: function(format, key, wrappingKey, wrapAlgorithm) {
+        return Promise.resolve(new ArrayBuffer(32));
+      },
+      unwrapKey: function(format, wrappedKey, unwrappingKey, unwrapAlgorithm, unwrappedKeyAlgorithm, extractable, keyUsages) {
+        return Promise.resolve({
+          algorithm: unwrappedKeyAlgorithm,
+          extractable: extractable,
+          usages: keyUsages,
+          type: 'secret'
+        });
+      }
+    };
+    console.log('[Ultralight] Web Crypto API polyfill loaded');
+  }
+  // Also ensure crypto.getRandomValues exists
+  if (typeof window.crypto.getRandomValues === 'undefined') {
+    window.crypto.getRandomValues = function(array) {
+      for (var i = 0; i < array.length; i++) {
+        array[i] = Math.floor(Math.random() * 256);
+      }
+      return array;
+    };
+  }
+})();
+)JS";
+    caller->EvaluateScript(String(cryptoPolyfill), nullptr);
+  }
+}
+
 void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const String &url)
 {
   // Install hooks for all frames (main and subframes)
@@ -271,13 +463,14 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
   // Bind a native JS callback that the page can call when right-click occurs (main frame only)
   if (is_main_frame)
   {
+    auto url_utf8 = url.utf8();
+
     RefPtr<JSContext> ctx = caller->LockJSContext();
     SetJSContext(ctx->ctx());
     JSObject global = JSGlobalObject();
     global["NativeOpenContextMenu"] = BindJSCallback(&Tab::OnOpenContextMenu);
 
     // Check if this is the settings page
-    auto url_utf8 = url.utf8();
     bool is_settings_page = url_utf8.data() && std::strstr(url_utf8.data(), "settings.html") != nullptr;
     bool is_extensions_page = url_utf8.data() && std::strstr(url_utf8.data(), "extensions.html") != nullptr;
 

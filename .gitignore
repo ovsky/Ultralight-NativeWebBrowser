@@ -18,3 +18,5 @@ CMakeUserPresets.json
 /.vscode
 /crashdumps
 /_CPack_Packages
+debug_log*
+debug_*
