@@ -169,10 +169,8 @@ endif()
  # Unit test for utils
  enable_testing()
 
- # Only build UtilsTest in environments where linking to the Ultralight
- # libraries is supported. On Windows CI we sometimes use the MinGW toolchain
- # (GNU) which cannot link MSVC-generated .lib import libraries. In that
- # case skip adding the test to avoid linker errors.
+ # Only build tests in environments where linking to the Ultralight
+ # libraries is supported.
  if(NOT (WIN32 AND NOT MSVC))
 	 include(FetchContent)
 	 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -183,23 +181,37 @@ endif()
 	 )
 	 FetchContent_MakeAvailable(googletest)
 
-	 add_executable(UtilsTest tests/UtilsTest.cpp src/Utils.cpp)
+	 # UtilsTest requires Ultralight SDK libraries. Only build if SDK libs are found.
 	 find_library(APP_CORE_LIB NAMES AppCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
 	 find_library(ULTRALIGHT_LIB NAMES Ultralight PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
 	 find_library(ULTRALIGHT_CORE_LIB NAMES UltralightCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
 	 find_library(WEB_CORE_LIB NAMES WebCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
-	 if(APP_CORE_LIB)
+	 
+	 if(APP_CORE_LIB AND ULTRALIGHT_LIB)
+		 add_executable(UtilsTest tests/UtilsTest.cpp src/Utils.cpp)
 		 target_link_libraries(UtilsTest PRIVATE ${APP_CORE_LIB} ${ULTRALIGHT_LIB} ${ULTRALIGHT_CORE_LIB} ${WEB_CORE_LIB})
+		 target_include_directories(UtilsTest PRIVATE "${ULTRALIGHT_SDK_ROOT}/include")
+		 # Set RPATH to find SDK libraries at runtime (for Linux/macOS)
+		 if(NOT WIN32)
+			 set_target_properties(UtilsTest PROPERTIES
+				 BUILD_RPATH "${ULTRALIGHT_SDK_ROOT}/lib"
+				 INSTALL_RPATH "${ULTRALIGHT_SDK_ROOT}/lib"
+			 )
+		 endif()
+		 add_test(NAME UtilsTest COMMAND UtilsTest)
+		 message(STATUS "Building UtilsTest with Ultralight SDK libraries")
+	 else()
+		 message(STATUS "Skipping UtilsTest: Ultralight SDK libraries not found")
 	 endif()
-	 add_test(NAME UtilsTest COMMAND UtilsTest)
 
+	 # DRMSettingsTest doesn't need Ultralight libraries - it's standalone
 	 add_executable(DRMSettingsTest
 	 	tests/DRMSettingsTest.cpp
 	 	src/drm/DRMSettings.cpp)
 	 target_link_libraries(DRMSettingsTest PRIVATE GTest::gtest_main)
 	 add_test(NAME DRMSettingsTest COMMAND DRMSettingsTest)
  else()
-	 message(STATUS "Skipping UtilsTest on Windows when not using MSVC (to avoid linking MSVC .lib with MinGW)")
+	 message(STATUS "Skipping tests on Windows when not using MSVC (to avoid linking MSVC .lib with MinGW)")
  endif()
 
 # Install/package settings

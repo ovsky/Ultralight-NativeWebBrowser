@@ -270,7 +270,9 @@ jobs:
 
       - name: 7.8 Run tests (ctest)
         if: steps.prep_sdk.outputs.present == 'true'
-        run: ctest --test-dir build --output-on-failure
+        run: |
+          export LD_LIBRARY_PATH="${ULTRALIGHT_SDK_ROOT}/lib:${LD_LIBRARY_PATH:-}"
+          ctest --test-dir build --output-on-failure
 
       - name: 7.9 Install packaging toolchain (rpm if needed)
         if: steps.prep_sdk.outputs.present == 'true'

@@ -322,7 +322,9 @@ jobs:
 
       - name: 6.8 Run tests (ctest)
         if: steps.prep_sdk.outputs.present == 'true'
-        run: ctest --test-dir build -C Release --output-on-failure
+        run: |
+          export DYLD_LIBRARY_PATH="${ULTRALIGHT_SDK_ROOT}/lib:${DYLD_LIBRARY_PATH:-}"
+          ctest --test-dir build -C Release --output-on-failure
 
       - name: 6.9 Package with CPack (macOS)
         if: steps.prep_sdk.outputs.present == 'true'
