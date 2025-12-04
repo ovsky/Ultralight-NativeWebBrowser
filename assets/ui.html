@@ -518,6 +518,7 @@
             </svg>
             <span class="password-save-text">Save password for <strong id="password-save-origin"></strong>?</span>
             <span class="password-save-username" id="password-save-username"></span>
+            <span class="password-autosave-info" id="password-autosave-info"></span>
         </div>
         <div class="password-save-buttons">
             <button id="password-save-btn" class="password-btn primary">Save</button>
@@ -564,6 +565,12 @@
             padding: 2px 8px;
             border-radius: 4px;
             font-size: 12px;
+        }
+        .password-autosave-info {
+            font-size: 11px;
+            color: white;
+            margin-left: auto;
+            font-style: italic;
         }
         .password-save-buttons {
             display: flex;
@@ -634,28 +641,34 @@
                 }
                 usernameSpan.textContent = username;
                 
+                // Get autosave info element
+                var autosaveInfo = document.getElementById('password-autosave-info');
+                
                 // Update save button text with countdown
-                var countdown = 5;
+                var countdown = 10;
                 saveBtn.textContent = 'Save (' + countdown + ')';
+                if (autosaveInfo) autosaveInfo.textContent = 'Auto-saving in ' + countdown + 's...';
                 
                 countdownInterval = setInterval(function() {
                     countdown--;
                     if (countdown > 0) {
                         saveBtn.textContent = 'Save (' + countdown + ')';
+                        if (autosaveInfo) autosaveInfo.textContent = 'Auto-saving in ' + countdown + 's...';
                     } else {
                         saveBtn.textContent = 'Save';
+                        if (autosaveInfo) autosaveInfo.textContent = 'Saving...';
                         clearInterval(countdownInterval);
                         countdownInterval = null;
                     }
                 }, 1000);
                 
-                // Auto-save after 5 seconds if user doesn't respond
+                // Auto-save after 10 seconds if user doesn't respond
                 autoSaveTimer = setTimeout(function() {
                     if (window.OnPasswordSaveBarResponse) {
                         OnPasswordSaveBarResponse('save', currentOrigin, currentUsername);
                     }
                     window.hidePasswordSaveBar();
-                }, 5000);
+                }, 10000);
                 
                 bar.classList.remove('hidden');
                 setTimeout(function() {
@@ -674,6 +687,8 @@
                     countdownInterval = null;
                 }
                 saveBtn.textContent = 'Save';
+                var autosaveInfo = document.getElementById('password-autosave-info');
+                if (autosaveInfo) autosaveInfo.textContent = '';
                 
                 bar.classList.remove('visible');
                 setTimeout(function() {
