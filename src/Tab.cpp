@@ -14,17 +14,22 @@
 #define INSPECTOR_DRAG_HANDLE_HEIGHT 10
 
 Tab::Tab(UI *ui, uint64_t id, uint32_t width, uint32_t height, int x, int y,
-         const std::string &user_agent)
+         const std::string &user_agent, const TabViewSettings &view_settings)
     : ui_(ui), id_(id), container_width_(width), container_height_(height)
 {
   // Create a ViewConfig with the user agent - always set one
   ultralight::ViewConfig cfg;
   cfg.initial_device_scale = ui->window_->scale();
   
+  // Apply view settings from browser settings
+  cfg.enable_javascript = view_settings.enable_javascript;
+  
   // Match acceleration/display settings with main UI view to avoid GPU driver issues
+  // But allow user to override via settings (hardware_acceleration)
   if (ui->overlay_ && ui->overlay_->view())
   {
-    cfg.is_accelerated = ui->overlay_->view()->is_accelerated();
+    // Use hardware acceleration if both the main UI supports it AND user has it enabled
+    cfg.is_accelerated = ui->overlay_->view()->is_accelerated() && view_settings.hardware_acceleration;
     cfg.display_id = ui->overlay_->view()->display_id();
   }
   

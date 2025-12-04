@@ -7,6 +7,15 @@ class UI;
 using namespace ultralight;
 
 /**
+ * Settings that affect View/ViewConfig creation for a tab.
+ * These must be provided at tab creation time since ViewConfig is immutable.
+ */
+struct TabViewSettings {
+  bool enable_javascript = true;
+  bool hardware_acceleration = true;
+};
+
+/**
  * Browser Tab UI implementation. Renders the actual page content in bottom pane.
  */
 class Tab : public ViewListener,
@@ -14,7 +23,7 @@ class Tab : public ViewListener,
 {
 public:
   Tab(UI *ui, uint64_t id, uint32_t width, uint32_t height, int x, int y,
-      const std::string &user_agent = "");
+      const std::string &user_agent = "", const TabViewSettings &view_settings = TabViewSettings());
   ~Tab();
 
   void set_ready_to_close(bool ready) { ready_to_close_ = ready; }

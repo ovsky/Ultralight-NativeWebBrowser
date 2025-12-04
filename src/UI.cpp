@@ -154,7 +154,7 @@ namespace
       // DRM subsystem
       SettingDescriptor{"enable_drm_webview", "Enable DRM WebView",
                         "Automatically switch Widevine-protected sites to a native DRM-capable WebView.",
-                        "drm", "Requires native runtime", false, &UI::BrowserSettings::enable_drm_webview, true},
+                        "drm", "Requires native runtime", false, &UI::BrowserSettings::enable_drm_webview, false},
 
       // Networking / User Agent
       SettingDescriptor{"use_custom_user_agent", "Use custom user agent",
@@ -645,14 +645,17 @@ void UI::EnsureDrmManager()
 
 bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_initiated)
 {
-  if (!settings_.enable_drm_webview)
-  {
-    // DRM webview is disabled in settings
-    return false;
-  }
-  if (!drm_settings_.IsDRMRequired(url))
+  // Check if URL matches a DRM site (ignores DRMSettings enabled_ flag)
+  if (!drm_settings_.IsDrmSite(url))
   {
     // URL is not a DRM site
+    return false;
+  }
+
+  if (!settings_.enable_drm_webview)
+  {
+    // DRM webview is disabled in browser settings - show prompt to user
+    ShowDrmPrompt(url, tab_id);
     return false;
   }
 
@@ -1326,6 +1329,8 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnCloseSettingsPanel"] = BindJSCallback(&UI::OnCloseSettingsPanel);
   // Password save bar callback
   global["OnPasswordSaveBarResponse"] = BindJSCallback(&UI::OnPasswordSaveBarResponse);
+  // DRM prompt bar callback
+  global["OnDrmPromptResponse"] = BindJSCallback(&UI::OnDrmPromptResponse);
   // Allow UI documents (including settings) to request a chrome overlay reload.
   global["OnReloadChromeUI"] = BindJSCallback(&UI::OnReloadChromeUI);
   // Allow UI documents to request reloading the active non-settings tab.
@@ -2092,7 +2097,13 @@ void UI::CreateNewTab()
   int tab_height = window->height() - ui_height_;
   if (tab_height < 1)
     tab_height = 1;
-  tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_);
+  
+  // Build view settings from current browser settings
+  TabViewSettings view_settings;
+  view_settings.enable_javascript = settings_.enable_javascript;
+  view_settings.hardware_acceleration = settings_.hardware_acceleration;
+  
+  tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_, view_settings);
   // Load local static start page
   const char *kStartPage = "file:///static-sties/google-static.html";
   tabs_[id]->view()->LoadURL(kStartPage);
@@ -2114,7 +2125,13 @@ RefPtr<View> UI::CreateNewTabForChildView(const String &url)
   int tab_height = window->height() - ui_height_;
   if (tab_height < 1)
     tab_height = 1;
-  tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_);
+  
+  // Build view settings from current browser settings
+  TabViewSettings view_settings;
+  view_settings.enable_javascript = settings_.enable_javascript;
+  view_settings.hardware_acceleration = settings_.hardware_acceleration;
+  
+  tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_, view_settings);
 
   {
     RefPtr<JSContext> lock(view()->LockJSContext());
@@ -3102,8 +3119,9 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
   adblock_enabled_cached_ = settings_.enable_adblock;
   clear_history_on_exit_ = settings_.clear_history_on_exit;
 
-  // Note: JavaScript, web security, cookies, DNT would require View config changes
-  // These settings are stored and can be applied on next tab creation
+  // Note: enable_javascript and hardware_acceleration are applied to NEW tabs via TabViewSettings
+  // Existing tabs keep their original settings since ViewConfig is immutable after creation.
+  // enable_web_security, block_third_party_cookies, do_not_track are not yet implemented.
 
   // Address Bar & Suggestions
   suggestions_enabled_ = settings_.enable_suggestions;
@@ -3117,8 +3135,8 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
   // ask_download_location would be checked when download starts
 
   // Performance
-  // smooth_scrolling, hardware_acceleration, local_storage, database
-  // These would typically be applied during View/Config creation
+  // enable_javascript and hardware_acceleration are applied during Tab creation (see CreateNewTab)
+  // smooth_scrolling, local_storage, database - would require additional Ultralight session config
 
   // Accessibility
   reduce_motion_enabled_ = settings_.reduce_motion;
@@ -5034,6 +5052,75 @@ void UI::OnPasswordNeverSave(const JSObject &obj, const JSArgs &args)
 
   if (!origin.empty())
     password_manager_->BlacklistOrigin(origin);
+}
+
+// DRM Prompt functionality
+void UI::ShowDrmPrompt(const std::string &url, uint64_t tab_id)
+{
+  // Show DRM prompt bar in the UI
+  std::ostringstream js;
+  js << "(function(){ "
+     << "if(typeof window.showDrmPromptBar === 'function') { "
+     << "  window.showDrmPromptBar('" << util::EscapeJsonString(url) << "', " << tab_id << "); "
+     << "} "
+     << "})();";
+  view()->EvaluateScript(String(js.str().c_str()), nullptr);
+}
+
+void UI::HideDrmPrompt()
+{
+  // Hide DRM prompt bar in the UI
+  view()->EvaluateScript("(function(){ if(typeof window.hideDrmPromptBar === 'function') window.hideDrmPromptBar(); })();", nullptr);
+}
+
+void UI::OnDrmPromptResponse(const JSObject &obj, const JSArgs &args)
+{
+  // Called when user clicks Enable DRM / Always Enable / Dismiss on the DRM prompt bar
+  if (args.size() < 3)
+    return;
+
+  ultralight::String action_ul = args[0].ToString();
+  ultralight::String url_ul = args[1].ToString();
+  int tab_id_int = args[2].ToInteger();
+
+  auto action_str = action_ul.utf8();
+  auto url_str = url_ul.utf8();
+
+  std::string action = action_str.data() ? action_str.data() : "";
+  std::string url = url_str.data() ? url_str.data() : "";
+  uint64_t tab_id = static_cast<uint64_t>(tab_id_int);
+
+  if (action == "enable_once")
+  {
+    // Temporarily enable DRM for this navigation only
+    // We'll directly open the DRM tab without changing the setting
+    bool old_setting = settings_.enable_drm_webview;
+    settings_.enable_drm_webview = true;
+    
+    // Try to open the DRM tab
+    if (tab_id > 0 && tabs_.count(tab_id))
+    {
+      // Force open DRM tab for this URL
+      MaybeOpenDrmTab(tab_id, url, true);
+    }
+    
+    // Restore the setting (user didn't want it permanently enabled)
+    settings_.enable_drm_webview = old_setting;
+  }
+  else if (action == "enable_always")
+  {
+    // Permanently enable DRM setting
+    settings_.enable_drm_webview = true;
+    ApplySettings(false, false);
+    SaveSettingsToDisk();
+    
+    // Now open the DRM tab
+    if (tab_id > 0 && tabs_.count(tab_id))
+    {
+      MaybeOpenDrmTab(tab_id, url, true);
+    }
+  }
+  // "dismiss" action - do nothing, just close the bar
 }
 
 ultralight::JSValue UI::OnGetAutofillSuggestions(const JSObject &obj, const JSArgs &args)
