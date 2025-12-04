@@ -320,7 +320,8 @@ jobs:
             libxtst-dev \
             libxss-dev \
             libdbus-glib-1-dev \
-            libcurl4-openssl-dev
+            libcurl4-openssl-dev \
+            libssl-dev
 
       - name: 5.5 AUTO_INSTALL_CURL (helper script)
         run: |
