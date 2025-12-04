@@ -27,6 +27,9 @@ namespace drm
         void SetSiteRule(const std::string &host, const SiteRule &rule);
 
         bool IsDRMRequired(const std::string &url) const;
+        
+        // Check if URL matches a DRM site (ignores enabled_ flag)
+        bool IsDrmSite(const std::string &url) const;
 
         const std::filesystem::path &storage_path() const { return storage_path_; }
 

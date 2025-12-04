@@ -205,6 +205,12 @@ namespace drm
     {
         if (!enabled_)
             return false;
+        return IsDrmSite(url);
+    }
+
+    bool DRMSettings::IsDrmSite(const std::string &url) const
+    {
+        // Check if URL matches a DRM site (ignores enabled_ flag)
         std::string host = NormalizeHost(ExtractHost(url));
         if (host.empty())
             return false;
