@@ -154,7 +154,7 @@ namespace
       // DRM subsystem
       SettingDescriptor{"enable_drm_webview", "Enable DRM WebView",
                         "Automatically switch Widevine-protected sites to a native DRM-capable WebView.",
-                        "drm", "Requires native runtime", false, &UI::BrowserSettings::enable_drm_webview, true},
+                        "drm", "Requires native runtime", false, &UI::BrowserSettings::enable_drm_webview, false},
 
       // Networking / User Agent
       SettingDescriptor{"use_custom_user_agent", "Use custom user agent",
@@ -645,14 +645,17 @@ void UI::EnsureDrmManager()
 
 bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_initiated)
 {
-  if (!settings_.enable_drm_webview)
-  {
-    // DRM webview is disabled in settings
-    return false;
-  }
-  if (!drm_settings_.IsDRMRequired(url))
+  // Check if URL matches a DRM site (ignores DRMSettings enabled_ flag)
+  if (!drm_settings_.IsDrmSite(url))
   {
     // URL is not a DRM site
+    return false;
+  }
+
+  if (!settings_.enable_drm_webview)
+  {
+    // DRM webview is disabled in browser settings - show prompt to user
+    ShowDrmPrompt(url, tab_id);
     return false;
   }
 
@@ -1326,6 +1329,8 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnCloseSettingsPanel"] = BindJSCallback(&UI::OnCloseSettingsPanel);
   // Password save bar callback
   global["OnPasswordSaveBarResponse"] = BindJSCallback(&UI::OnPasswordSaveBarResponse);
+  // DRM prompt bar callback
+  global["OnDrmPromptResponse"] = BindJSCallback(&UI::OnDrmPromptResponse);
   // Allow UI documents (including settings) to request a chrome overlay reload.
   global["OnReloadChromeUI"] = BindJSCallback(&UI::OnReloadChromeUI);
   // Allow UI documents to request reloading the active non-settings tab.
@@ -5047,6 +5052,75 @@ void UI::OnPasswordNeverSave(const JSObject &obj, const JSArgs &args)
 
   if (!origin.empty())
     password_manager_->BlacklistOrigin(origin);
+}
+
+// DRM Prompt functionality
+void UI::ShowDrmPrompt(const std::string &url, uint64_t tab_id)
+{
+  // Show DRM prompt bar in the UI
+  std::ostringstream js;
+  js << "(function(){ "
+     << "if(typeof window.showDrmPromptBar === 'function') { "
+     << "  window.showDrmPromptBar('" << util::EscapeJsonString(url) << "', " << tab_id << "); "
+     << "} "
+     << "})();";
+  view()->EvaluateScript(String(js.str().c_str()), nullptr);
+}
+
+void UI::HideDrmPrompt()
+{
+  // Hide DRM prompt bar in the UI
+  view()->EvaluateScript("(function(){ if(typeof window.hideDrmPromptBar === 'function') window.hideDrmPromptBar(); })();", nullptr);
+}
+
+void UI::OnDrmPromptResponse(const JSObject &obj, const JSArgs &args)
+{
+  // Called when user clicks Enable DRM / Always Enable / Dismiss on the DRM prompt bar
+  if (args.size() < 3)
+    return;
+
+  ultralight::String action_ul = args[0].ToString();
+  ultralight::String url_ul = args[1].ToString();
+  int tab_id_int = args[2].ToInteger();
+
+  auto action_str = action_ul.utf8();
+  auto url_str = url_ul.utf8();
+
+  std::string action = action_str.data() ? action_str.data() : "";
+  std::string url = url_str.data() ? url_str.data() : "";
+  uint64_t tab_id = static_cast<uint64_t>(tab_id_int);
+
+  if (action == "enable_once")
+  {
+    // Temporarily enable DRM for this navigation only
+    // We'll directly open the DRM tab without changing the setting
+    bool old_setting = settings_.enable_drm_webview;
+    settings_.enable_drm_webview = true;
+    
+    // Try to open the DRM tab
+    if (tab_id > 0 && tabs_.count(tab_id))
+    {
+      // Force open DRM tab for this URL
+      MaybeOpenDrmTab(tab_id, url, true);
+    }
+    
+    // Restore the setting (user didn't want it permanently enabled)
+    settings_.enable_drm_webview = old_setting;
+  }
+  else if (action == "enable_always")
+  {
+    // Permanently enable DRM setting
+    settings_.enable_drm_webview = true;
+    ApplySettings(false, false);
+    SaveSettingsToDisk();
+    
+    // Now open the DRM tab
+    if (tab_id > 0 && tabs_.count(tab_id))
+    {
+      MaybeOpenDrmTab(tab_id, url, true);
+    }
+  }
+  // "dismiss" action - do nothing, just close the bar
 }
 
 ultralight::JSValue UI::OnGetAutofillSuggestions(const JSObject &obj, const JSArgs &args)

@@ -98,8 +98,8 @@ public:
     // When false, user must press "Save Changes" in the Settings UI.
     bool auto_save_settings = true;
 
-    // DRM WebView subsystem toggle
-    bool enable_drm_webview = true;
+    // DRM WebView subsystem toggle (disabled by default, user must opt-in)
+    bool enable_drm_webview = false;
 
     bool operator==(const BrowserSettings &other) const;
     bool operator!=(const BrowserSettings &other) const { return !(*this == other); }
@@ -198,6 +198,11 @@ public:
   void OnPasswordSaveBarResponse(const JSObject &obj, const JSArgs &args);
   ultralight::JSValue OnGetAutofillSuggestions(const JSObject &obj, const JSArgs &args);
   ultralight::JSValue OnIsDarkModeEnabled(const JSObject &obj, const JSArgs &args);
+
+  // DRM prompt methods
+  void OnDrmPromptResponse(const JSObject &obj, const JSArgs &args);
+  void ShowDrmPrompt(const std::string &url, uint64_t tab_id);
+  void HideDrmPrompt();
 
   // Password save prompt methods (called from Tab)
   void ShowPasswordSavePrompt(const std::string &origin, const std::string &username);
