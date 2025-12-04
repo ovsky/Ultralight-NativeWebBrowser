@@ -2092,7 +2092,13 @@ void UI::CreateNewTab()
   int tab_height = window->height() - ui_height_;
   if (tab_height < 1)
     tab_height = 1;
-  tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_);
+  
+  // Build view settings from current browser settings
+  TabViewSettings view_settings;
+  view_settings.enable_javascript = settings_.enable_javascript;
+  view_settings.hardware_acceleration = settings_.hardware_acceleration;
+  
+  tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_, view_settings);
   // Load local static start page
   const char *kStartPage = "file:///static-sties/google-static.html";
   tabs_[id]->view()->LoadURL(kStartPage);
@@ -2114,7 +2120,13 @@ RefPtr<View> UI::CreateNewTabForChildView(const String &url)
   int tab_height = window->height() - ui_height_;
   if (tab_height < 1)
     tab_height = 1;
-  tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_);
+  
+  // Build view settings from current browser settings
+  TabViewSettings view_settings;
+  view_settings.enable_javascript = settings_.enable_javascript;
+  view_settings.hardware_acceleration = settings_.hardware_acceleration;
+  
+  tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_, view_settings);
 
   {
     RefPtr<JSContext> lock(view()->LockJSContext());
@@ -3102,8 +3114,9 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
   adblock_enabled_cached_ = settings_.enable_adblock;
   clear_history_on_exit_ = settings_.clear_history_on_exit;
 
-  // Note: JavaScript, web security, cookies, DNT would require View config changes
-  // These settings are stored and can be applied on next tab creation
+  // Note: enable_javascript and hardware_acceleration are applied to NEW tabs via TabViewSettings
+  // Existing tabs keep their original settings since ViewConfig is immutable after creation.
+  // enable_web_security, block_third_party_cookies, do_not_track are not yet implemented.
 
   // Address Bar & Suggestions
   suggestions_enabled_ = settings_.enable_suggestions;
@@ -3117,8 +3130,8 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
   // ask_download_location would be checked when download starts
 
   // Performance
-  // smooth_scrolling, hardware_acceleration, local_storage, database
-  // These would typically be applied during View/Config creation
+  // enable_javascript and hardware_acceleration are applied during Tab creation (see CreateNewTab)
+  // smooth_scrolling, local_storage, database - would require additional Ultralight session config
 
   // Accessibility
   reduce_motion_enabled_ = settings_.reduce_motion;
