@@ -451,6 +451,10 @@ bool ExtensionManager::CreateExtensionTemplate(const std::string& name) {
     
     // Create manifest.json
     std::ofstream manifest(ext_dir / "manifest.json");
+    if (!manifest.is_open()) {
+        std::cerr << "[Extensions] Failed to create manifest.json" << std::endl;
+        return false;
+    }
     manifest << "{\n";
     manifest << "  \"name\": \"" << name << "\",\n";
     manifest << "  \"version\": \"1.0.0\",\n";
@@ -463,6 +467,10 @@ bool ExtensionManager::CreateExtensionTemplate(const std::string& name) {
     
     // Create content.js template
     std::ofstream content(ext_dir / "content.js");
+    if (!content.is_open()) {
+        std::cerr << "[Extensions] Failed to create content.js" << std::endl;
+        return false;
+    }
     content << "// " << name << " - Content Script\n";
     content << "// This script runs on every page that matches your patterns.\n\n";
     content << "console.log('[" << name << "] Extension loaded!');\n\n";
