@@ -2079,10 +2079,10 @@ void UI::OnOpenExtensionsFolder(const JSObject &obj, const JSArgs &args)
   std::wstring wide_path(ext_dir.begin(), ext_dir.end());
   ShellExecuteW(NULL, L"explore", wide_path.c_str(), NULL, NULL, SW_SHOWNORMAL);
 #elif defined(__APPLE__)
-  std::string cmd = "open \"" + ext_dir + "\"";
+  std::string cmd = "open " + util::EscapeShellArg(ext_dir);
   system(cmd.c_str());
 #else
-  std::string cmd = "xdg-open \"" + ext_dir + "\"";
+  std::string cmd = "xdg-open " + util::EscapeShellArg(ext_dir);
   system(cmd.c_str());
 #endif
 }
@@ -5081,7 +5081,7 @@ void UI::OnDrmPromptResponse(const JSObject &obj, const JSArgs &args)
 
   ultralight::String action_ul = args[0].ToString();
   ultralight::String url_ul = args[1].ToString();
-  int tab_id_int = args[2].ToInteger();
+  int64_t tab_id_int = args[2].ToInteger();
 
   auto action_str = action_ul.utf8();
   auto url_str = url_ul.utf8();
