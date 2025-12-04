@@ -156,9 +156,10 @@ bool SettingsManager::LoadSettingsFromDisk(UI &ui)
   ui.saved_settings_ = ui.settings_;
   ui.settings_dirty_ = false;
 
+  // Load DRM settings file, then sync its enabled state FROM the browser settings
+  // (browser settings.json is the source of truth for enable_drm_webview)
   ui.drm_settings_.Load();
-  ui.settings_.enable_drm_webview = ui.drm_settings_.IsEnabled();
-  ui.saved_settings_.enable_drm_webview = ui.settings_.enable_drm_webview;
+  ui.drm_settings_.SetEnabled(ui.settings_.enable_drm_webview);
 
   if (migrated)
   {
