@@ -453,7 +453,7 @@ std::vector<SavedCredential> PasswordManager::GetCredentialsForOrigin(const std:
         if (cred.origin == normalized_origin && !cred.blacklisted) {
             SavedCredential decrypted = cred;
             if (!decrypted.encrypted_password.empty() && decrypted.password.empty()) {
-                decrypted.password = const_cast<PasswordManager*>(this)->Decrypt(decrypted.encrypted_password);
+                decrypted.password = Decrypt(decrypted.encrypted_password);
             }
             result.push_back(decrypted);
         }
@@ -479,7 +479,7 @@ std::vector<SavedCredential> PasswordManager::GetAllCredentials() const {
     for (const auto& cred : credentials_) {
         SavedCredential decrypted = cred;
         if (!decrypted.encrypted_password.empty() && decrypted.password.empty()) {
-            decrypted.password = const_cast<PasswordManager*>(this)->Decrypt(decrypted.encrypted_password);
+            decrypted.password = Decrypt(decrypted.encrypted_password);
         }
         result.push_back(decrypted);
     }
@@ -778,7 +778,7 @@ bool PasswordManager::ExportToCSV(const std::filesystem::path& filepath, const s
         
         std::string password = cred.password;
         if (password.empty() && !cred.encrypted_password.empty()) {
-            password = const_cast<PasswordManager*>(this)->Decrypt(cred.encrypted_password);
+            password = Decrypt(cred.encrypted_password);
         }
         
         // Escape fields for CSV
@@ -880,7 +880,7 @@ bool PasswordManager::ExportToJSON(const std::filesystem::path& filepath) const 
         
         std::string password = cred.password;
         if (password.empty() && !cred.encrypted_password.empty()) {
-            password = const_cast<PasswordManager*>(this)->Decrypt(cred.encrypted_password);
+            password = Decrypt(cred.encrypted_password);
         }
         
         file << "    {\n"
@@ -1073,7 +1073,7 @@ PasswordManager::Stats PasswordManager::GetStats() const {
         // Check for weak passwords
         std::string password = cred.password;
         if (password.empty() && !cred.encrypted_password.empty()) {
-            password = const_cast<PasswordManager*>(this)->Decrypt(cred.encrypted_password);
+            password = Decrypt(cred.encrypted_password);
         }
         
         auto strength = CheckPasswordStrength(password);
