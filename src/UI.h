@@ -17,6 +17,11 @@ namespace drm
   class DRMWebViewTab;
 }
 
+namespace password
+{
+  class PasswordManager;
+}
+
 using ultralight::JSArgs;
 using ultralight::JSFunction;
 using ultralight::JSObject;
@@ -128,6 +133,7 @@ public:
   // Open History page in a new tab (used by menu button and shortcuts)
   void OnOpenHistoryNewTab(const JSObject &obj, const JSArgs &args);
   void OnOpenDownloadsNewTab(const JSObject &obj, const JSArgs &args);
+  void OnOpenPasswordsNewTab(const JSObject &obj, const JSArgs &args);
   void OnAddressBarBlur(const JSObject &obj, const JSArgs &args);
   void OnAddressBarFocus(const JSObject &obj, const JSArgs &args);
   void OnMenuOpen(const JSObject &obj, const JSArgs &args);
@@ -176,8 +182,30 @@ public:
   void OnCreateExtension(const JSObject &obj, const JSArgs &args);
   void OnOpenExtensionsFolder(const JSObject &obj, const JSArgs &args);
 
+  // Password Manager callbacks
+  ultralight::JSValue OnGetPasswords(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnGetPasswordStats(const JSObject &obj, const JSArgs &args);
+  void OnSavePassword(const JSObject &obj, const JSArgs &args);
+  void OnDeletePassword(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnGetDecryptedPassword(const JSObject &obj, const JSArgs &args);
+  void OnSavePasswordSettings(const JSObject &obj, const JSArgs &args);
+  void OnExportPasswords(const JSObject &obj, const JSArgs &args);
+  void OnImportPasswords(const JSObject &obj, const JSArgs &args);
+  void OnShowPasswordSavePrompt(const JSObject &obj, const JSArgs &args);
+  void OnHidePasswordSavePrompt(const JSObject &obj, const JSArgs &args);
+  void OnPasswordSaveResponse(const JSObject &obj, const JSArgs &args);
+  void OnPasswordNeverSave(const JSObject &obj, const JSArgs &args);
+  void OnPasswordSaveBarResponse(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnGetAutofillSuggestions(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnIsDarkModeEnabled(const JSObject &obj, const JSArgs &args);
+
+  // Password save prompt methods (called from Tab)
+  void ShowPasswordSavePrompt(const std::string &origin, const std::string &username);
+  void HidePasswordSavePrompt();
+
   RefPtr<Window> window() { return window_; }
   DownloadManager *download_manager() { return download_manager_.get(); }
+  password::PasswordManager *password_manager() { return password_manager_.get(); }
   AdBlocker *network_blocker() { return adblock_; }
 
 protected:
@@ -291,6 +319,7 @@ protected:
   AdBlocker *adblock_ = nullptr;
   AdBlocker *trackerblock_ = nullptr;
   std::unique_ptr<DownloadManager> download_manager_;
+  std::unique_ptr<password::PasswordManager> password_manager_;
   bool downloads_overlay_had_active_ = false;
   bool downloads_overlay_user_dismissed_ = false;
   uint64_t downloads_last_sequence_seen_ = 0;

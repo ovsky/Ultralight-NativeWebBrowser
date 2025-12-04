@@ -69,6 +69,7 @@
             <div class="menu-separator"></div>
             <div class="menu-item" data-action="history">History [Ctrl+H]</div>
             <div class="menu-item" data-action="downloads">Downloads [Ctrl+J]</div>
+            <div class="menu-item" data-action="passwords">Passwords</div>
             <div class="menu-item" data-action="extensions">Extensions [Ctrl+Shift+E]</div>
             <div class="menu-item" data-action="settings">Settings [Ctrl+,]</div>
         </div>
@@ -146,6 +147,9 @@
                         break;
                     case 'downloads':
                         if (window.OnOpenDownloadsNewTab) OnOpenDownloadsNewTab();
+                        break;
+                    case 'passwords':
+                        if (window.OnOpenPasswordsNewTab) OnOpenPasswordsNewTab();
                         break;
                     case 'extensions':
                         if (window.OnOpenExtensionsNewTab) OnOpenExtensionsNewTab();

@@ -18,6 +18,7 @@
 #include <vector>
 #include <cstdlib>
 #include "DownloadManager.h"
+#include "PasswordManager.h"
 #include "Settings.h"
 #include "Utils.h"
 #include "AdBlocker.h"
@@ -476,6 +477,10 @@ UI::UI(RefPtr<Window> window)
   download_manager_->SetOnChangeCallback([this]()
                                          { NotifyDownloadsChanged(); });
 
+  // Initialize password manager
+  password_manager_ = std::make_unique<password::PasswordManager>();
+  password_manager_->Initialize(SettingsDirectory());
+
   // Apply runtime toggles (visual sync happens on DOMReady via SyncSettingsStateToUI)
   ApplySettings(true, true);
 
@@ -517,6 +522,10 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
   download_manager_ = std::make_unique<DownloadManager>();
   download_manager_->SetOnChangeCallback([this]()
                                          { NotifyDownloadsChanged(); });
+
+  // Initialize password manager
+  password_manager_ = std::make_unique<password::PasswordManager>();
+  password_manager_->Initialize(SettingsDirectory());
 
   // Apply runtime toggles (visual sync happens on DOMReady via SyncSettingsStateToUI)
   ApplySettings(true, true);
@@ -1315,6 +1324,8 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["GetAdblockEnabled"] = BindJSCallbackWithRetval(&UI::OnGetAdblockEnabled);
   global["OnOpenSettingsPanel"] = BindJSCallback(&UI::OnOpenSettingsPanel);
   global["OnCloseSettingsPanel"] = BindJSCallback(&UI::OnCloseSettingsPanel);
+  // Password save bar callback
+  global["OnPasswordSaveBarResponse"] = BindJSCallback(&UI::OnPasswordSaveBarResponse);
   // Allow UI documents (including settings) to request a chrome overlay reload.
   global["OnReloadChromeUI"] = BindJSCallback(&UI::OnReloadChromeUI);
   // Allow UI documents to request reloading the active non-settings tab.
@@ -1359,6 +1370,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnAddressBarNavigate"] = BindJSCallback(&UI::OnAddressBarNavigate);
   global["OnOpenHistoryNewTab"] = BindJSCallback(&UI::OnOpenHistoryNewTab);
   global["OnOpenDownloadsNewTab"] = BindJSCallback(&UI::OnOpenDownloadsNewTab);
+  global["OnOpenPasswordsNewTab"] = BindJSCallback(&UI::OnOpenPasswordsNewTab);
   global["OnOpenExtensionsNewTab"] = BindJSCallback(&UI::OnOpenExtensionsNewTab);
   global["GetDownloadsSnapshot"] = BindJSCallbackWithRetval(&UI::OnDownloadsOverlayGet);
   global["ClearDownloadsSnapshot"] = BindJSCallback(&UI::OnDownloadsOverlayClear);
@@ -1409,6 +1421,22 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     global["OnLoadExtension"] = BindJSCallback(&UI::OnLoadExtension);
     global["OnCreateExtension"] = BindJSCallback(&UI::OnCreateExtension);
     global["OnOpenExtensionsFolder"] = BindJSCallback(&UI::OnOpenExtensionsFolder);
+  }
+
+  // Passwords page bindings
+  bool is_passwords_page_view = url_utf8.data() && std::strstr(url_utf8.data(), "passwords.html") != nullptr;
+  if (is_passwords_page_view)
+  {
+    // Password management callbacks - bind directly to global object
+    global["getPasswords"] = BindJSCallbackWithRetval(&UI::OnGetPasswords);
+    global["getPasswordStats"] = BindJSCallbackWithRetval(&UI::OnGetPasswordStats);
+    global["savePassword"] = BindJSCallback(&UI::OnSavePassword);
+    global["deletePassword"] = BindJSCallback(&UI::OnDeletePassword);
+    global["getDecryptedPassword"] = BindJSCallbackWithRetval(&UI::OnGetDecryptedPassword);
+    global["savePasswordSettings"] = BindJSCallback(&UI::OnSavePasswordSettings);
+    global["exportPasswords"] = BindJSCallback(&UI::OnExportPasswords);
+    global["importPasswords"] = BindJSCallback(&UI::OnImportPasswords);
+    global["isDarkModeEnabled"] = BindJSCallbackWithRetval(&UI::OnIsDarkModeEnabled);
   }
 
   if (!is_menu_view && !is_ctx_view && !is_sugg_view && !is_downloads_overlay_view && !is_settings_page_view && !is_extensions_page_view)
@@ -1751,6 +1779,13 @@ void UI::OnOpenDownloadsNewTab(const JSObject &obj, const JSArgs &args)
   RefPtr<View> child = CreateNewTabForChildView(String("file:///downloads.html"));
   if (child)
     child->LoadURL("file:///downloads.html");
+}
+
+void UI::OnOpenPasswordsNewTab(const JSObject &obj, const JSArgs &args)
+{
+  RefPtr<View> child = CreateNewTabForChildView(String("file:///passwords.html"));
+  if (child)
+    child->LoadURL("file:///passwords.html");
 }
 
 void UI::OnOpenExtensionsNewTab(const JSObject &obj, const JSArgs &args)
@@ -4692,4 +4727,345 @@ std::filesystem::path UI::LegacySettingsFilePath()
 {
   namespace fs = std::filesystem;
   return fs::path("data") / "settings.json";
+}
+
+// ============================================================================
+// Password Manager Implementation
+// ============================================================================
+
+ultralight::JSValue UI::OnGetPasswords(const JSObject &obj, const JSArgs &args)
+{
+  if (!password_manager_)
+    return JSValue("[]");
+
+  auto credentials = password_manager_->GetAllCredentials();
+  std::ostringstream ss;
+  ss << "[";
+  bool first = true;
+  for (const auto &cred : credentials)
+  {
+    if (!first)
+      ss << ",";
+    first = false;
+
+    ss << "{";
+    ss << "\"id\":\"" << util::EscapeJsonString(cred.id) << "\",";
+    ss << "\"origin\":\"" << util::EscapeJsonString(cred.origin) << "\",";
+    ss << "\"username\":\"" << util::EscapeJsonString(cred.username) << "\",";
+    ss << "\"password\":\"" << util::EscapeJsonString(cred.password) << "\",";
+    ss << "\"notes\":\"" << util::EscapeJsonString(cred.notes) << "\",";
+    ss << "\"created\":" << cred.date_created << ",";
+    ss << "\"modified\":" << cred.date_password_modified << ",";
+    ss << "\"last_used\":" << cred.date_last_used;
+    ss << "}";
+  }
+  ss << "]";
+  return JSValue(String(ss.str().c_str()));
+}
+
+ultralight::JSValue UI::OnGetPasswordStats(const JSObject &obj, const JSArgs &args)
+{
+  if (!password_manager_)
+    return JSValue("{}");
+
+  auto credentials = password_manager_->GetAllCredentials();
+  int total = static_cast<int>(credentials.size());
+  int weak = 0;
+  int reused = 0;
+  std::unordered_map<std::string, int> password_counts;
+
+  for (const auto &cred : credentials)
+  {
+    auto strength = password_manager_->CheckPasswordStrength(cred.password);
+    if (strength.score < 3)
+      weak++;
+
+    password_counts[cred.password]++;
+  }
+
+  for (const auto &pair : password_counts)
+  {
+    if (pair.second > 1)
+      reused += pair.second;
+  }
+
+  int blacklisted = static_cast<int>(password_manager_->GetBlacklistedOrigins().size());
+
+  std::ostringstream ss;
+  ss << "{";
+  ss << "\"total_passwords\":" << total << ",";
+  ss << "\"weak_passwords\":" << weak << ",";
+  ss << "\"reused_passwords\":" << reused << ",";
+  ss << "\"blacklisted_sites\":" << blacklisted;
+  ss << "}";
+  return JSValue(String(ss.str().c_str()));
+}
+
+void UI::OnSavePassword(const JSObject &obj, const JSArgs &args)
+{
+  if (!password_manager_ || args.empty())
+    return;
+
+  ultralight::String json = args[0].ToString();
+  auto json_str = json.utf8();
+  std::string data = json_str.data() ? json_str.data() : "";
+
+  // Parse JSON manually
+  auto extract_string = [&data](const std::string &key) -> std::string
+  {
+    std::string search_key = "\"" + key + "\":\"";
+    size_t pos = data.find(search_key);
+    if (pos == std::string::npos)
+      return "";
+    pos += search_key.length();
+    std::string result;
+    while (pos < data.length() && data[pos] != '"')
+    {
+      if (data[pos] == '\\' && pos + 1 < data.length())
+      {
+        pos++;
+        if (data[pos] == 'n')
+          result += '\n';
+        else if (data[pos] == 't')
+          result += '\t';
+        else if (data[pos] == '"')
+          result += '"';
+        else if (data[pos] == '\\')
+          result += '\\';
+        else
+          result += data[pos];
+      }
+      else
+      {
+        result += data[pos];
+      }
+      pos++;
+    }
+    return result;
+  };
+
+  std::string id = extract_string("id");
+  std::string origin = extract_string("origin");
+  std::string username = extract_string("username");
+  std::string password = extract_string("password");
+  std::string notes = extract_string("notes");
+
+  if (origin.empty() || username.empty() || password.empty())
+    return;
+
+  password::SavedCredential cred;
+  cred.id = id.empty() ? password_manager_->GenerateUUID() : id;
+  cred.origin = origin;
+  cred.signon_realm = origin;
+  cred.username = username;
+  cred.password = password;
+  cred.notes = notes;
+  cred.date_created = static_cast<uint64_t>(std::time(nullptr));
+  cred.date_password_modified = cred.date_created;
+  cred.date_last_used = 0;
+  cred.times_used = 0;
+  cred.blacklisted = false;
+
+  if (id.empty())
+  {
+    password_manager_->SaveCredential(cred);
+  }
+  else
+  {
+    password_manager_->UpdateCredential(cred);
+  }
+}
+
+void UI::OnDeletePassword(const JSObject &obj, const JSArgs &args)
+{
+  if (!password_manager_ || args.empty())
+    return;
+
+  ultralight::String id_ul = args[0].ToString();
+  auto id_str = id_ul.utf8();
+  std::string id = id_str.data() ? id_str.data() : "";
+
+  if (!id.empty())
+    password_manager_->DeleteCredential(id);
+}
+
+ultralight::JSValue UI::OnGetDecryptedPassword(const JSObject &obj, const JSArgs &args)
+{
+  if (!password_manager_ || args.empty())
+    return JSValue("");
+
+  ultralight::String id_ul = args[0].ToString();
+  auto id_str = id_ul.utf8();
+  std::string id = id_str.data() ? id_str.data() : "";
+
+  auto credentials = password_manager_->GetAllCredentials();
+  for (const auto &cred : credentials)
+  {
+    if (cred.id == id)
+      return JSValue(String(cred.password.c_str()));
+  }
+  return JSValue("");
+}
+
+void UI::OnSavePasswordSettings(const JSObject &obj, const JSArgs &args)
+{
+  // Password settings are stored in browser settings, not password manager
+  // This is a placeholder for future implementation
+}
+
+void UI::OnExportPasswords(const JSObject &obj, const JSArgs &args)
+{
+  if (!password_manager_ || args.empty())
+    return;
+
+  ultralight::String format_ul = args[0].ToString();
+  auto format_str = format_ul.utf8();
+  std::string format = format_str.data() ? format_str.data() : "csv";
+
+  std::string filename = "passwords_export." + format;
+  std::filesystem::path export_path = SettingsDirectory() / filename;
+
+  if (format == "json")
+    password_manager_->ExportToJSON(export_path.string());
+  else
+    password_manager_->ExportToCSV(export_path.string());
+}
+
+void UI::OnImportPasswords(const JSObject &obj, const JSArgs &args)
+{
+  if (!password_manager_ || args.size() < 2)
+    return;
+
+  ultralight::String content_ul = args[0].ToString();
+  ultralight::String format_ul = args[1].ToString();
+
+  auto content_str = content_ul.utf8();
+  auto format_str = format_ul.utf8();
+
+  std::string content = content_str.data() ? content_str.data() : "";
+  std::string format = format_str.data() ? format_str.data() : "csv";
+
+  // Write to temp file and import
+  std::filesystem::path temp_path = SettingsDirectory() / ("temp_import." + format);
+  {
+    std::ofstream out(temp_path, std::ios::binary);
+    out << content;
+  }
+
+  if (format == "json")
+    password_manager_->ImportFromJSON(temp_path.string());
+  else
+    password_manager_->ImportFromCSV(temp_path.string());
+
+  std::filesystem::remove(temp_path);
+}
+
+void UI::OnShowPasswordSavePrompt(const JSObject &obj, const JSArgs &args)
+{
+  // Placeholder for showing password save prompt overlay
+}
+
+void UI::OnHidePasswordSavePrompt(const JSObject &obj, const JSArgs &args)
+{
+  // Placeholder for hiding password save prompt overlay
+}
+
+void UI::OnPasswordSaveResponse(const JSObject &obj, const JSArgs &args)
+{
+  // Placeholder for handling user response to password save prompt
+}
+
+// Non-JS versions called from Tab
+void UI::ShowPasswordSavePrompt(const std::string &origin, const std::string &username)
+{
+  // Show password save prompt bar in the UI
+  std::ostringstream js;
+  js << "(function(){ "
+     << "if(typeof window.showPasswordSaveBar === 'function') { "
+     << "  window.showPasswordSaveBar('" << util::EscapeJsonString(origin) << "', '" << util::EscapeJsonString(username) << "'); "
+     << "} "
+     << "})();";
+  view()->EvaluateScript(String(js.str().c_str()), nullptr);
+}
+
+void UI::HidePasswordSavePrompt()
+{
+  // Hide password save prompt bar in the UI
+  view()->EvaluateScript("(function(){ if(typeof window.hidePasswordSaveBar === 'function') window.hidePasswordSaveBar(); })();", nullptr);
+}
+
+void UI::OnPasswordSaveBarResponse(const JSObject &obj, const JSArgs &args)
+{
+  // Called when user clicks Save/Never on the password save bar
+  if (!password_manager_ || args.size() < 3)
+    return;
+
+  ultralight::String action_ul = args[0].ToString();
+  ultralight::String origin_ul = args[1].ToString();
+  ultralight::String username_ul = args[2].ToString();
+
+  auto action_str = action_ul.utf8();
+  auto origin_str = origin_ul.utf8();
+  auto username_str = username_ul.utf8();
+
+  std::string action = action_str.data() ? action_str.data() : "";
+  std::string origin = origin_str.data() ? origin_str.data() : "";
+  std::string username = username_str.data() ? username_str.data() : "";
+
+  // Get the active tab to retrieve pending credentials
+  if (active_tab_id_ && tabs_.count(active_tab_id_) && tabs_[active_tab_id_])
+  {
+    auto &tab = tabs_[active_tab_id_];
+    // Call the tab's password save response handler
+    JSArgs response_args;
+    response_args.push_back(JSValue(String(action.c_str())));
+    tab->OnPasswordSaveResponse(JSObject(), response_args);
+  }
+}
+
+void UI::OnPasswordNeverSave(const JSObject &obj, const JSArgs &args)
+{
+  if (!password_manager_ || args.empty())
+    return;
+
+  ultralight::String origin_ul = args[0].ToString();
+  auto origin_str = origin_ul.utf8();
+  std::string origin = origin_str.data() ? origin_str.data() : "";
+
+  if (!origin.empty())
+    password_manager_->BlacklistOrigin(origin);
+}
+
+ultralight::JSValue UI::OnGetAutofillSuggestions(const JSObject &obj, const JSArgs &args)
+{
+  if (!password_manager_ || args.empty())
+    return JSValue("[]");
+
+  ultralight::String origin_ul = args[0].ToString();
+  auto origin_str = origin_ul.utf8();
+  std::string origin = origin_str.data() ? origin_str.data() : "";
+
+  auto credentials = password_manager_->GetCredentialsForOrigin(origin);
+
+  std::ostringstream ss;
+  ss << "[";
+  bool first = true;
+  for (const auto &cred : credentials)
+  {
+    if (!first)
+      ss << ",";
+    first = false;
+
+    ss << "{";
+    ss << "\"id\":\"" << util::EscapeJsonString(cred.id) << "\",";
+    ss << "\"username\":\"" << util::EscapeJsonString(cred.username) << "\"";
+    ss << "}";
+  }
+  ss << "]";
+  return JSValue(String(ss.str().c_str()));
+}
+
+ultralight::JSValue UI::OnIsDarkModeEnabled(const JSObject &obj, const JSArgs &args)
+{
+  return JSValue(dark_mode_enabled_);
 }

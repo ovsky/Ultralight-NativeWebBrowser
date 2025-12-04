@@ -509,6 +509,218 @@
             window.addEventListener('resize', () => hide(true));
         })();
     </script>
+
+    <!-- Password Save Bar -->
+    <div id="password-save-bar" class="password-save-bar hidden">
+        <div class="password-save-content">
+            <svg viewBox="0 0 24 24" width="20" height="20" class="password-icon">
+                <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" fill="currentColor"/>
+            </svg>
+            <span class="password-save-text">Save password for <strong id="password-save-origin"></strong>?</span>
+            <span class="password-save-username" id="password-save-username"></span>
+            <span class="password-autosave-info" id="password-autosave-info"></span>
+        </div>
+        <div class="password-save-buttons">
+            <button id="password-save-btn" class="password-btn primary">Save</button>
+            <button id="password-never-btn" class="password-btn">Never</button>
+            <button id="password-close-btn" class="password-btn">✕</button>
+        </div>
+    </div>
+
+    <style>
+        .password-save-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #1a73e8, #4285f4);
+            color: white;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 10000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 13px;
+            transform: translateY(-100%);
+            transition: transform 0.3s ease;
+        }
+        .password-save-bar.visible {
+            transform: translateY(0);
+        }
+        .password-save-bar.hidden {
+            display: none;
+        }
+        .password-save-content {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .password-icon {
+            flex-shrink: 0;
+        }
+        .password-save-username {
+            background: rgba(255,255,255,0.2);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .password-autosave-info {
+            font-size: 11px;
+            color: white;
+            margin-left: auto;
+            font-style: italic;
+        }
+        .password-save-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        .password-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        .password-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        .password-btn.primary {
+            background: white;
+            color: #1a73e8;
+            font-weight: 500;
+        }
+        .password-btn.primary:hover {
+            background: #f0f0f0;
+        }
+        #password-close-btn {
+            padding: 6px 10px;
+        }
+        body.dark-mode .password-save-bar {
+            background: linear-gradient(135deg, #3c4043, #5f6368);
+        }
+        body.dark-mode .password-btn.primary {
+            background: #8ab4f8;
+            color: #202124;
+        }
+    </style>
+
+    <script>
+        // Password save bar functionality
+        (function() {
+            var bar = document.getElementById('password-save-bar');
+            var originSpan = document.getElementById('password-save-origin');
+            var usernameSpan = document.getElementById('password-save-username');
+            var saveBtn = document.getElementById('password-save-btn');
+            var neverBtn = document.getElementById('password-never-btn');
+            var closeBtn = document.getElementById('password-close-btn');
+            
+            var currentOrigin = '';
+            var currentUsername = '';
+            var autoSaveTimer = null;
+            var countdownInterval = null;
+            
+            window.showPasswordSaveBar = function(origin, username) {
+                // Clear any existing timers
+                if (autoSaveTimer) clearTimeout(autoSaveTimer);
+                if (countdownInterval) clearInterval(countdownInterval);
+                
+                currentOrigin = origin;
+                currentUsername = username;
+                
+                // Extract domain from origin
+                try {
+                    var url = new URL(origin);
+                    originSpan.textContent = url.hostname;
+                } catch(e) {
+                    originSpan.textContent = origin;
+                }
+                usernameSpan.textContent = username;
+                
+                // Get autosave info element
+                var autosaveInfo = document.getElementById('password-autosave-info');
+                
+                // Update save button text with countdown
+                var countdown = 10;
+                saveBtn.textContent = 'Save (' + countdown + ')';
+                if (autosaveInfo) autosaveInfo.textContent = 'Auto-saving in ' + countdown + 's...';
+                
+                countdownInterval = setInterval(function() {
+                    countdown--;
+                    if (countdown > 0) {
+                        saveBtn.textContent = 'Save (' + countdown + ')';
+                        if (autosaveInfo) autosaveInfo.textContent = 'Auto-saving in ' + countdown + 's...';
+                    } else {
+                        saveBtn.textContent = 'Save';
+                        if (autosaveInfo) autosaveInfo.textContent = 'Saving...';
+                        clearInterval(countdownInterval);
+                        countdownInterval = null;
+                    }
+                }, 1000);
+                
+                // Auto-save after 10 seconds if user doesn't respond
+                autoSaveTimer = setTimeout(function() {
+                    if (window.OnPasswordSaveBarResponse) {
+                        OnPasswordSaveBarResponse('save', currentOrigin, currentUsername);
+                    }
+                    window.hidePasswordSaveBar();
+                }, 10000);
+                
+                bar.classList.remove('hidden');
+                setTimeout(function() {
+                    bar.classList.add('visible');
+                }, 10);
+            };
+            
+            window.hidePasswordSaveBar = function() {
+                // Clear timers
+                if (autoSaveTimer) {
+                    clearTimeout(autoSaveTimer);
+                    autoSaveTimer = null;
+                }
+                if (countdownInterval) {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                }
+                saveBtn.textContent = 'Save';
+                var autosaveInfo = document.getElementById('password-autosave-info');
+                if (autosaveInfo) autosaveInfo.textContent = '';
+                
+                bar.classList.remove('visible');
+                setTimeout(function() {
+                    bar.classList.add('hidden');
+                }, 300);
+            };
+            
+            if (saveBtn) {
+                saveBtn.addEventListener('click', function() {
+                    if (window.OnPasswordSaveBarResponse) {
+                        OnPasswordSaveBarResponse('save', currentOrigin, currentUsername);
+                    }
+                    window.hidePasswordSaveBar();
+                });
+            }
+            
+            if (neverBtn) {
+                neverBtn.addEventListener('click', function() {
+                    if (window.OnPasswordSaveBarResponse) {
+                        OnPasswordSaveBarResponse('never', currentOrigin, currentUsername);
+                    }
+                    window.hidePasswordSaveBar();
+                });
+            }
+            
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function() {
+                    window.hidePasswordSaveBar();
+                });
+            }
+        })();
+    </script>
 </body>
 
 </html>

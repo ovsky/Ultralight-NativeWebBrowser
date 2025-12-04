@@ -141,6 +141,23 @@ public:
   void JS_CreateExtension(const JSObject &obj, const JSArgs &args);
   void JS_OpenExtensionsFolder(const JSObject &obj, const JSArgs &args);
 
+  // Passwords page callbacks (for passwords.html UI)
+  JSValue JS_GetPasswords(const JSObject &obj, const JSArgs &args);
+  JSValue JS_GetPasswordStats(const JSObject &obj, const JSArgs &args);
+  void JS_SavePassword(const JSObject &obj, const JSArgs &args);
+  void JS_DeletePassword(const JSObject &obj, const JSArgs &args);
+  JSValue JS_GetDecryptedPassword(const JSObject &obj, const JSArgs &args);
+  void JS_SavePasswordSettings(const JSObject &obj, const JSArgs &args);
+  void JS_ExportPasswords(const JSObject &obj, const JSArgs &args);
+  void JS_ImportPasswords(const JSObject &obj, const JSArgs &args);
+
+  // Password Manager callbacks (called from page scripts)
+  void OnPasswordFormDetected(const JSObject &obj, const JSArgs &args);
+  void OnPasswordFormSubmitted(const JSObject &obj, const JSArgs &args);
+  JSValue OnGetPasswordSuggestions(const JSObject &obj, const JSArgs &args);
+  void OnPasswordSelected(const JSObject &obj, const JSArgs &args);
+  void OnPasswordSaveResponse(const JSObject &obj, const JSArgs &args);
+
 protected:
   UI *ui_;
   RefPtr<Overlay> overlay_;
@@ -148,4 +165,9 @@ protected:
   uint64_t id_;
   bool ready_to_close_ = false;
   uint32_t container_width_, container_height_;
+  
+  // Password manager state for this tab
+  std::string pending_save_origin_;
+  std::string pending_save_username_;
+  std::string pending_save_password_;
 };

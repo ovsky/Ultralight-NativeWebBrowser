@@ -73,6 +73,8 @@ set(SOURCES
 	"src/DownloadManager.cpp"
 	"src/ExtensionManager.h"
 	"src/ExtensionManager.cpp"
+	"src/PasswordManager.h"
+	"src/PasswordManager.cpp"
 	"src/Tab.h"
 	"src/Tab.cpp"
 	"src/UI.h"

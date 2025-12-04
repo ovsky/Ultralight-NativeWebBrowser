@@ -4,10 +4,12 @@
 #include "DownloadManager.h"
 #include "ExtensionManager.h"
 #include "AdBlocker.h"
+#include "PasswordManager.h"
 #include <iostream>
 #include <string>
 #include <cstdio>
 #include <sstream>
+#include <unordered_map>
 
 #define INSPECTOR_DRAG_HANDLE_HEIGHT 10
 
@@ -473,6 +475,7 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
     // Check if this is the settings page
     bool is_settings_page = url_utf8.data() && std::strstr(url_utf8.data(), "settings.html") != nullptr;
     bool is_extensions_page = url_utf8.data() && std::strstr(url_utf8.data(), "extensions.html") != nullptr;
+    bool is_passwords_page = url_utf8.data() && std::strstr(url_utf8.data(), "passwords.html") != nullptr;
 
     if (is_settings_page)
     {
@@ -497,6 +500,23 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
       global["OnLoadExtension"] = BindJSCallback(&Tab::JS_LoadExtension);
       global["OnCreateExtension"] = BindJSCallback(&Tab::JS_CreateExtension);
       global["OnOpenExtensionsFolder"] = BindJSCallback(&Tab::JS_OpenExtensionsFolder);
+    }
+
+    if (is_passwords_page)
+    {
+      // Bind password manager functions when passwords page loads in a tab
+      global["getPasswords"] = BindJSCallbackWithRetval(&Tab::JS_GetPasswords);
+      global["getPasswordStats"] = BindJSCallbackWithRetval(&Tab::JS_GetPasswordStats);
+      global["savePassword"] = BindJSCallback(&Tab::JS_SavePassword);
+      global["deletePassword"] = BindJSCallback(&Tab::JS_DeletePassword);
+      global["getDecryptedPassword"] = BindJSCallbackWithRetval(&Tab::JS_GetDecryptedPassword);
+      global["savePasswordSettings"] = BindJSCallback(&Tab::JS_SavePasswordSettings);
+      global["exportPasswords"] = BindJSCallback(&Tab::JS_ExportPasswords);
+      global["importPasswords"] = BindJSCallback(&Tab::JS_ImportPasswords);
+      global["isDarkModeEnabled"] = BindJSCallbackWithRetval(&Tab::JS_IsDarkModeEnabled);
+      
+      // Notify the page that native bindings are ready, so it can reload passwords
+      caller->EvaluateScript("(function(){ if(typeof loadPasswords === 'function') loadPasswords(); })();", nullptr);
     }
 
     // Expose a unified native bridge on window.__ul using global function proxies
@@ -614,6 +634,251 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
         // Wrap in IIFE to isolate scope
         std::string wrapped = "(function(){\ntry{\n" + script_code + "\n}catch(e){console.error('Extension error:',e);}\n})();";
         caller->EvaluateScript(String(wrapped.c_str()), nullptr);
+      }
+
+      // Inject password form detection and autofill script
+      {
+        RefPtr<JSContext> ctx = caller->LockJSContext();
+        SetJSContext(ctx->ctx());
+        JSObject global = JSGlobalObject();
+        
+        // Bind password manager callbacks
+        global["NativePasswordFormDetected"] = BindJSCallback(&Tab::OnPasswordFormDetected);
+        global["NativePasswordFormSubmitted"] = BindJSCallback(&Tab::OnPasswordFormSubmitted);
+        global["NativeGetPasswordSuggestions"] = BindJSCallbackWithRetval(&Tab::OnGetPasswordSuggestions);
+        global["NativePasswordSelected"] = BindJSCallback(&Tab::OnPasswordSelected);
+        global["NativePasswordSaveResponse"] = BindJSCallback(&Tab::OnPasswordSaveResponse);
+
+        // Inject the password form detection script
+        const char *passwordScript = R"JS((function(){
+          if (window.__ul_password_manager_installed) return;
+          window.__ul_password_manager_installed = true;
+          
+          var origin = window.location.origin;
+          var pendingForms = [];
+          var lastSubmittedCredentials = null;
+          
+          // Find password fields
+          function findPasswordFields() {
+            return document.querySelectorAll('input[type="password"]');
+          }
+          
+          // Find associated username field for a password field
+          function findUsernameField(passwordField) {
+            var form = passwordField.closest('form');
+            var fields = form ? form.querySelectorAll('input') : document.querySelectorAll('input');
+            var usernameTypes = ['text', 'email', 'tel'];
+            var usernameNames = ['user', 'email', 'login', 'name', 'account', 'id'];
+            
+            for (var i = 0; i < fields.length; i++) {
+              var f = fields[i];
+              if (f === passwordField) continue;
+              var type = (f.type || '').toLowerCase();
+              var name = ((f.name || '') + (f.id || '')).toLowerCase();
+              
+              if (usernameTypes.indexOf(type) >= 0) {
+                for (var j = 0; j < usernameNames.length; j++) {
+                  if (name.indexOf(usernameNames[j]) >= 0) {
+                    return f;
+                  }
+                }
+                // If no specific name match, return the first text/email field before password
+                if (f.compareDocumentPosition(passwordField) & Node.DOCUMENT_POSITION_FOLLOWING) {
+                  return f;
+                }
+              }
+            }
+            return null;
+          }
+          
+          // Create autofill dropdown
+          var dropdown = null;
+          function showAutofillDropdown(field, suggestions) {
+            hideAutofillDropdown();
+            if (!suggestions || suggestions.length === 0) return;
+            
+            dropdown = document.createElement('div');
+            dropdown.className = '__ul_password_dropdown';
+            dropdown.style.cssText = 'position:absolute;z-index:999999;background:#fff;border:1px solid #ccc;border-radius:4px;box-shadow:0 2px 10px rgba(0,0,0,0.2);max-height:200px;overflow-y:auto;min-width:200px;';
+            
+            var rect = field.getBoundingClientRect();
+            dropdown.style.top = (window.scrollY + rect.bottom + 2) + 'px';
+            dropdown.style.left = (window.scrollX + rect.left) + 'px';
+            dropdown.style.width = Math.max(rect.width, 200) + 'px';
+            
+            suggestions.forEach(function(s) {
+              var item = document.createElement('div');
+              item.style.cssText = 'padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee;';
+              item.innerHTML = '<div style="font-weight:500;">' + escapeHtml(s.username) + '</div><div style="font-size:11px;color:#666;">Password saved</div>';
+              item.addEventListener('mouseenter', function() { this.style.background = '#f0f0f0'; });
+              item.addEventListener('mouseleave', function() { this.style.background = '#fff'; });
+              item.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (window.NativePasswordSelected) {
+                  window.NativePasswordSelected(s.username, s.password);
+                }
+                hideAutofillDropdown();
+              });
+              dropdown.appendChild(item);
+            });
+            
+            document.body.appendChild(dropdown);
+          }
+          
+          function hideAutofillDropdown() {
+            if (dropdown && dropdown.parentNode) {
+              dropdown.parentNode.removeChild(dropdown);
+            }
+            dropdown = null;
+          }
+          
+          function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+          }
+          
+          // Fill form with credentials
+          window.__ul_fill_password_form = function(username, password) {
+            var pwFields = findPasswordFields();
+            pwFields.forEach(function(pwField) {
+              var userField = findUsernameField(pwField);
+              if (userField) {
+                userField.value = username;
+                userField.dispatchEvent(new Event('input', {bubbles: true}));
+                userField.dispatchEvent(new Event('change', {bubbles: true}));
+              }
+              pwField.value = password;
+              pwField.dispatchEvent(new Event('input', {bubbles: true}));
+              pwField.dispatchEvent(new Event('change', {bubbles: true}));
+            });
+          };
+          
+          // Submit credentials to native
+          function submitCredentials(username, password) {
+            // Avoid duplicate submissions
+            var credKey = username + '|' + password;
+            if (lastSubmittedCredentials === credKey) return;
+            lastSubmittedCredentials = credKey;
+            
+            if (username && password && window.NativePasswordFormSubmitted) {
+              console.log('[PasswordManager] Submitting credentials for:', origin, username);
+              window.NativePasswordFormSubmitted(JSON.stringify({
+                origin: origin,
+                username: username,
+                password: password
+              }));
+            }
+          }
+          
+          // Detect and handle password forms
+          function setupPasswordFields() {
+            var pwFields = findPasswordFields();
+            if (pwFields.length === 0) return;
+            
+            // Notify native that we found password forms
+            if (window.NativePasswordFormDetected) {
+              window.NativePasswordFormDetected(JSON.stringify({origin: origin}));
+            }
+            
+            pwFields.forEach(function(pwField) {
+              if (pwField.__ul_pw_setup) return;
+              pwField.__ul_pw_setup = true;
+              
+              var userField = findUsernameField(pwField);
+              
+              // Show autofill dropdown on focus
+              function showDropdown(field) {
+                if (window.NativeGetPasswordSuggestions) {
+                  var suggestionsJson = window.NativeGetPasswordSuggestions(origin);
+                  try {
+                    var suggestions = JSON.parse(suggestionsJson);
+                    if (suggestions && suggestions.length > 0) {
+                      showAutofillDropdown(field, suggestions);
+                    }
+                  } catch(e) {}
+                }
+              }
+              
+              pwField.addEventListener('focus', function() { showDropdown(pwField); });
+              if (userField) {
+                userField.addEventListener('focus', function() { showDropdown(userField); });
+              }
+              
+              // Hide dropdown when clicking elsewhere
+              document.addEventListener('click', function(e) {
+                if (dropdown && !dropdown.contains(e.target) && e.target !== pwField && e.target !== userField) {
+                  hideAutofillDropdown();
+                }
+              });
+              
+              // Handle form submission
+              var form = pwField.closest('form');
+              if (form && !form.__ul_pw_submit_setup) {
+                form.__ul_pw_submit_setup = true;
+                
+                // Traditional form submit
+                form.addEventListener('submit', function(e) {
+                  var username = userField ? userField.value : '';
+                  var password = pwField.value;
+                  submitCredentials(username, password);
+                });
+                
+                // Also capture click on submit buttons (for JS-based form handling)
+                var submitBtns = form.querySelectorAll('button[type="submit"], input[type="submit"], button:not([type])');
+                submitBtns.forEach(function(btn) {
+                  if (btn.__ul_pw_click_setup) return;
+                  btn.__ul_pw_click_setup = true;
+                  btn.addEventListener('click', function(e) {
+                    // Small delay to let form validation happen
+                    setTimeout(function() {
+                      var username = userField ? userField.value : '';
+                      var password = pwField.value;
+                      if (username && password) {
+                        submitCredentials(username, password);
+                      }
+                    }, 100);
+                  });
+                });
+              }
+              
+              // Also handle Enter key on password field
+              pwField.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                  setTimeout(function() {
+                    var username = userField ? userField.value : '';
+                    var password = pwField.value;
+                    if (username && password) {
+                      submitCredentials(username, password);
+                    }
+                  }, 100);
+                }
+              });
+            });
+          }
+          
+          // Run on page load
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupPasswordFields);
+          } else {
+            setupPasswordFields();
+          }
+          
+          // Also watch for dynamically added forms
+          var observer = new MutationObserver(function(mutations) {
+            var hasNewInputs = mutations.some(function(m) {
+              return m.addedNodes.length > 0;
+            });
+            if (hasNewInputs) {
+              setTimeout(setupPasswordFields, 100);
+            }
+          });
+          observer.observe(document.body || document.documentElement, {childList: true, subtree: true});
+          
+        })();)JS";
+
+        caller->EvaluateScript(passwordScript, nullptr);
       }
     }
   }
@@ -1209,6 +1474,520 @@ void Tab::JS_OpenExtensionsFolder(const JSObject &obj, const JSArgs &args)
 {
   if (ui_)
     ui_->OnOpenExtensionsFolder(obj, args);
+}
+
+// --- Password Manager callbacks ---
+
+void Tab::OnPasswordFormDetected(const JSObject &obj, const JSArgs &args)
+{
+  // Called when a login form is detected on the page
+  // This is informational - we'll autofill if we have credentials
+  if (!ui_ || !ui_->password_manager() || args.empty())
+    return;
+
+  ultralight::String json_ul = args[0].ToString();
+  auto json_str = json_ul.utf8();
+  std::string data = json_str.data() ? json_str.data() : "";
+
+  // Parse origin from the JSON
+  auto extract_string = [&data](const std::string &key) -> std::string
+  {
+    std::string search_key = "\"" + key + "\":\"";
+    size_t pos = data.find(search_key);
+    if (pos == std::string::npos)
+      return "";
+    pos += search_key.length();
+    std::string result;
+    while (pos < data.length() && data[pos] != '"')
+    {
+      if (data[pos] == '\\' && pos + 1 < data.length())
+      {
+        pos++;
+        result += data[pos];
+      }
+      else
+      {
+        result += data[pos];
+      }
+      pos++;
+    }
+    return result;
+  };
+
+  std::string origin = extract_string("origin");
+  if (origin.empty())
+    return;
+
+  // Check if we have saved credentials for this origin
+  auto creds = ui_->password_manager()->GetCredentialsForOrigin(origin);
+  if (!creds.empty())
+  {
+    // Notify JS that autofill is available
+    std::ostringstream ss;
+    ss << "(function(){ if(window.__ul_password_autofill_available) window.__ul_password_autofill_available(" << creds.size() << "); })();";
+    view()->EvaluateScript(String(ss.str().c_str()), nullptr);
+  }
+}
+
+void Tab::OnPasswordFormSubmitted(const JSObject &obj, const JSArgs &args)
+{
+  // Called when a login form is submitted - offer to save the password
+  if (!ui_ || !ui_->password_manager() || args.empty())
+    return;
+
+  ultralight::String json_ul = args[0].ToString();
+  auto json_str = json_ul.utf8();
+  std::string data = json_str.data() ? json_str.data() : "";
+
+  auto extract_string = [&data](const std::string &key) -> std::string
+  {
+    std::string search_key = "\"" + key + "\":\"";
+    size_t pos = data.find(search_key);
+    if (pos == std::string::npos)
+      return "";
+    pos += search_key.length();
+    std::string result;
+    while (pos < data.length() && data[pos] != '"')
+    {
+      if (data[pos] == '\\' && pos + 1 < data.length())
+      {
+        pos++;
+        if (data[pos] == 'n')
+          result += '\n';
+        else if (data[pos] == 't')
+          result += '\t';
+        else if (data[pos] == '"')
+          result += '"';
+        else if (data[pos] == '\\')
+          result += '\\';
+        else
+          result += data[pos];
+      }
+      else
+      {
+        result += data[pos];
+      }
+      pos++;
+    }
+    return result;
+  };
+
+  std::string origin = extract_string("origin");
+  std::string username = extract_string("username");
+  std::string password = extract_string("password");
+
+  if (origin.empty() || username.empty() || password.empty())
+    return;
+
+  // Check if this origin is blacklisted
+  if (ui_->password_manager()->IsOriginBlacklisted(origin))
+    return;
+
+  // Check if we already have this exact credential
+  auto existing = ui_->password_manager()->GetCredentialsForOrigin(origin);
+  for (const auto &cred : existing)
+  {
+    if (cred.username == username && cred.password == password)
+    {
+      // Already saved, just update last used time
+      ui_->password_manager()->RecordAutofillUsage(cred.id);
+      return;
+    }
+    if (cred.username == username && cred.password != password)
+    {
+      // Password changed - store pending and show update prompt
+      pending_save_origin_ = origin;
+      pending_save_username_ = username;
+      pending_save_password_ = password;
+
+      // Show update prompt in the UI overlay (same as save, but will update)
+      if (ui_)
+      {
+        ui_->ShowPasswordSavePrompt(origin, username);
+      }
+      return;
+    }
+  }
+
+  // New credential - store pending and show save prompt
+  pending_save_origin_ = origin;
+  pending_save_username_ = username;
+  pending_save_password_ = password;
+
+  // Notify the UI overlay to show the save prompt bar
+  if (ui_)
+  {
+    ui_->ShowPasswordSavePrompt(origin, username);
+  }
+}
+
+JSValue Tab::OnGetPasswordSuggestions(const JSObject &obj, const JSArgs &args)
+{
+  // Return list of saved passwords for autofill dropdown
+  if (!ui_ || !ui_->password_manager() || args.empty())
+    return JSValue("[]");
+
+  ultralight::String origin_ul = args[0].ToString();
+  auto origin_str = origin_ul.utf8();
+  std::string origin = origin_str.data() ? origin_str.data() : "";
+
+  if (origin.empty())
+    return JSValue("[]");
+
+  auto creds = ui_->password_manager()->GetCredentialsForOrigin(origin);
+
+  std::ostringstream ss;
+  ss << "[";
+  bool first = true;
+  for (const auto &cred : creds)
+  {
+    if (!first)
+      ss << ",";
+    first = false;
+    ss << "{";
+    ss << "\"id\":\"" << util::EscapeJsonString(cred.id) << "\",";
+    ss << "\"username\":\"" << util::EscapeJsonString(cred.username) << "\",";
+    ss << "\"password\":\"" << util::EscapeJsonString(cred.password) << "\"";
+    ss << "}";
+  }
+  ss << "]";
+
+  return JSValue(String(ss.str().c_str()));
+}
+
+void Tab::OnPasswordSelected(const JSObject &obj, const JSArgs &args)
+{
+  // User selected a password from the dropdown - fill it in
+  if (!ui_ || !ui_->password_manager() || args.size() < 2)
+    return;
+
+  ultralight::String username_ul = args[0].ToString();
+  ultralight::String password_ul = args[1].ToString();
+
+  auto username_str = username_ul.utf8();
+  auto password_str = password_ul.utf8();
+
+  std::string username = username_str.data() ? username_str.data() : "";
+  std::string password = password_str.data() ? password_str.data() : "";
+
+  // Fill the form via JS
+  std::ostringstream ss;
+  ss << "(function(){ if(window.__ul_fill_password_form) window.__ul_fill_password_form("
+     << "'" << util::EscapeJsonString(username) << "',"
+     << "'" << util::EscapeJsonString(password) << "'"
+     << "); })();";
+  view()->EvaluateScript(String(ss.str().c_str()), nullptr);
+}
+
+void Tab::OnPasswordSaveResponse(const JSObject &obj, const JSArgs &args)
+{
+  // User responded to save/update password prompt
+  if (!ui_ || !ui_->password_manager() || args.empty())
+    return;
+
+  ultralight::String response_ul = args[0].ToString();
+  auto response_str = response_ul.utf8();
+  std::string response = response_str.data() ? response_str.data() : "";
+
+  if (response == "save" || response == "update")
+  {
+    if (!pending_save_origin_.empty() && !pending_save_username_.empty())
+    {
+      // Check if updating existing or saving new
+      auto existing = ui_->password_manager()->GetCredentialsForOrigin(pending_save_origin_);
+      bool found = false;
+      for (auto &cred : existing)
+      {
+        if (cred.username == pending_save_username_)
+        {
+          // Update existing credential
+          cred.password = pending_save_password_;
+          cred.date_password_modified = password::PasswordManager::GetCurrentTimestamp();
+          ui_->password_manager()->UpdateCredential(cred);
+          found = true;
+          break;
+        }
+      }
+
+      if (!found)
+      {
+        // Save new credential
+        password::SavedCredential cred;
+        cred.id = password::PasswordManager::GenerateUUID();
+        cred.origin = pending_save_origin_;
+        cred.signon_realm = pending_save_origin_;
+        cred.username = pending_save_username_;
+        cred.password = pending_save_password_;
+        cred.date_created = password::PasswordManager::GetCurrentTimestamp();
+        cred.date_password_modified = cred.date_created;
+        cred.date_last_used = 0;
+        cred.times_used = 0;
+        cred.blacklisted = false;
+        ui_->password_manager()->SaveCredential(cred);
+      }
+    }
+  }
+  else if (response == "never")
+  {
+    // Add to blacklist
+    if (!pending_save_origin_.empty())
+    {
+      ui_->password_manager()->BlacklistOrigin(pending_save_origin_);
+    }
+  }
+
+  // Clear pending
+  pending_save_origin_.clear();
+  pending_save_username_.clear();
+  pending_save_password_.clear();
+
+  // Hide the prompt
+  if (ui_)
+  {
+    ui_->HidePasswordSavePrompt();
+  }
+}
+
+// ============================================================================
+// Password Page JS Callbacks (for passwords.html)
+// ============================================================================
+
+JSValue Tab::JS_GetPasswords(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || !ui_->password_manager())
+    return JSValue("[]");
+
+  auto credentials = ui_->password_manager()->GetAllCredentials();
+  std::ostringstream ss;
+  ss << "[";
+  bool first = true;
+  for (const auto &cred : credentials)
+  {
+    if (!first)
+      ss << ",";
+    first = false;
+
+    ss << "{";
+    ss << "\"id\":\"" << util::EscapeJsonString(cred.id) << "\",";
+    ss << "\"origin\":\"" << util::EscapeJsonString(cred.origin) << "\",";
+    ss << "\"username\":\"" << util::EscapeJsonString(cred.username) << "\",";
+    ss << "\"password\":\"" << util::EscapeJsonString(cred.password) << "\",";
+    ss << "\"notes\":\"" << util::EscapeJsonString(cred.notes) << "\",";
+    ss << "\"created\":" << cred.date_created << ",";
+    ss << "\"modified\":" << cred.date_password_modified << ",";
+    ss << "\"last_used\":" << cred.date_last_used;
+    ss << "}";
+  }
+  ss << "]";
+  return JSValue(String(ss.str().c_str()));
+}
+
+JSValue Tab::JS_GetPasswordStats(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || !ui_->password_manager())
+    return JSValue("{}");
+
+  auto credentials = ui_->password_manager()->GetAllCredentials();
+  int total = static_cast<int>(credentials.size());
+  int weak = 0;
+  int reused = 0;
+  std::unordered_map<std::string, int> password_counts;
+
+  for (const auto &cred : credentials)
+  {
+    auto strength = ui_->password_manager()->CheckPasswordStrength(cred.password);
+    if (strength.score < 3)
+      weak++;
+
+    password_counts[cred.password]++;
+  }
+
+  for (const auto &p : password_counts)
+  {
+    if (p.second > 1)
+      reused += p.second;
+  }
+
+  int blacklisted = static_cast<int>(ui_->password_manager()->GetBlacklistedOrigins().size());
+
+  std::ostringstream ss;
+  ss << "{";
+  ss << "\"total_passwords\":" << total << ",";
+  ss << "\"weak_passwords\":" << weak << ",";
+  ss << "\"reused_passwords\":" << reused << ",";
+  ss << "\"blacklisted_sites\":" << blacklisted;
+  ss << "}";
+
+  return JSValue(String(ss.str().c_str()));
+}
+
+void Tab::JS_SavePassword(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || !ui_->password_manager() || args.empty())
+    return;
+
+  ultralight::String json_ul = args[0].ToString();
+  auto json_str = json_ul.utf8();
+  std::string data = json_str.data() ? json_str.data() : "";
+
+  auto extract_string = [&data](const std::string &key) -> std::string
+  {
+    std::string search_key = "\"" + key + "\":\"";
+    size_t pos = data.find(search_key);
+    if (pos == std::string::npos)
+      return "";
+    pos += search_key.length();
+    std::string result;
+    while (pos < data.length() && data[pos] != '"')
+    {
+      if (data[pos] == '\\' && pos + 1 < data.length())
+      {
+        pos++;
+        if (data[pos] == 'n')
+          result += '\n';
+        else if (data[pos] == 't')
+          result += '\t';
+        else if (data[pos] == '"')
+          result += '"';
+        else if (data[pos] == '\\')
+          result += '\\';
+        else
+          result += data[pos];
+      }
+      else
+      {
+        result += data[pos];
+      }
+      pos++;
+    }
+    return result;
+  };
+
+  std::string id = extract_string("id");
+  std::string origin = extract_string("origin");
+  std::string username = extract_string("username");
+  std::string password = extract_string("password");
+  std::string notes = extract_string("notes");
+
+  if (origin.empty() || username.empty())
+    return;
+
+  password::SavedCredential cred;
+  cred.id = id.empty() ? password::PasswordManager::GenerateUUID() : id;
+  cred.origin = origin;
+  cred.signon_realm = origin;
+  cred.username = username;
+  cred.password = password;
+  cred.notes = notes;
+  cred.date_created = password::PasswordManager::GetCurrentTimestamp();
+  cred.date_password_modified = cred.date_created;
+  cred.date_last_used = 0;
+  cred.times_used = 0;
+  cred.blacklisted = false;
+
+  if (id.empty())
+  {
+    ui_->password_manager()->SaveCredential(cred);
+  }
+  else
+  {
+    ui_->password_manager()->UpdateCredential(cred);
+  }
+}
+
+void Tab::JS_DeletePassword(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || !ui_->password_manager() || args.empty())
+    return;
+
+  ultralight::String id_ul = args[0].ToString();
+  auto id_str = id_ul.utf8();
+  std::string id = id_str.data() ? id_str.data() : "";
+
+  if (!id.empty())
+    ui_->password_manager()->DeleteCredential(id);
+}
+
+JSValue Tab::JS_GetDecryptedPassword(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || !ui_->password_manager() || args.empty())
+    return JSValue("");
+
+  ultralight::String id_ul = args[0].ToString();
+  auto id_str = id_ul.utf8();
+  std::string id = id_str.data() ? id_str.data() : "";
+
+  auto credentials = ui_->password_manager()->GetAllCredentials();
+  for (const auto &cred : credentials)
+  {
+    if (cred.id == id)
+      return JSValue(String(cred.password.c_str()));
+  }
+
+  return JSValue("");
+}
+
+void Tab::JS_SavePasswordSettings(const JSObject &obj, const JSArgs &args)
+{
+  // TODO: Implement password settings storage
+}
+
+void Tab::JS_ExportPasswords(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || !ui_->password_manager() || args.empty())
+    return;
+
+  ultralight::String format_ul = args[0].ToString();
+  auto format_str = format_ul.utf8();
+  std::string format = format_str.data() ? format_str.data() : "json";
+
+  std::filesystem::path export_path = std::filesystem::path(ui_->SettingsDirectory()) / "passwords_export";
+  if (format == "csv")
+  {
+    export_path += ".csv";
+    ui_->password_manager()->ExportToCSV(export_path.string());
+  }
+  else
+  {
+    export_path += ".json";
+    ui_->password_manager()->ExportToJSON(export_path.string());
+  }
+}
+
+void Tab::JS_ImportPasswords(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || !ui_->password_manager() || args.size() < 2)
+    return;
+
+  ultralight::String content_ul = args[0].ToString();
+  ultralight::String format_ul = args[1].ToString();
+
+  auto content_str = content_ul.utf8();
+  auto format_str = format_ul.utf8();
+
+  std::string content = content_str.data() ? content_str.data() : "";
+  std::string format = format_str.data() ? format_str.data() : "json";
+
+  // Create a temp file and import from it
+  std::filesystem::path temp_path = std::filesystem::temp_directory_path() / "passwords_import_temp";
+  if (format == "csv")
+    temp_path += ".csv";
+  else
+    temp_path += ".json";
+
+  std::ofstream temp_file(temp_path);
+  if (temp_file.is_open())
+  {
+    temp_file << content;
+    temp_file.close();
+
+    if (format == "csv")
+      ui_->password_manager()->ImportFromCSV(temp_path.string());
+    else
+      ui_->password_manager()->ImportFromJSON(temp_path.string());
+
+    std::filesystem::remove(temp_path);
+  }
 }
 
 // (Disable-history removed)
