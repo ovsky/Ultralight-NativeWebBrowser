@@ -631,7 +631,8 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
     auto url_str = url.utf8();
     const char *c = url_str.data();
     // Skip internal pages (file:/// URLs)
-    if (c && std::strncmp(c, "file://", 7) != 0)
+    std::string_view url_view(c ? c : "");
+    if (c && (url_view.size() < 7 || url_view.substr(0, 7) != "file://"))
     {
       std::string script_code = extensions::ExtensionManager::Instance().GetContentScriptsForURL(c);
       if (!script_code.empty())
