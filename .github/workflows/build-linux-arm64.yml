@@ -148,7 +148,8 @@ jobs:
             echo "${VER:-Unknown}" > build/ultralight_sdk_version.txt
             echo "== ARM64: Configure & Build =="
             cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ROOT" -DBUILD_TESTING=OFF -DAUTO_INSTALL_CURL=ON -DWEBBROWSER_VERSION="$WEBBROWSER_VERSION"
-            cmake --build build --parallel
+            # Limit parallelism to 2 jobs to avoid compiler crashes under QEMU emulation
+            cmake --build build --parallel 2
             echo "== ARM64: Package (TGZ) =="
             cpack --config build/CPackConfig.cmake -C Release -G TGZ -D CPACK_OUTPUT_FILE_PREFIX="$GITHUB_WORKSPACE/build"
             # Rename package to final name
