@@ -1680,17 +1680,6 @@ void UI::OnRequestChangeURL(const JSObject &obj, const JSArgs &args)
 
 void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
 {
-  // DEBUG: Log that we got here
-  std::ofstream debug("debug_navigate.txt", std::ios::app);
-  debug << "OnAddressBarNavigate called with " << args.size() << " args\n";
-  if (args.size() > 0) {
-    ultralight::String url = args[0];
-    auto url_data = url.utf8();
-    if (url_data.data())
-      debug << "URL: " << url_data.data() << "\n";
-  }
-  debug.close();
-  
   if (args.size() == 1)
   {
     ultralight::String url = args[0];
@@ -2153,7 +2142,8 @@ void UI::UpdateTabTitle(uint64_t id, const ultralight::String &title)
   {
     auto url_u = tabs_[id]->view()->url().utf8();
     const char *cur = url_u.data();
-    if (cur && strncmp(cur, "file://", 7) == 0)
+    std::string_view cur_view(cur ? cur : "");
+    if (cur && cur_view.size() >= 7 && cur_view.substr(0, 7) == "file://")
     {
       updateURL({title});
     }
@@ -2257,7 +2247,10 @@ String UI::GetFaviconURL(const String &page_url)
   if (!url)
     return String("");
 
-  if (strncmp(url, "http://", 7) != 0 && strncmp(url, "https://", 8) != 0)
+  std::string_view url_view(url);
+  if (url_view.size() < 7 || 
+      (url_view.substr(0, 7) != "http://" && 
+       (url_view.size() < 8 || url_view.substr(0, 8) != "https://")))
     return String("");
 
   const char *scheme_sep = strstr(url, "://");
@@ -2297,7 +2290,10 @@ void UI::RecordHistory(const String &url, const String &title)
     return;
 
   // Only record http(s)
-  if (strncmp(c_url, "http://", 7) != 0 && strncmp(c_url, "https://", 8) != 0)
+  std::string_view url_view(c_url);
+  if (url_view.size() < 7 || 
+      (url_view.substr(0, 7) != "http://" && 
+       (url_view.size() < 8 || url_view.substr(0, 8) != "https://")))
     return;
 
   // Basic cap to avoid unbounded growth later (we'll prune oldest when exceeding)
@@ -4967,6 +4963,8 @@ void UI::OnImportPasswords(const JSObject &obj, const JSArgs &args)
   std::filesystem::path temp_path = SettingsDirectory() / ("temp_import." + format);
   {
     std::ofstream out(temp_path, std::ios::binary);
+    if (!out.is_open())
+      return;
     out << content;
   }
 
