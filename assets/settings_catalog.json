@@ -223,5 +223,21 @@
     "category": "developer",
     "note": null,
     "default": false
+  },
+  {
+    "key": "restore_session_on_startup",
+    "name": "Restore previous session",
+    "description": "Reopen tabs from your last browsing session when starting the browser.",
+    "category": "general",
+    "note": null,
+    "default": true
+  },
+  {
+    "key": "save_session_continuously",
+    "name": "Enable crash recovery",
+    "description": "Continuously save session state so tabs can be restored after crashes or unexpected closures (ALT+F4).",
+    "category": "general",
+    "note": null,
+    "default": true
   }
 ]
