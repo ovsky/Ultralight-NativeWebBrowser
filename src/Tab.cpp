@@ -1746,17 +1746,17 @@ JSValue Tab::JS_UpdateBookmark(const JSObject &obj, const JSArgs &args)
   auto title_str = title_ul.utf8();
   std::string title = title_str.data() ? title_str.data() : "";
   
-  // Keep existing favicon and show_in_bar settings
+  // Keep existing favicon and show_on_bar settings
   std::string favicon;
-  bool show_in_bar = true;
+  bool show_on_bar = true;
   
   auto* existing = ui_->bookmark_store()->GetBookmarkById(id);
   if (existing) {
-    favicon = existing->favicon_url;
-    show_in_bar = existing->show_in_bar;
+    favicon = existing->favicon;
+    show_on_bar = existing->show_on_bar;
   }
   
-  return JSValue(ui_->bookmark_store()->UpdateBookmark(id, url, title, favicon, show_in_bar));
+  return JSValue(ui_->bookmark_store()->UpdateBookmark(id, url, title, favicon, show_on_bar));
 }
 
 JSValue Tab::OnDownloadsGetData(const JSObject &obj, const JSArgs &args)
