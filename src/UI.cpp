@@ -486,6 +486,11 @@ UI::UI(RefPtr<Window> window)
   // Apply runtime toggles (visual sync happens on DOMReady via SyncSettingsStateToUI)
   ApplySettings(true, true);
 
+  // Pre-load start page HTML for instant new tab creation
+  LoadCachedStartPage();
+  // Pre-load internal browser pages for instant loading
+  LoadCachedInternalPages();
+
   // Load keyboard shortcuts mapping
   LoadShortcuts();
 
@@ -531,6 +536,11 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
 
   // Apply runtime toggles (visual sync happens on DOMReady via SyncSettingsStateToUI)
   ApplySettings(true, true);
+
+  // Pre-load start page HTML for instant new tab creation
+  LoadCachedStartPage();
+  // Pre-load internal browser pages for instant loading
+  LoadCachedInternalPages();
 
   // Load keyboard shortcuts mapping
   LoadShortcuts();
@@ -959,6 +969,70 @@ static void trim(std::string &s)
   s = s.substr(a, b - a + 1);
 }
 
+void UI::LoadCachedStartPage()
+{
+  // Pre-load the start page HTML into memory for instant tab creation
+  // This eliminates file I/O delay when opening new tabs
+  std::ifstream in("assets/static-sties/google-static.html", std::ios::in | std::ios::binary);
+  if (!in.is_open())
+  {
+    // Fallback to a minimal dark page if file not found
+    cached_start_page_html_ = R"(<!DOCTYPE html><html><head><title>New Tab</title>
+      <style>body,html{margin:0;padding:0;height:100%;background:#202124;}</style>
+      </head><body></body></html>)";
+    return;
+  }
+  std::ostringstream ss;
+  ss << in.rdbuf();
+  cached_start_page_html_ = ss.str();
+  in.close();
+}
+
+void UI::LoadCachedInternalPages()
+{
+  // Pre-load frequently used internal pages for instant loading
+  static const char* pages[] = {
+    "assets/settings.html",
+    "assets/history.html",
+    "assets/downloads.html",
+    "assets/passwords.html",
+    "assets/extensions.html",
+    "assets/about.html",
+    "assets/new_tab_page.html"
+  };
+  
+  static const char* urls[] = {
+    "file:///settings.html",
+    "file:///history.html",
+    "file:///downloads.html",
+    "file:///passwords.html",
+    "file:///extensions.html",
+    "file:///about.html",
+    "file:///new_tab_page.html"
+  };
+  
+  for (size_t i = 0; i < sizeof(pages) / sizeof(pages[0]); ++i)
+  {
+    std::ifstream in(pages[i], std::ios::in | std::ios::binary);
+    if (in.is_open())
+    {
+      std::ostringstream ss;
+      ss << in.rdbuf();
+      cached_internal_pages_[urls[i]] = ss.str();
+      in.close();
+    }
+  }
+}
+
+const std::string& UI::GetCachedPageHTML(const std::string& url) const
+{
+  static const std::string empty;
+  auto it = cached_internal_pages_.find(url);
+  if (it != cached_internal_pages_.end())
+    return it->second;
+  return empty;
+}
+
 void UI::LoadShortcuts()
 {
   // Defaults
@@ -1034,13 +1108,8 @@ bool UI::RunShortcutAction(const std::string &action)
   if (action == "open-history")
   {
     // Open History in a NEW tab instead of replacing current
-    RefPtr<View> child = CreateNewTabForChildView(String("file:///history.html"));
-    if (child)
-    {
-      child->LoadURL("file:///history.html");
-      return true;
-    }
-    return false;
+    CreateNewTabForChildView(String("file:///history.html"));
+    return true;
   }
   if (action == "focus-address")
   {
@@ -1062,35 +1131,20 @@ bool UI::RunShortcutAction(const std::string &action)
   if (action == "open-extensions")
   {
     // Open Extensions in a new tab
-    RefPtr<View> child = CreateNewTabForChildView(String("file:///extensions.html"));
-    if (child)
-    {
-      child->LoadURL("file:///extensions.html");
-      return true;
-    }
-    return false;
+    CreateNewTabForChildView(String("file:///extensions.html"));
+    return true;
   }
   if (action == "open-passwords")
   {
     // Open Passwords in a new tab
-    RefPtr<View> child = CreateNewTabForChildView(String("file:///passwords.html"));
-    if (child)
-    {
-      child->LoadURL("file:///passwords.html");
-      return true;
-    }
-    return false;
+    CreateNewTabForChildView(String("file:///passwords.html"));
+    return true;
   }
   if (action == "open-settings")
   {
     // Open Settings in a NEW tab (like Ctrl+H opens history)
-    RefPtr<View> child = CreateNewTabForChildView(String("file:///settings.html"));
-    if (child)
-    {
-      child->LoadURL("file:///settings.html");
-      return true;
-    }
-    return false;
+    CreateNewTabForChildView(String("file:///settings.html"));
+    return true;
   }
   return false;
 }
@@ -1808,30 +1862,22 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
 
 void UI::OnOpenHistoryNewTab(const JSObject &obj, const JSArgs &args)
 {
-  RefPtr<View> child = CreateNewTabForChildView(String("file:///history.html"));
-  if (child)
-    child->LoadURL("file:///history.html");
+  CreateNewTabForChildView(String("file:///history.html"));
 }
 
 void UI::OnOpenDownloadsNewTab(const JSObject &obj, const JSArgs &args)
 {
-  RefPtr<View> child = CreateNewTabForChildView(String("file:///downloads.html"));
-  if (child)
-    child->LoadURL("file:///downloads.html");
+  CreateNewTabForChildView(String("file:///downloads.html"));
 }
 
 void UI::OnOpenPasswordsNewTab(const JSObject &obj, const JSArgs &args)
 {
-  RefPtr<View> child = CreateNewTabForChildView(String("file:///passwords.html"));
-  if (child)
-    child->LoadURL("file:///passwords.html");
+  CreateNewTabForChildView(String("file:///passwords.html"));
 }
 
 void UI::OnOpenExtensionsNewTab(const JSObject &obj, const JSArgs &args)
 {
-  RefPtr<View> child = CreateNewTabForChildView(String("file:///extensions.html"));
-  if (child)
-    child->LoadURL("file:///extensions.html");
+  CreateNewTabForChildView(String("file:///extensions.html"));
 }
 
 // ============================================================================
@@ -2138,13 +2184,22 @@ void UI::CreateNewTab()
   view_settings.hardware_acceleration = settings_.hardware_acceleration;
   
   tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_, view_settings);
-  // Load local static start page
-  const char *kStartPage = "file:///static-sties/google-static.html";
-  tabs_[id]->view()->LoadURL(kStartPage);
+  
+  // Use cached HTML for instant page display (no file I/O delay)
+  // This eliminates the white flash before page content loads
+  const char *kStartPageURL = "file:///static-sties/google-static.html";
+  if (!cached_start_page_html_.empty())
+  {
+    tabs_[id]->view()->LoadHTML(String(cached_start_page_html_.c_str()), String(kStartPageURL));
+  }
+  else
+  {
+    tabs_[id]->view()->LoadURL(kStartPageURL);
+  }
 
   {
     RefPtr<JSContext> lock(view()->LockJSContext());
-    addTab({id, "New Tab", GetFaviconURL(kStartPage), tabs_[id]->view()->is_loading()});
+    addTab({id, "New Tab", GetFaviconURL(kStartPageURL), tabs_[id]->view()->is_loading()});
   }
   UpdateDrmBadge(id, false);
 }
@@ -2166,6 +2221,21 @@ RefPtr<View> UI::CreateNewTabForChildView(const String &url)
   view_settings.hardware_acceleration = settings_.hardware_acceleration;
   
   tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_, view_settings);
+
+  // Try to use cached HTML for instant loading of internal pages
+  auto url_utf8 = url.utf8();
+  std::string url_str(url_utf8.data() ? url_utf8.data() : "");
+  const std::string& cached_html = GetCachedPageHTML(url_str);
+  if (!cached_html.empty())
+  {
+    // Use cached HTML for instant display
+    tabs_[id]->view()->LoadHTML(String(cached_html.c_str()), url);
+  }
+  else
+  {
+    // Fall back to regular URL loading for non-cached pages
+    tabs_[id]->view()->LoadURL(url);
+  }
 
   {
     RefPtr<JSContext> lock(view()->LockJSContext());
@@ -2729,9 +2799,7 @@ void UI::OnToggleDarkMode(const JSObject &obj, const JSArgs &args)
 void UI::OnOpenSettingsPanel(const JSObject &, const JSArgs &)
 {
   HideMenuOverlay();
-  RefPtr<View> child = CreateNewTabForChildView(String("file:///settings.html"));
-  if (child)
-    child->LoadURL("file:///settings.html");
+  CreateNewTabForChildView(String("file:///settings.html"));
 }
 
 void UI::OnCloseSettingsPanel(const JSObject &, const JSArgs &)
@@ -3682,9 +3750,7 @@ void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
   if (action == "open_tab" && args.size() >= 2)
   {
     ultralight::String url = args[1];
-    RefPtr<View> child = CreateNewTabForChildView(url);
-    if (child)
-      child->LoadURL(url);
+    CreateNewTabForChildView(url);  // Handles loading internally
     HideContextMenuOverlay();
     return;
   }
@@ -5002,9 +5068,7 @@ void UI::OnSuggestionPick(const JSObject &obj, const JSArgs &args)
   }
   if (open_new_tab)
   {
-    RefPtr<View> child = CreateNewTabForChildView(s);
-    if (child)
-      child->LoadURL(s);
+    CreateNewTabForChildView(s);  // Handles loading internally
     return;
   }
   if (!tabs_.empty())

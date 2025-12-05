@@ -432,6 +432,14 @@ protected:
   void ApplyTransparentToolbar(bool enabled);
   void RemoveTransparentToolbar();
 
+  // Cached page HTML for instant loading (avoids file I/O delay)
+  std::string cached_start_page_html_;
+  std::unordered_map<std::string, std::string> cached_internal_pages_;
+  void LoadCachedStartPage();
+  void LoadCachedInternalPages();
+  // Get cached HTML for a file:/// URL, or empty if not cached
+  const std::string& GetCachedPageHTML(const std::string& url) const;
+
   // Cached user agent string currently applied to outgoing requests.
   std::string active_user_agent_;
   // Compute a Chromium-like user agent string approximating the host platform.
