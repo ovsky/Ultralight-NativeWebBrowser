@@ -29,6 +29,7 @@ public:
     ~DownloadManager() override;
 
     void SetOnChangeCallback(std::function<void()> callback);
+    void SetWebPConversionCallback(std::function<bool()> callback);
 
     std::string GetDownloadsJSON();
     void ClearFinishedDownloads();
@@ -117,6 +118,7 @@ private:
     uint64_t start_sequence_counter_ = 0;
     uint64_t last_started_sequence_ = 0;
     std::function<void()> on_change_;
+    std::function<bool()> should_convert_webp_;
     static constexpr size_t kMaxHistoryEntries = 200;
 
     bool PruneStaleRequestsLocked(std::unique_lock<std::mutex> &lock, std::chrono::system_clock::time_point now, bool notify);
