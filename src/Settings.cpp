@@ -78,6 +78,39 @@ namespace
     }
     return result;
   }
+
+  double ParseDoubleLenient(const std::string &buffer, const std::string &key, double fallback)
+  {
+    if (key.empty())
+      return fallback;
+    std::string needle = std::string("\"") + key + "\"";
+    auto pos = buffer.find(needle);
+    if (pos == std::string::npos)
+      return fallback;
+    pos = buffer.find(':', pos + needle.size());
+    if (pos == std::string::npos)
+      return fallback;
+    ++pos;
+    while (pos < buffer.size() && std::isspace(static_cast<unsigned char>(buffer[pos])))
+      ++pos;
+    if (pos >= buffer.size())
+      return fallback;
+    // Parse number (may be negative, may have decimal point)
+    std::string numStr;
+    while (pos < buffer.size() && (buffer[pos] == '-' || buffer[pos] == '+' || buffer[pos] == '.' ||
+                                   std::isdigit(static_cast<unsigned char>(buffer[pos]))))
+    {
+      numStr += buffer[pos];
+      ++pos;
+    }
+    if (numStr.empty())
+      return fallback;
+    try {
+      return std::stod(numStr);
+    } catch (...) {
+      return fallback;
+    }
+  }
 }
 
 void SettingsManager::EnsureDataDirectoryExists()
@@ -147,6 +180,9 @@ bool SettingsManager::LoadSettingsFromDisk(UI &ui)
     // Parse string settings
     ui.settings_.custom_user_agent = ParseStringLenient(content, "custom_user_agent", "");
     ui.settings_.dark_theme_excluded_sites = ParseStringLenient(content, "dark_theme_excluded_sites", "");
+    // Parse location spoofing coordinates
+    ui.settings_.spoofed_latitude = ParseDoubleLenient(content, "spoofed_latitude", 0.0);
+    ui.settings_.spoofed_longitude = ParseDoubleLenient(content, "spoofed_longitude", 0.0);
     ui.settings_storage_path_ = (migrated ? legacy_path.string() : primary_path.string());
   }
   else
@@ -182,6 +218,8 @@ bool SettingsManager::SaveSettingsToDisk(UI &ui)
   doc << "  \"values\": " << ui.BuildSettingsJSON() << ",\n";
   doc << "  \"custom_user_agent\": \"" << util::EscapeJsonString(ui.settings_.custom_user_agent) << "\",\n";
   doc << "  \"dark_theme_excluded_sites\": \"" << util::EscapeJsonString(ui.settings_.dark_theme_excluded_sites) << "\",\n";
+  doc << "  \"spoofed_latitude\": " << ui.settings_.spoofed_latitude << ",\n";
+  doc << "  \"spoofed_longitude\": " << ui.settings_.spoofed_longitude << ",\n";
   doc << "  \"meta\": {\n";
   doc << "    \"updated_at\": \"" << util::ToIso8601UTC(std::chrono::system_clock::now()) << "\",\n";
   doc << "    \"dirty\": false,\n";
