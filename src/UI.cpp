@@ -1486,6 +1486,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnRequestChangeURL"] = BindJSCallback(&UI::OnRequestChangeURL);
   global["OnAddressBarNavigate"] = BindJSCallback(&UI::OnAddressBarNavigate);
   global["OnOpenHistoryNewTab"] = BindJSCallback(&UI::OnOpenHistoryNewTab);
+  global["OnOpenBookmarksNewTab"] = BindJSCallback(&UI::OnOpenBookmarksNewTab);
   global["OnOpenDownloadsNewTab"] = BindJSCallback(&UI::OnOpenDownloadsNewTab);
   global["OnOpenPasswordsNewTab"] = BindJSCallback(&UI::OnOpenPasswordsNewTab);
   global["OnOpenExtensionsNewTab"] = BindJSCallback(&UI::OnOpenExtensionsNewTab);
@@ -1927,6 +1928,11 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
 void UI::OnOpenHistoryNewTab(const JSObject &obj, const JSArgs &args)
 {
   CreateNewTabForChildView(String("file:///history.html"));
+}
+
+void UI::OnOpenBookmarksNewTab(const JSObject &obj, const JSArgs &args)
+{
+  CreateNewTabForChildView(String("file:///bookmarks.html"));
 }
 
 void UI::OnOpenDownloadsNewTab(const JSObject &obj, const JSArgs &args)

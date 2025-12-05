@@ -145,6 +145,7 @@ public:
   void OnAddressBarNavigate(const JSObject &obj, const JSArgs &args);
   // Open History page in a new tab (used by menu button and shortcuts)
   void OnOpenHistoryNewTab(const JSObject &obj, const JSArgs &args);
+  void OnOpenBookmarksNewTab(const JSObject &obj, const JSArgs &args);
   void OnOpenDownloadsNewTab(const JSObject &obj, const JSArgs &args);
   void OnOpenPasswordsNewTab(const JSObject &obj, const JSArgs &args);
   void OnAddressBarBlur(const JSObject &obj, const JSArgs &args);
