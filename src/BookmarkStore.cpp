@@ -34,6 +34,14 @@ uint64_t BookmarkStore::AddBookmark(const std::string& url, const std::string& t
             return bm.id;  // Already exists, return existing ID
     }
     
+    // Find the highest position among bar items
+    int max_position = -1;
+    for (const auto& bm : bookmarks_)
+    {
+        if (bm.show_on_bar && bm.position > max_position)
+            max_position = bm.position;
+    }
+    
     Bookmark bm;
     bm.id = next_id_++;
     bm.url = url;
@@ -41,6 +49,7 @@ uint64_t BookmarkStore::AddBookmark(const std::string& url, const std::string& t
     bm.favicon = favicon;
     bm.created_at = GetCurrentTimestamp();
     bm.show_on_bar = show_on_bar;
+    bm.position = show_on_bar ? (max_position + 1) : 0;
     
     bookmarks_.push_back(bm);
     SaveToDisk();
@@ -121,7 +130,27 @@ std::vector<BookmarkStore::Bookmark> BookmarkStore::GetBookmarkBarItems() const
         if (bm.show_on_bar)
             bar_items.push_back(bm);
     }
+    // Sort by position
+    std::sort(bar_items.begin(), bar_items.end(),
+        [](const Bookmark& a, const Bookmark& b) { return a.position < b.position; });
     return bar_items;
+}
+
+bool BookmarkStore::ReorderBookmarks(const std::vector<uint64_t>& ordered_ids)
+{
+    // Update positions based on the order in ordered_ids
+    for (size_t i = 0; i < ordered_ids.size(); ++i)
+    {
+        for (auto& bm : bookmarks_)
+        {
+            if (bm.id == ordered_ids[i])
+            {
+                bm.position = static_cast<int>(i);
+                break;
+            }
+        }
+    }
+    return SaveToDisk();
 }
 
 // Helper to escape JSON strings
@@ -168,7 +197,8 @@ std::string BookmarkStore::ToJSON() const
         ss << "\"title\":\"" << EscapeJSON(bm.title) << "\",";
         ss << "\"favicon\":\"" << EscapeJSON(bm.favicon) << "\",";
         ss << "\"created_at\":" << bm.created_at << ",";
-        ss << "\"show_on_bar\":" << (bm.show_on_bar ? "true" : "false");
+        ss << "\"show_on_bar\":" << (bm.show_on_bar ? "true" : "false") << ",";
+        ss << "\"position\":" << bm.position;
         ss << "}";
     }
     ss << "]";
@@ -177,12 +207,14 @@ std::string BookmarkStore::ToJSON() const
 
 std::string BookmarkStore::BookmarkBarToJSON() const
 {
+    // Get sorted bar items
+    auto bar_items = GetBookmarkBarItems();
+    
     std::ostringstream ss;
     ss << "[";
     bool first = true;
-    for (const auto& bm : bookmarks_)
+    for (const auto& bm : bar_items)
     {
-        if (!bm.show_on_bar) continue;
         if (!first) ss << ",";
         first = false;
         ss << "{";
@@ -217,7 +249,8 @@ bool BookmarkStore::SaveToDisk()
         ss << "      \"title\": \"" << EscapeJSON(bm.title) << "\",\n";
         ss << "      \"favicon\": \"" << EscapeJSON(bm.favicon) << "\",\n";
         ss << "      \"created_at\": " << bm.created_at << ",\n";
-        ss << "      \"show_on_bar\": " << (bm.show_on_bar ? "true" : "false") << "\n";
+        ss << "      \"show_on_bar\": " << (bm.show_on_bar ? "true" : "false") << ",\n";
+        ss << "      \"position\": " << bm.position << "\n";
         ss << "    }";
     }
     
@@ -364,6 +397,7 @@ bool BookmarkStore::LoadFromDisk()
         bm.favicon = ExtractString(obj_json, "favicon");
         bm.created_at = ExtractUint64(obj_json, "created_at");
         bm.show_on_bar = ExtractBool(obj_json, "show_on_bar", true);
+        bm.position = static_cast<int>(ExtractUint64(obj_json, "position"));
         
         if (!bm.url.empty())
         {

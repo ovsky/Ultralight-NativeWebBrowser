@@ -19,6 +19,7 @@ public:
         std::string favicon;  // Data URL or empty
         uint64_t created_at;  // Timestamp in milliseconds
         bool show_on_bar;     // Whether to show on bookmark bar
+        int position;         // Position in bookmark bar (for ordering)
     };
 
     BookmarkStore();
@@ -50,8 +51,11 @@ public:
     // Get all bookmarks
     const std::vector<Bookmark>& GetAllBookmarks() const { return bookmarks_; }
 
-    // Get bookmarks for the bookmark bar only
+    // Get bookmarks for the bookmark bar only (sorted by position)
     std::vector<Bookmark> GetBookmarkBarItems() const;
+
+    // Reorder bookmarks on the bar - takes a vector of bookmark IDs in new order
+    bool ReorderBookmarks(const std::vector<uint64_t>& ordered_ids);
 
     // Save bookmarks to disk
     bool SaveToDisk();
