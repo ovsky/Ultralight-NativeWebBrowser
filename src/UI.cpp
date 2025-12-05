@@ -58,7 +58,7 @@ namespace
     bool default_value;
   };
 
-  constexpr std::array<SettingDescriptor, 28> kFallbackSettingsCatalog = {
+  constexpr std::array<SettingDescriptor, 30> kFallbackSettingsCatalog = {
       // Appearance
       SettingDescriptor{"launch_dark_theme", "Launch in dark theme",
                         "Start Ultralight with dark chrome, toolbars, and tabs by default.",
@@ -152,6 +152,14 @@ namespace
       SettingDescriptor{"auto_save_settings", "Auto save settings",
                         "Automatically save changes to settings as soon as you toggle options.",
                         "general", nullptr, false, &UI::BrowserSettings::auto_save_settings, true},
+
+      // Session restore
+      SettingDescriptor{"restore_session_on_startup", "Restore previous session",
+                        "Reopen tabs from your last browsing session when starting the browser.",
+                        "general", nullptr, false, &UI::BrowserSettings::restore_session_on_startup, true},
+      SettingDescriptor{"save_session_continuously", "Enable crash recovery",
+                        "Continuously save session state so tabs can be restored after crashes or unexpected closures.",
+                        "general", nullptr, false, &UI::BrowserSettings::save_session_continuously, true},
 
       // DRM subsystem
       SettingDescriptor{"enable_drm_webview", "Enable DRM WebView",
@@ -501,6 +509,9 @@ UI::UI(RefPtr<Window> window)
 
   // Load history from disk
   LoadHistoryFromDisk();
+  
+  // Load session data for crash recovery
+  LoadSessionFromDisk();
 }
 
 // Compatibility overload: accepts optional ad/tracker blockers (ignored if not used)
@@ -552,6 +563,9 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
 
   // Load history from disk
   LoadHistoryFromDisk();
+
+  // Load session data for crash recovery
+  LoadSessionFromDisk();
 
   // Initialize extension system
   InitializeExtensions();
@@ -851,6 +865,10 @@ void UI::HandleDrmNavigationState(uint64_t tab_id, bool can_back, bool can_forwa
 
 UI::~UI()
 {
+  // Save session one final time with clean_exit flag
+  // This preserves tabs for restoration while indicating it was a normal shutdown
+  SaveSessionToDiskWithCleanExit();
+  
   // Persist or clear history on shutdown based on settings
   if (clear_history_on_exit_)
   {
@@ -1403,6 +1421,9 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnPasswordSaveBarResponse"] = BindJSCallback(&UI::OnPasswordSaveBarResponse);
   // DRM prompt bar callback
   global["OnDrmPromptResponse"] = BindJSCallback(&UI::OnDrmPromptResponse);
+  // Session restore bar callbacks
+  global["OnRestoreSession"] = BindJSCallback(&UI::OnRestoreSession);
+  global["OnDismissSession"] = BindJSCallback(&UI::OnDismissSession);
   // Allow UI documents (including settings) to request a chrome overlay reload.
   global["OnReloadChromeUI"] = BindJSCallback(&UI::OnReloadChromeUI);
   // Allow UI documents to request reloading the active non-settings tab.
@@ -1528,7 +1549,26 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     RefPtr<JSContext> lock(view()->LockJSContext());
     if (tabs_.empty())
     {
-      CreateNewTab();
+      // Check if we should restore a previous session
+      // Only show restore bar if there are meaningful (non-internal) tabs to restore
+      if (settings_.restore_session_on_startup && session_restore_pending_ && HasSavedSession() && GetMeaningfulSavedTabCount() > 0)
+      {
+        // IMPORTANT: Set this flag BEFORE creating the tab to prevent session saving
+        // from overwriting the saved session while the restore bar is visible
+        session_restore_bar_visible_ = true;
+        
+        // Create a blank tab first, then show restore bar
+        CreateNewTab();
+        // Show the session restore bar to ask user
+        ShowSessionRestoreBar();
+      }
+      else
+      {
+        // No meaningful session to restore, create a new tab
+        CreateNewTab();
+        // Clear restore pending since there's nothing meaningful to restore
+        session_restore_pending_ = false;
+      }
     }
     else
     {
@@ -1681,6 +1721,9 @@ void UI::OnRequestTabClose(const JSObject &obj, const JSArgs &args)
 
     RefPtr<JSContext> lock(view()->LockJSContext());
     closeTab({id});
+    
+    // Save session after tab close for crash recovery
+    SaveSessionToDisk();
   }
 }
 
@@ -2202,6 +2245,9 @@ void UI::CreateNewTab()
     addTab({id, "New Tab", GetFaviconURL(kStartPageURL), tabs_[id]->view()->is_loading()});
   }
   UpdateDrmBadge(id, false);
+  
+  // Save session after new tab for crash recovery
+  SaveSessionToDisk();
 }
 
 RefPtr<View> UI::CreateNewTabForChildView(const String &url)
@@ -2303,6 +2349,12 @@ void UI::UpdateTabNavigation(uint64_t id, bool is_loading, bool can_go_back, boo
     SetLoading(is_loading);
     SetCanGoBack(can_go_back);
     SetCanGoForward(can_go_forward);
+  }
+  
+  // Save session when navigation completes (not during loading to reduce disk I/O)
+  if (!is_loading)
+  {
+    SaveSessionToDisk();
   }
 }
 
@@ -4405,6 +4457,535 @@ void UI::SaveHistoryToDisk()
   out.close();
 }
 
+// ================================================================================
+// Session Management (Crash Recovery / Restore Tabs)
+// ================================================================================
+
+void UI::SaveSessionToDisk()
+{
+  // Save current session state to disk for crash recovery
+  // This is called whenever tabs change (new tab, close tab, navigation)
+  
+  if (!settings_.save_session_continuously)
+    return;
+  
+  // Don't overwrite saved session while restore bar is visible
+  // User hasn't made a choice yet, so preserve their previous session
+  if (session_restore_bar_visible_)
+    return;
+    
+  EnsureDataDirectoryExists();
+  std::ofstream out("data/session.json", std::ios::out | std::ios::binary | std::ios::trunc);
+  if (!out.is_open())
+    return;
+
+  // Get current timestamp
+  auto now = std::chrono::system_clock::now();
+  auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                       now.time_since_epoch())
+                       .count();
+
+  out << "{\n";
+  out << "  \"version\": 1,\n";
+  out << "  \"timestamp\": " << timestamp << ",\n";
+  out << "  \"clean_exit\": false,\n";
+  out << "  \"active_tab_id\": " << active_tab_id_ << ",\n";
+  out << "  \"tabs\": [\n";
+  
+  bool first = true;
+  for (const auto &entry : tabs_)
+  {
+    if (!entry.second)
+      continue;
+      
+    auto view = entry.second->view();
+    if (!view)
+      continue;
+      
+    auto url_ul = view->url();
+    auto title_ul = view->title();
+    std::string url = url_ul.utf8().data() ? url_ul.utf8().data() : "";
+    std::string title = title_ul.utf8().data() ? title_ul.utf8().data() : "";
+    
+    // Skip internal pages that shouldn't be restored
+    if (url.find("file:///ui.html") != std::string::npos ||
+        url.find("file:///menu.html") != std::string::npos ||
+        url.find("file:///contextmenu.html") != std::string::npos ||
+        url.find("file:///suggestions.html") != std::string::npos ||
+        url.find("file:///downloads-panel.html") != std::string::npos)
+      continue;
+    
+    // Skip empty URLs
+    if (url.empty() || url == "about:blank")
+      continue;
+    
+    if (!first)
+      out << ",\n";
+    first = false;
+    
+    out << "    {\"id\": " << entry.first 
+        << ", \"url\": \"" << jsonEscape(url) 
+        << "\", \"title\": \"" << jsonEscape(title) << "\"}";
+  }
+  
+  out << "\n  ],\n";
+  
+  // Also save DRM tabs
+  out << "  \"drm_tabs\": [\n";
+  first = true;
+  for (const auto &entry : drm_tab_urls_)
+  {
+    auto title_it = drm_tab_titles_.find(entry.first);
+    std::string title = (title_it != drm_tab_titles_.end()) ? title_it->second : "";
+    
+    if (entry.second.empty())
+      continue;
+    
+    if (!first)
+      out << ",\n";
+    first = false;
+    
+    out << "    {\"id\": " << entry.first 
+        << ", \"url\": \"" << jsonEscape(entry.second) 
+        << "\", \"title\": \"" << jsonEscape(title) << "\"}";
+  }
+  out << "\n  ]\n";
+  out << "}\n";
+  out.close();
+}
+
+void UI::LoadSessionFromDisk()
+{
+  // Load session data from disk (does not restore tabs, just loads the data)
+  std::ifstream in("data/session.json");
+  if (!in.is_open())
+  {
+    session_restore_pending_ = false;
+    session_was_clean_exit_ = true;
+    return;
+  }
+
+  std::stringstream buffer;
+  buffer << in.rdbuf();
+  in.close();
+  
+  std::string content = buffer.str();
+  
+  // Parse clean_exit flag to determine if last session crashed
+  size_t clean_exit_pos = content.find("\"clean_exit\"");
+  if (clean_exit_pos != std::string::npos)
+  {
+    size_t colon_pos = content.find(":", clean_exit_pos);
+    if (colon_pos != std::string::npos)
+    {
+      std::string value = content.substr(colon_pos + 1, 10);
+      session_was_clean_exit_ = (value.find("true") != std::string::npos);
+    }
+  }
+  
+  // Mark for restore if we have session data (regardless of how last session ended)
+  // Chrome-like behavior: always restore previous session if enabled
+  if (content.find("\"tabs\"") != std::string::npos)
+  {
+    // Check if tabs array has content
+    size_t tabs_pos = content.find("\"tabs\"");
+    if (tabs_pos != std::string::npos)
+    {
+      size_t bracket_start = content.find("[", tabs_pos);
+      size_t bracket_end = content.find("]", bracket_start);
+      if (bracket_start != std::string::npos && bracket_end != std::string::npos)
+      {
+        std::string tabs_str = content.substr(bracket_start + 1, bracket_end - bracket_start - 1);
+        // Remove whitespace to check if empty
+        tabs_str.erase(std::remove_if(tabs_str.begin(), tabs_str.end(), ::isspace), tabs_str.end());
+        if (!tabs_str.empty())
+        {
+          session_restore_pending_ = true;
+        }
+      }
+    }
+  }
+}
+
+bool UI::HasSavedSession() const
+{
+  std::ifstream in("data/session.json");
+  if (!in.is_open())
+    return false;
+  
+  // Quick check if file has any tab data
+  std::stringstream buffer;
+  buffer << in.rdbuf();
+  std::string content = buffer.str();
+  
+  // Check if there are any tabs saved
+  size_t tabs_pos = content.find("\"tabs\"");
+  if (tabs_pos == std::string::npos)
+    return false;
+    
+  // Check if tabs array is non-empty
+  size_t bracket_start = content.find("[", tabs_pos);
+  size_t bracket_end = content.find("]", bracket_start);
+  if (bracket_start == std::string::npos || bracket_end == std::string::npos)
+    return false;
+    
+  std::string tabs_content = content.substr(bracket_start + 1, bracket_end - bracket_start - 1);
+  // Remove whitespace
+  tabs_content.erase(std::remove_if(tabs_content.begin(), tabs_content.end(), ::isspace), tabs_content.end());
+  
+  return !tabs_content.empty();
+}
+
+void UI::ClearSavedSession()
+{
+  // Clear the restore pending flag (used after session is restored)
+  session_restore_pending_ = false;
+}
+
+void UI::SaveSessionToDiskWithCleanExit()
+{
+  // Save current session state with clean_exit=true
+  // Called during normal shutdown to preserve tabs for next startup
+  
+  EnsureDataDirectoryExists();
+  std::ofstream out("data/session.json", std::ios::out | std::ios::binary | std::ios::trunc);
+  if (!out.is_open())
+    return;
+
+  auto now = std::chrono::system_clock::now();
+  auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                       now.time_since_epoch())
+                       .count();
+
+  out << "{\n";
+  out << "  \"version\": 1,\n";
+  out << "  \"timestamp\": " << timestamp << ",\n";
+  out << "  \"clean_exit\": true,\n";  // Mark as clean exit
+  out << "  \"active_tab_id\": " << active_tab_id_ << ",\n";
+  out << "  \"tabs\": [\n";
+  
+  bool first = true;
+  for (const auto &entry : tabs_)
+  {
+    if (!entry.second)
+      continue;
+      
+    auto view = entry.second->view();
+    if (!view)
+      continue;
+      
+    auto url_ul = view->url();
+    auto title_ul = view->title();
+    std::string url = url_ul.utf8().data() ? url_ul.utf8().data() : "";
+    std::string title = title_ul.utf8().data() ? title_ul.utf8().data() : "";
+    
+    // Skip internal UI pages
+    if (url.find("file:///ui.html") != std::string::npos ||
+        url.find("file:///menu.html") != std::string::npos ||
+        url.find("file:///contextmenu.html") != std::string::npos ||
+        url.find("file:///suggestions.html") != std::string::npos ||
+        url.find("file:///downloads-panel.html") != std::string::npos)
+      continue;
+    
+    if (url.empty() || url == "about:blank")
+      continue;
+    
+    if (!first)
+      out << ",\n";
+    first = false;
+    
+    out << "    {\"id\": " << entry.first 
+        << ", \"url\": \"" << jsonEscape(url) 
+        << "\", \"title\": \"" << jsonEscape(title) << "\"}";
+  }
+  
+  out << "\n  ],\n";
+  out << "  \"drm_tabs\": [\n";
+  first = true;
+  for (const auto &entry : drm_tab_urls_)
+  {
+    auto title_it = drm_tab_titles_.find(entry.first);
+    std::string title = (title_it != drm_tab_titles_.end()) ? title_it->second : "";
+    
+    if (entry.second.empty())
+      continue;
+    
+    if (!first)
+      out << ",\n";
+    first = false;
+    
+    out << "    {\"id\": " << entry.first 
+        << ", \"url\": \"" << jsonEscape(entry.second) 
+        << "\", \"title\": \"" << jsonEscape(title) << "\"}";
+  }
+  out << "\n  ]\n";
+  out << "}\n";
+  out.close();
+}
+
+void UI::RestoreSavedSession()
+{
+  // Restore tabs from saved session
+  std::ifstream in("data/session.json");
+  if (!in.is_open())
+    return;
+
+  std::stringstream buffer;
+  buffer << in.rdbuf();
+  in.close();
+  
+  std::string content = buffer.str();
+  
+  // Parse tabs array - simple JSON parsing
+  size_t tabs_pos = content.find("\"tabs\"");
+  if (tabs_pos == std::string::npos)
+    return;
+    
+  size_t bracket_start = content.find("[", tabs_pos);
+  size_t bracket_end = content.find("]", bracket_start);
+  if (bracket_start == std::string::npos || bracket_end == std::string::npos)
+    return;
+  
+  std::string tabs_content = content.substr(bracket_start + 1, bracket_end - bracket_start - 1);
+  
+  // Parse each tab entry - collect ALL tabs including duplicates
+  size_t pos = 0;
+  std::vector<std::string> urls_to_restore;
+  
+  while ((pos = tabs_content.find("{", pos)) != std::string::npos)
+  {
+    size_t end_obj = tabs_content.find("}", pos);
+    if (end_obj == std::string::npos)
+      break;
+      
+    std::string obj = tabs_content.substr(pos, end_obj - pos + 1);
+    
+    // Extract URL
+    size_t url_pos = obj.find("\"url\"");
+    std::string url;
+    if (url_pos != std::string::npos)
+    {
+      size_t url_start = obj.find("\"", url_pos + 5);
+      size_t url_end = obj.find("\"", url_start + 1);
+      if (url_start != std::string::npos && url_end != std::string::npos)
+      {
+        url = obj.substr(url_start + 1, url_end - url_start - 1);
+      }
+    }
+    
+    // Add ALL non-empty URLs (including duplicates)
+    if (!url.empty())
+    {
+      urls_to_restore.push_back(url);
+    }
+    
+    pos = end_obj + 1;
+  }
+  
+  // If no tabs to restore, do nothing
+  if (urls_to_restore.empty())
+  {
+    session_restore_pending_ = false;
+    return;
+  }
+  
+  // Strategy: Navigate the existing first tab to the first URL,
+  // then create new tabs for the remaining URLs.
+  // This avoids the complexity of closing tabs.
+  
+  bool first_url = true;
+  for (const auto &url : urls_to_restore)
+  {
+    if (first_url && !tabs_.empty())
+    {
+      // Navigate the existing (start page) tab to the first restored URL
+      auto first_tab_it = tabs_.begin();
+      if (first_tab_it->second && first_tab_it->second->view())
+      {
+        first_tab_it->second->view()->LoadURL(String(url.c_str()));
+      }
+      first_url = false;
+    }
+    else
+    {
+      // Create new tabs for remaining URLs
+      CreateNewTabForChildView(String(url.c_str()));
+    }
+  }
+  
+  // Clear the pending restore flag
+  session_restore_pending_ = false;
+  
+  // Mark current session as active (not clean exit) since we're running
+  SaveSessionToDisk();
+}
+
+int UI::GetSavedSessionTabCount() const
+{
+  std::ifstream in("data/session.json");
+  if (!in.is_open())
+    return 0;
+  
+  std::stringstream buffer;
+  buffer << in.rdbuf();
+  in.close();
+  
+  std::string content = buffer.str();
+  
+  // Count tabs in the array
+  size_t tabs_pos = content.find("\"tabs\"");
+  if (tabs_pos == std::string::npos)
+    return 0;
+    
+  size_t bracket_start = content.find("[", tabs_pos);
+  size_t bracket_end = content.find("]", bracket_start);
+  if (bracket_start == std::string::npos || bracket_end == std::string::npos)
+    return 0;
+  
+  std::string tabs_content = content.substr(bracket_start + 1, bracket_end - bracket_start - 1);
+  
+  // Count '{' characters to count objects
+  int count = 0;
+  for (char c : tabs_content)
+  {
+    if (c == '{')
+      count++;
+  }
+  
+  return count;
+}
+
+bool UI::IsInternalBrowserPage(const std::string &url) const
+{
+  // List of internal/default browser pages that don't need to be restored
+  static const std::vector<std::string> internal_pages = {
+    "file:///static-sties/google-static.html",
+    "file:///new_tab_page.html",
+    "file:///settings.html",
+    "file:///history.html",
+    "file:///downloads.html",
+    "file:///passwords.html",
+    "file:///extensions.html",
+    "file:///about.html",
+    "file:///release_notes.html",
+    "file:///ui.html",
+    "file:///menu.html",
+    "file:///contextmenu.html",
+    "file:///suggestions.html",
+    "file:///downloads-panel.html",
+    "about:blank"
+  };
+  
+  for (const auto &page : internal_pages)
+  {
+    if (url.find(page) != std::string::npos || url == page)
+      return true;
+  }
+  
+  // Also check for any file:/// URL that's an internal asset
+  if (url.find("file:///") == 0)
+  {
+    // Check if it's a local static site or internal page
+    if (url.find("static-sties") != std::string::npos)
+      return true;
+  }
+  
+  return false;
+}
+
+int UI::GetMeaningfulSavedTabCount() const
+{
+  // Count tabs that are NOT internal browser pages
+  std::ifstream in("data/session.json");
+  if (!in.is_open())
+    return 0;
+  
+  std::stringstream buffer;
+  buffer << in.rdbuf();
+  in.close();
+  
+  std::string content = buffer.str();
+  
+  size_t tabs_pos = content.find("\"tabs\"");
+  if (tabs_pos == std::string::npos)
+    return 0;
+    
+  size_t bracket_start = content.find("[", tabs_pos);
+  size_t bracket_end = content.find("]", bracket_start);
+  if (bracket_start == std::string::npos || bracket_end == std::string::npos)
+    return 0;
+  
+  std::string tabs_content = content.substr(bracket_start + 1, bracket_end - bracket_start - 1);
+  
+  int meaningful_count = 0;
+  size_t pos = 0;
+  
+  while ((pos = tabs_content.find("{", pos)) != std::string::npos)
+  {
+    size_t end_obj = tabs_content.find("}", pos);
+    if (end_obj == std::string::npos)
+      break;
+      
+    std::string obj = tabs_content.substr(pos, end_obj - pos + 1);
+    
+    // Extract URL
+    size_t url_pos = obj.find("\"url\"");
+    if (url_pos != std::string::npos)
+    {
+      size_t url_start = obj.find("\"", url_pos + 5);
+      size_t url_end = obj.find("\"", url_start + 1);
+      if (url_start != std::string::npos && url_end != std::string::npos)
+      {
+        std::string url = obj.substr(url_start + 1, url_end - url_start - 1);
+        if (!IsInternalBrowserPage(url))
+        {
+          meaningful_count++;
+        }
+      }
+    }
+    
+    pos = end_obj + 1;
+  }
+  
+  return meaningful_count;
+}
+
+void UI::ShowSessionRestoreBar()
+{
+  // Mark that restore bar is visible to prevent session saving
+  session_restore_bar_visible_ = true;
+  
+  int tabCount = GetMeaningfulSavedTabCount();
+  bool wasCrash = !session_was_clean_exit_;
+  
+  std::ostringstream js;
+  js << "(function(){ if(typeof showSessionRestoreBar === 'function') showSessionRestoreBar("
+     << tabCount << ", " << (wasCrash ? "true" : "false") << "); })();";
+  
+  view()->EvaluateScript(String(js.str().c_str()), nullptr);
+}
+
+void UI::OnRestoreSession(const JSObject &obj, const JSArgs &args)
+{
+  // User clicked "Restore" - restore all saved tabs
+  // Clear the bar visibility flag first so we can save the restored session
+  session_restore_bar_visible_ = false;
+  RestoreSavedSession();
+}
+
+void UI::OnDismissSession(const JSObject &obj, const JSArgs &args)
+{
+  // User clicked "Start Fresh" or closed the bar
+  // Clear the bar visibility flag so we can save the new session
+  session_restore_bar_visible_ = false;
+  
+  // Clear the pending flag so we don't show the bar again
+  session_restore_pending_ = false;
+  
+  // Start a new session with the current tab
+  SaveSessionToDisk();
+}
+
 std::vector<std::string> UI::GetSuggestions(const std::string &input, int maxResults)
 {
   std::vector<std::string> suggestions;
@@ -5204,7 +5785,9 @@ bool UI::BrowserSettings::operator==(const BrowserSettings &other) const
          use_custom_user_agent == other.use_custom_user_agent &&
          custom_user_agent == other.custom_user_agent &&
          auto_save_settings == other.auto_save_settings &&
-         enable_drm_webview == other.enable_drm_webview;
+         enable_drm_webview == other.enable_drm_webview &&
+         restore_session_on_startup == other.restore_session_on_startup &&
+         save_session_continuously == other.save_session_continuously;
 }
 
 std::filesystem::path UI::SettingsDirectory()

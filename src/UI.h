@@ -102,6 +102,10 @@ public:
     // DRM WebView subsystem toggle (disabled by default, user must opt-in)
     bool enable_drm_webview = false;
 
+    // Session restore settings
+    bool restore_session_on_startup = true;  // Restore previous session tabs on startup
+    bool save_session_continuously = true;   // Save session state continuously (crash recovery)
+
     bool operator==(const BrowserSettings &other) const;
     bool operator!=(const BrowserSettings &other) const { return !(*this == other); }
   };
@@ -254,6 +258,20 @@ protected:
   String GetHistoryJSON();
   void ClearHistory();
 
+  // Session management (crash recovery / restore tabs)
+  void SaveSessionToDisk();
+  void SaveSessionToDiskWithCleanExit();
+  void LoadSessionFromDisk();
+  bool HasSavedSession() const;
+  void ClearSavedSession();
+  void RestoreSavedSession();
+  void ShowSessionRestoreBar();  // Show restore prompt in UI
+  void OnRestoreSession(const JSObject &obj, const JSArgs &args);  // User clicked restore
+  void OnDismissSession(const JSObject &obj, const JSArgs &args);  // User clicked dismiss
+  int GetSavedSessionTabCount() const;  // Get number of saved tabs
+  int GetMeaningfulSavedTabCount() const;  // Get count of non-internal tabs
+  bool IsInternalBrowserPage(const std::string &url) const;  // Check if URL is internal
+
   // Downloads management helpers
   String GetDownloadsJSON();
   void ClearCompletedDownloads();
@@ -372,6 +390,12 @@ protected:
   bool high_contrast_ui_enabled_ = false;
   bool vibrant_window_theme_enabled_ = false;
   bool smooth_scrolling_enabled_ = true;
+  
+  // Session restore state
+  bool session_restore_pending_ = false;  // True if we should prompt to restore session
+  bool session_was_clean_exit_ = false;   // True if last exit was clean (not crash/ALT+F4)
+  bool session_restore_bar_visible_ = false;  // True while restore bar is shown (prevents session saving)
+  std::string session_file_path_;         // Path to session.json
 
   JSFunction updateBack;
   JSFunction updateForward;
