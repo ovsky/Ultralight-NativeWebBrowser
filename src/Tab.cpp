@@ -686,6 +686,7 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
     global["removeBookmark"] = BindJSCallback(&Tab::JS_RemoveBookmark);
     global["isBookmarked"] = BindJSCallbackWithRetval(&Tab::JS_IsBookmarked);
     global["toggleBookmark"] = BindJSCallback(&Tab::JS_ToggleBookmark);
+    global["reorderBookmarks"] = BindJSCallback(&Tab::JS_ReorderBookmarks);
 
     const char *attachScript = R"JS((function(){
       try{
@@ -1679,6 +1680,52 @@ void Tab::JS_ToggleBookmark(const JSObject &obj, const JSArgs &args)
   {
     // Add the bookmark
     ui_->bookmark_store()->AddBookmark(url, title, favicon, true);
+  }
+}
+
+void Tab::JS_ReorderBookmarks(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || !ui_->bookmark_store() || args.empty())
+    return;
+  
+  // Parse the JSON array of IDs
+  ultralight::String json_ul = args[0].ToString();
+  auto json_str = json_ul.utf8();
+  std::string json = json_str.data() ? json_str.data() : "";
+  
+  std::vector<uint64_t> ordered_ids;
+  
+  // Simple JSON array parsing for [id1, id2, id3, ...]
+  size_t pos = json.find('[');
+  if (pos == std::string::npos) return;
+  pos++;
+  
+  while (pos < json.length())
+  {
+    // Skip whitespace
+    while (pos < json.length() && std::isspace(json[pos])) pos++;
+    
+    if (json[pos] == ']') break;
+    
+    // Parse number
+    std::string num;
+    while (pos < json.length() && std::isdigit(json[pos]))
+    {
+      num += json[pos++];
+    }
+    
+    if (!num.empty())
+    {
+      ordered_ids.push_back(std::stoull(num));
+    }
+    
+    // Skip comma and whitespace
+    while (pos < json.length() && (json[pos] == ',' || std::isspace(json[pos]))) pos++;
+  }
+  
+  if (!ordered_ids.empty())
+  {
+    ui_->bookmark_store()->ReorderBookmarks(ordered_ids);
   }
 }
 

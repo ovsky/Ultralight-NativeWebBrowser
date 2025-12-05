@@ -109,6 +109,7 @@ public:
   void JS_RemoveBookmark(const JSObject &obj, const JSArgs &args);
   JSValue JS_IsBookmarked(const JSObject &obj, const JSArgs &args);
   void JS_ToggleBookmark(const JSObject &obj, const JSArgs &args);
+  void JS_ReorderBookmarks(const JSObject &obj, const JSArgs &args);
 
   // Downloads page callbacks
   JSValue OnDownloadsGetData(const JSObject &obj, const JSArgs &args);
