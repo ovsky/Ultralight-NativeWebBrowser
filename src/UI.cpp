@@ -1015,6 +1015,11 @@ bool UI::RunShortcutAction(const std::string &action)
     CreateNewTab();
     return true;
   }
+  if (action == "new-window")
+  {
+    OnRequestNewWindow({}, {});
+    return true;
+  }
   if (action == "close-tab")
   {
     if (active_tab())
@@ -1059,6 +1064,17 @@ bool UI::RunShortcutAction(const std::string &action)
     if (child)
     {
       child->LoadURL("file:///extensions.html");
+      return true;
+    }
+    return false;
+  }
+  if (action == "open-passwords")
+  {
+    // Open Passwords in a new tab
+    RefPtr<View> child = CreateNewTabForChildView(String("file:///passwords.html"));
+    if (child)
+    {
+      child->LoadURL("file:///passwords.html");
       return true;
     }
     return false;
@@ -1369,6 +1385,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     }
   }
   global["OnRequestNewTab"] = BindJSCallback(&UI::OnRequestNewTab);
+  global["OnRequestNewWindow"] = BindJSCallback(&UI::OnRequestNewWindow);
   global["OnRequestTabClose"] = BindJSCallback(&UI::OnRequestTabClose);
   global["OnActiveTabChange"] = BindJSCallback(&UI::OnActiveTabChange);
   global["OnRequestChangeURL"] = BindJSCallback(&UI::OnRequestChangeURL);
@@ -1547,6 +1564,32 @@ void UI::OnToggleTools(const JSObject &obj, const JSArgs &args)
 void UI::OnRequestNewTab(const JSObject &obj, const JSArgs &args)
 {
   CreateNewTab();
+}
+
+void UI::OnRequestNewWindow(const JSObject &obj, const JSArgs &args)
+{
+#if defined(_WIN32)
+  // Get the executable path
+  wchar_t exePath[MAX_PATH];
+  GetModuleFileNameW(NULL, exePath, MAX_PATH);
+  
+  // Launch new instance
+  STARTUPINFOW si = {sizeof(si)};
+  PROCESS_INFORMATION pi;
+  if (CreateProcessW(exePath, NULL, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+  {
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+  }
+#else
+  // For non-Windows platforms, spawn a new process
+  std::string exePath = std::filesystem::read_symlink("/proc/self/exe").string();
+  if (fork() == 0)
+  {
+    execl(exePath.c_str(), exePath.c_str(), nullptr);
+    exit(0);
+  }
+#endif
 }
 
 void UI::OnRequestTabClose(const JSObject &obj, const JSArgs &args)
