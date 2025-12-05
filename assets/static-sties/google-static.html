@@ -301,6 +301,21 @@
       background: rgba(255, 60, 60, 1);
     }
     
+    /* Drag and drop styles */
+    .bookmark-item.dragging {
+      opacity: 0.5;
+      background: rgba(100, 100, 255, 0.3);
+    }
+    
+    .bookmark-item.drag-over {
+      border-left: 2px solid #6C63FF;
+      margin-left: -2px;
+    }
+    
+    .bookmark-bar.drag-active {
+      background: rgba(29, 29, 33, 0.98);
+    }
+    
     /* Adjust main container for bookmark bar */
     .main-container {
       padding-top: 50px;
@@ -368,17 +383,26 @@
       }
     }
 
-    // Create a bookmark element
+    // Drag and drop state
+    let draggedElement = null;
+    let draggedBookmarkId = null;
+    let longPressTimer = null;
+    let isDragging = false;
+
+    // Create a bookmark element with drag support
     function createBookmarkElement(bookmark) {
       const item = document.createElement('a');
       item.className = 'bookmark-item';
       item.href = bookmark.url;
       item.title = bookmark.title || bookmark.url;
+      item.dataset.bookmarkId = bookmark.id;
+      item.draggable = true;
 
       // Icon (favicon or default)
       if (bookmark.favicon && bookmark.favicon.startsWith('data:')) {
         const img = document.createElement('img');
         img.src = bookmark.favicon;
+        img.draggable = false;
         img.onerror = function() {
           const defaultIcon = document.createElement('div');
           defaultIcon.className = 'default-icon';
@@ -412,7 +436,104 @@
       };
       item.appendChild(removeBtn);
 
+      // Drag events
+      item.addEventListener('dragstart', handleDragStart);
+      item.addEventListener('dragend', handleDragEnd);
+      item.addEventListener('dragover', handleDragOver);
+      item.addEventListener('dragenter', handleDragEnter);
+      item.addEventListener('dragleave', handleDragLeave);
+      item.addEventListener('drop', handleDrop);
+
+      // Long press for touch/mouse
+      item.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
+        longPressTimer = setTimeout(() => {
+          isDragging = true;
+          item.classList.add('dragging');
+        }, 300);
+      });
+
+      item.addEventListener('mouseup', function() {
+        clearTimeout(longPressTimer);
+      });
+
+      item.addEventListener('click', function(e) {
+        if (isDragging) {
+          e.preventDefault();
+          isDragging = false;
+        }
+      });
+
       return item;
+    }
+
+    function handleDragStart(e) {
+      draggedElement = this;
+      draggedBookmarkId = this.dataset.bookmarkId;
+      this.classList.add('dragging');
+      document.getElementById('bookmarkBar').classList.add('drag-active');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', draggedBookmarkId);
+    }
+
+    function handleDragEnd(e) {
+      this.classList.remove('dragging');
+      document.getElementById('bookmarkBar').classList.remove('drag-active');
+      document.querySelectorAll('.bookmark-item').forEach(item => {
+        item.classList.remove('drag-over');
+      });
+      draggedElement = null;
+      draggedBookmarkId = null;
+      isDragging = false;
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleDragEnter(e) {
+      e.preventDefault();
+      if (this !== draggedElement) {
+        this.classList.add('drag-over');
+      }
+    }
+
+    function handleDragLeave(e) {
+      this.classList.remove('drag-over');
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (this === draggedElement) return;
+      
+      const bar = document.getElementById('bookmarkBar');
+      const items = Array.from(bar.querySelectorAll('.bookmark-item'));
+      const draggedIndex = items.indexOf(draggedElement);
+      const dropIndex = items.indexOf(this);
+      
+      if (draggedIndex < dropIndex) {
+        this.parentNode.insertBefore(draggedElement, this.nextSibling);
+      } else {
+        this.parentNode.insertBefore(draggedElement, this);
+      }
+      
+      this.classList.remove('drag-over');
+      
+      // Save new order
+      saveBookmarkOrder();
+    }
+
+    function saveBookmarkOrder() {
+      const bar = document.getElementById('bookmarkBar');
+      const items = bar.querySelectorAll('.bookmark-item');
+      const orderedIds = Array.from(items).map(item => parseInt(item.dataset.bookmarkId));
+      
+      if (window.reorderBookmarks && orderedIds.length > 0) {
+        window.reorderBookmarks(JSON.stringify(orderedIds));
+      }
     }
 
     // Load and display bookmarks
