@@ -2,10 +2,14 @@
 
 #include <Ultralight/platform/Platform.h>
 #include "Utils.h"
+#include "UI.h"
 
 #ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
+#include <wincodec.h>
+#include <comdef.h>
+#pragma comment(lib, "windowscodecs.lib")
 #elif defined(__APPLE__)
 #include <TargetConditionals.h>
 #include <cstdlib>
@@ -111,6 +115,133 @@ namespace
 
         return name.substr(0, end);
     }
+
+    bool IsWebPFile(const std::filesystem::path &path)
+    {
+        std::string ext = path.extension().u8string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
+        return ext == ".webp";
+    }
+
+#ifdef _WIN32
+    // Convert WebP to PNG using Windows Imaging Component (WIC)
+    bool ConvertWebPToPNG(const std::filesystem::path &webp_path, std::filesystem::path &out_png_path)
+    {
+        // Initialize COM
+        HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+        bool com_initialized = SUCCEEDED(hr) || hr == S_FALSE;
+
+        IWICImagingFactory *factory = nullptr;
+        IWICBitmapDecoder *decoder = nullptr;
+        IWICBitmapFrameDecode *frame = nullptr;
+        IWICStream *stream = nullptr;
+        IWICBitmapEncoder *encoder = nullptr;
+        IWICBitmapFrameEncode *frame_encode = nullptr;
+        IWICFormatConverter *converter = nullptr;
+
+        bool success = false;
+
+        // Create WIC factory
+        hr = CoCreateInstance(
+            CLSID_WICImagingFactory,
+            nullptr,
+            CLSCTX_INPROC_SERVER,
+            IID_PPV_ARGS(&factory)
+        );
+        if (FAILED(hr)) goto cleanup;
+
+        // Create decoder from file
+        hr = factory->CreateDecoderFromFilename(
+            webp_path.wstring().c_str(),
+            nullptr,
+            GENERIC_READ,
+            WICDecodeMetadataCacheOnDemand,
+            &decoder
+        );
+        if (FAILED(hr)) goto cleanup;
+
+        // Get first frame
+        hr = decoder->GetFrame(0, &frame);
+        if (FAILED(hr)) goto cleanup;
+
+        // Create format converter to convert to 32bppBGRA
+        hr = factory->CreateFormatConverter(&converter);
+        if (FAILED(hr)) goto cleanup;
+
+        hr = converter->Initialize(
+            frame,
+            GUID_WICPixelFormat32bppBGRA,
+            WICBitmapDitherTypeNone,
+            nullptr,
+            0.0,
+            WICBitmapPaletteTypeCustom
+        );
+        if (FAILED(hr)) goto cleanup;
+
+        // Create output PNG path
+        out_png_path = webp_path;
+        out_png_path.replace_extension(".png");
+
+        // Create stream for output
+        hr = factory->CreateStream(&stream);
+        if (FAILED(hr)) goto cleanup;
+
+        hr = stream->InitializeFromFilename(out_png_path.wstring().c_str(), GENERIC_WRITE);
+        if (FAILED(hr)) goto cleanup;
+
+        // Create PNG encoder
+        hr = factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, &encoder);
+        if (FAILED(hr)) goto cleanup;
+
+        hr = encoder->Initialize(stream, WICBitmapEncoderNoCache);
+        if (FAILED(hr)) goto cleanup;
+
+        // Create frame
+        hr = encoder->CreateNewFrame(&frame_encode, nullptr);
+        if (FAILED(hr)) goto cleanup;
+
+        hr = frame_encode->Initialize(nullptr);
+        if (FAILED(hr)) goto cleanup;
+
+        // Get image dimensions
+        UINT width, height;
+        hr = converter->GetSize(&width, &height);
+        if (FAILED(hr)) goto cleanup;
+
+        hr = frame_encode->SetSize(width, height);
+        if (FAILED(hr)) goto cleanup;
+
+        WICPixelFormatGUID pixel_format = GUID_WICPixelFormat32bppBGRA;
+        hr = frame_encode->SetPixelFormat(&pixel_format);
+        if (FAILED(hr)) goto cleanup;
+
+        // Write the converted bitmap
+        hr = frame_encode->WriteSource(converter, nullptr);
+        if (FAILED(hr)) goto cleanup;
+
+        hr = frame_encode->Commit();
+        if (FAILED(hr)) goto cleanup;
+
+        hr = encoder->Commit();
+        if (FAILED(hr)) goto cleanup;
+
+        success = true;
+
+    cleanup:
+        if (frame_encode) frame_encode->Release();
+        if (encoder) encoder->Release();
+        if (stream) stream->Release();
+        if (converter) converter->Release();
+        if (frame) frame->Release();
+        if (decoder) decoder->Release();
+        if (factory) factory->Release();
+        if (com_initialized) CoUninitialize();
+
+        return success;
+    }
+#endif
 } // namespace
 
 DownloadManager::DownloadManager()
@@ -140,6 +271,12 @@ void DownloadManager::SetOnChangeCallback(std::function<void()> callback)
 {
     std::lock_guard<std::mutex> lock(mutex_);
     on_change_ = std::move(callback);
+}
+
+void DownloadManager::SetWebPConversionCallback(std::function<bool()> callback)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    should_convert_webp_ = std::move(callback);
 }
 
 DownloadManager::DownloadId DownloadManager::NextDownloadId(ultralight::View *caller)
@@ -290,6 +427,9 @@ void DownloadManager::OnFinishDownload(ultralight::View *caller, DownloadId id)
     std::unique_lock<std::mutex> lock(mutex_);
     DownloadId internal_id = GetInternalIdLocked(id);
     auto rec = FindRecordLocked(internal_id);
+    std::filesystem::path original_path;
+    bool should_convert = false;
+    
     if (rec)
     {
         if (rec->status != Status::Failed && rec->status != Status::Cancelled)
@@ -303,9 +443,35 @@ void DownloadManager::OnFinishDownload(ultralight::View *caller, DownloadId id)
         rec->suppress_ui = false;
         rec->placeholder = false;
         rec->finished_at = std::chrono::system_clock::now();
+        
+        // Check if we should convert WebP to PNG
+        original_path = rec->path;
+        if (should_convert_webp_ && should_convert_webp_() && IsWebPFile(original_path))
+        {
+            should_convert = true;
+        }
     }
 
     CloseStreamLocked(id, false);
+    
+#ifdef _WIN32
+    // Perform WebP to PNG conversion after releasing the file stream
+    if (should_convert && rec && !original_path.empty())
+    {
+        std::filesystem::path png_path;
+        if (ConvertWebPToPNG(original_path, png_path))
+        {
+            // Update the record with the new PNG path
+            rec->path = png_path;
+            rec->display_name = png_path.filename().u8string();
+            
+            // Delete the original WebP file
+            std::error_code ec;
+            std::filesystem::remove(original_path, ec);
+        }
+    }
+#endif
+    
     NotifyChangeLocked(lock);
 }
 
