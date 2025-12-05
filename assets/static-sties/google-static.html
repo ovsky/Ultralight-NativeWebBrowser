@@ -474,17 +474,44 @@
         document.addEventListener('mouseup', handleMouseUp);
       });
 
+      // Middle click opens in new tab
+      item.addEventListener('auxclick', function(e) {
+        if (e.button === 1) { // Middle mouse button
+          e.preventDefault();
+          openInNewTab(bookmark.url);
+        }
+      });
+
       // Click to navigate (only if not dragged)
       item.addEventListener('click', function(e) {
         if (dragState.moved) {
           e.preventDefault();
           return;
         }
-        // Navigate to bookmark
+        // Ctrl+Click opens in new tab
+        if (e.ctrlKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          openInNewTab(bookmark.url);
+          return;
+        }
+        // Regular click navigates in current tab
         window.location.href = bookmark.url;
       });
 
       return item;
+    }
+
+    // Open URL in new tab using native bridge
+    function openInNewTab(url) {
+      if (window.__ul_newTab) {
+        window.__ul_newTab(url);
+      } else if (window.__ul && window.__ul.newTab) {
+        window.__ul.newTab(url);
+      } else {
+        // Fallback: just navigate
+        window.location.href = url;
+      }
     }
 
     function handleMouseMove(e) {
