@@ -5,6 +5,7 @@
 #include "ExtensionManager.h"
 #include "AdBlocker.h"
 #include "PasswordManager.h"
+#include "BookmarkStore.h"
 #include <iostream>
 #include <string>
 #include <cstdio>
@@ -677,6 +678,14 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
     global["__ul_toggleDarkMode"] = BindJSCallback(&Tab::JS_ToggleDarkMode);
     global["__ul_isDarkModeEnabled"] = BindJSCallbackWithRetval(&Tab::JS_IsDarkModeEnabled);
     global["__ul_getAppInfo"] = BindJSCallbackWithRetval(&Tab::JS_GetAppInfo);
+    
+    // Bookmark bridge functions
+    global["getBookmarks"] = BindJSCallbackWithRetval(&Tab::JS_GetBookmarks);
+    global["getBookmarkBar"] = BindJSCallbackWithRetval(&Tab::JS_GetBookmarkBar);
+    global["addBookmark"] = BindJSCallbackWithRetval(&Tab::JS_AddBookmark);
+    global["removeBookmark"] = BindJSCallback(&Tab::JS_RemoveBookmark);
+    global["isBookmarked"] = BindJSCallbackWithRetval(&Tab::JS_IsBookmarked);
+    global["toggleBookmark"] = BindJSCallback(&Tab::JS_ToggleBookmark);
 
     const char *attachScript = R"JS((function(){
       try{
@@ -694,6 +703,10 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
         n.toggleDarkMode = window.__ul_toggleDarkMode;
         n.isDarkModeEnabled = window.__ul_isDarkModeEnabled;
         n.getAppInfo = window.__ul_getAppInfo;
+        // Trigger bookmark loading if function exists (with delay to ensure page JS is loaded)
+        setTimeout(function() {
+          if(typeof loadBookmarks === 'function') loadBookmarks();
+        }, 50);
       }catch(e){}
     })())JS";
     caller->EvaluateScript(attachScript, nullptr);
@@ -1566,6 +1579,107 @@ JSValue Tab::JS_GetAppInfo(const JSObject &obj, const JSArgs &args)
   // Minimal app info
   std::string json = std::string("{\"name\":\"Ultralight-WebBrowser\",\"version\":\"1.0\"}");
   return JSValue(String(json.c_str()));
+}
+
+// Bookmark bridge implementations
+JSValue Tab::JS_GetBookmarks(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || !ui_->bookmark_store())
+    return JSValue(String("[]"));
+  return JSValue(String(ui_->bookmark_store()->ToJSON().c_str()));
+}
+
+JSValue Tab::JS_GetBookmarkBar(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || !ui_->bookmark_store())
+    return JSValue(String("[]"));
+  return JSValue(String(ui_->bookmark_store()->BookmarkBarToJSON().c_str()));
+}
+
+JSValue Tab::JS_AddBookmark(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || !ui_->bookmark_store() || args.empty())
+    return JSValue(0);
+  
+  ultralight::String url_ul = args[0].ToString();
+  auto url_str = url_ul.utf8();
+  std::string url = url_str.data() ? url_str.data() : "";
+  
+  std::string title;
+  if (args.size() > 1) {
+    ultralight::String title_ul = args[1].ToString();
+    auto title_str = title_ul.utf8();
+    title = title_str.data() ? title_str.data() : "";
+  }
+  
+  std::string favicon;
+  if (args.size() > 2) {
+    ultralight::String favicon_ul = args[2].ToString();
+    auto favicon_str = favicon_ul.utf8();
+    favicon = favicon_str.data() ? favicon_str.data() : "";
+  }
+  
+  bool show_on_bar = args.size() > 3 ? (bool)args[3] : true;
+  
+  uint64_t id = ui_->bookmark_store()->AddBookmark(url, title, favicon, show_on_bar);
+  return JSValue((double)id);
+}
+
+void Tab::JS_RemoveBookmark(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || !ui_->bookmark_store() || args.empty())
+    return;
+  
+  uint64_t id = static_cast<uint64_t>((double)args[0]);
+  ui_->bookmark_store()->RemoveBookmark(id);
+}
+
+JSValue Tab::JS_IsBookmarked(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || !ui_->bookmark_store() || args.empty())
+    return JSValue(false);
+  
+  ultralight::String url_ul = args[0].ToString();
+  auto url_str = url_ul.utf8();
+  std::string url = url_str.data() ? url_str.data() : "";
+  return JSValue(ui_->bookmark_store()->IsBookmarked(url));
+}
+
+void Tab::JS_ToggleBookmark(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || !ui_->bookmark_store() || args.empty())
+    return;
+  
+  ultralight::String url_ul = args[0].ToString();
+  auto url_str = url_ul.utf8();
+  std::string url = url_str.data() ? url_str.data() : "";
+  
+  std::string title;
+  if (args.size() > 1) {
+    ultralight::String title_ul = args[1].ToString();
+    auto title_str = title_ul.utf8();
+    title = title_str.data() ? title_str.data() : "";
+  }
+  
+  std::string favicon;
+  if (args.size() > 2) {
+    ultralight::String favicon_ul = args[2].ToString();
+    auto favicon_str = favicon_ul.utf8();
+    favicon = favicon_str.data() ? favicon_str.data() : "";
+  }
+  
+  if (ui_->bookmark_store()->IsBookmarked(url))
+  {
+    // Remove the bookmark
+    auto* bm = ui_->bookmark_store()->GetBookmarkByUrl(url);
+    if (bm)
+      ui_->bookmark_store()->RemoveBookmark(bm->id);
+  }
+  else
+  {
+    // Add the bookmark
+    ui_->bookmark_store()->AddBookmark(url, title, favicon, true);
+  }
 }
 
 JSValue Tab::OnDownloadsGetData(const JSObject &obj, const JSArgs &args)
