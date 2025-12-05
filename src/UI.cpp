@@ -2933,6 +2933,22 @@ void UI::OnUpdateSetting(const JSObject &, const JSArgs &args)
     UpdateSettingsDirtyFlag();
     return;
   }
+
+  // Special-case: dark_theme_excluded_sites is a string value containing
+  // newline-separated URL patterns for sites where dark theme should be disabled.
+  if (key == "dark_theme_excluded_sites")
+  {
+    if (!args[1].IsString())
+      return;
+    ultralight::String sites_ul = args[1].ToString();
+    auto sites_str = sites_ul.utf8();
+    std::string sites = sites_str.data() ? sites_str.data() : "";
+    settings_.dark_theme_excluded_sites = sites;
+    UpdateSettingsDirtyFlag();
+    ApplySettings(false, false);
+    UpdateSettingsDirtyFlag();
+    return;
+  }
   bool value = false;
   if (args[1].IsBoolean())
   {
@@ -3331,6 +3347,8 @@ std::string UI::BuildSettingsPayload(bool snapshot_is_baseline) const
   // Settings page can always display the UA that will actually be used.
   // Also expose the raw custom_user_agent for the input field when use_custom_user_agent is enabled.
   ss << "\"target_user_agent\": \"" << util::EscapeJsonString(settings_.custom_user_agent.empty() ? active_user_agent_ : settings_.custom_user_agent) << "\",";
+  // Expose dark_theme_excluded_sites as a separate field for the text input in settings UI
+  ss << "\"dark_theme_excluded_sites\": \"" << util::EscapeJsonString(settings_.dark_theme_excluded_sites) << "\",";
   ss << "\"meta\": {";
   ss << "\"updated_at\": \"" << util::ToIso8601UTC(std::chrono::system_clock::now()) << "\",";
   ss << "\"dirty\": " << (settings_dirty_ ? "true" : "false") << ",";
@@ -3722,6 +3740,10 @@ void UI::ApplyDarkModeToView(RefPtr<View> v)
 {
   if (!v)
     return;
+  
+  // Build excluded sites list from settings
+  std::string excluded_patterns = settings_.dark_theme_excluded_sites;
+  
   const char *js = R"JS((function(){
     try{
       // Don't apply dark mode to browser internal pages (they have their own dark styling)
@@ -3743,6 +3765,22 @@ void UI::ApplyDarkModeToView(RefPtr<View> v)
           url.includes('release_notes.html') ||
           url.includes('static-sties/'))){
         return false; // Skip dark mode for these pages
+      }
+
+      // Check user-defined excluded sites
+      var excludedPatterns = %s;
+      if(excludedPatterns && excludedPatterns.length > 0){
+        for(var i=0; i<excludedPatterns.length; i++){
+          var pattern = excludedPatterns[i].trim();
+          if(!pattern) continue;
+          // Simple wildcard matching
+          var regex = pattern.replace(/\*/g, '.*').replace(/\?/g, '.');
+          try{
+            if(new RegExp(regex, 'i').test(url)){
+              return false; // Skip dark mode for this excluded site
+            }
+          }catch(e){}
+        }
       }
 
       var sid='__ul_auto_dark';
@@ -3788,7 +3826,31 @@ void UI::ApplyDarkModeToView(RefPtr<View> v)
       return true;
     }catch(e){return false;}
   })())JS";
-  v->EvaluateScript(js, nullptr);
+  
+  // Parse excluded patterns into JSON array
+  std::string patterns_json = "[]";
+  if (!excluded_patterns.empty()) {
+    std::stringstream ss;
+    ss << "[";
+    bool first = true;
+    std::istringstream iss(excluded_patterns);
+    std::string line;
+    while (std::getline(iss, line)) {
+      line.erase(0, line.find_first_not_of(" \t\r\n"));
+      line.erase(line.find_last_not_of(" \t\r\n") + 1);
+      if (!line.empty() && line[0] != '#') {
+        if (!first) ss << ",";
+        ss << "\"" << line << "\"";
+        first = false;
+      }
+    }
+    ss << "]";
+    patterns_json = ss.str();
+  }
+  
+  char buffer[8192];
+  snprintf(buffer, sizeof(buffer), js, patterns_json.c_str());
+  v->EvaluateScript(buffer, nullptr);
 }
 
 void UI::RemoveDarkModeFromView(RefPtr<View> v)
@@ -4748,6 +4810,7 @@ void UI::OnNewDownloadStarted()
 bool UI::BrowserSettings::operator==(const BrowserSettings &other) const
 {
   return launch_dark_theme == other.launch_dark_theme &&
+         dark_theme_excluded_sites == other.dark_theme_excluded_sites &&
          vibrant_window_theme == other.vibrant_window_theme &&
          experimental_transparent_toolbar == other.experimental_transparent_toolbar &&
          experimental_compact_tabs == other.experimental_compact_tabs &&

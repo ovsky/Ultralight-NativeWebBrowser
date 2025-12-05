@@ -49,6 +49,7 @@ public:
   {
     // Appearance
     bool launch_dark_theme = false;
+    std::string dark_theme_excluded_sites; // URL patterns where dark theme should NOT be applied (newline-separated)
     bool vibrant_window_theme = false;
     bool experimental_transparent_toolbar = false;
     bool experimental_compact_tabs = false;
