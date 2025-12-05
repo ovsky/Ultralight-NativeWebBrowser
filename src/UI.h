@@ -106,6 +106,11 @@ public:
     bool restore_session_on_startup = true;  // Restore previous session tabs on startup
     bool save_session_continuously = true;   // Save session state continuously (crash recovery)
 
+    // Location Spoofing
+    bool enable_location_spoofing = false;   // When true, override navigator.geolocation
+    double spoofed_latitude = 0.0;           // Latitude to report (-90 to 90)
+    double spoofed_longitude = 0.0;          // Longitude to report (-180 to 180)
+
     bool operator==(const BrowserSettings &other) const;
     bool operator!=(const BrowserSettings &other) const { return !(*this == other); }
   };
@@ -223,6 +228,11 @@ public:
   bool do_not_track_enabled() const { return settings_.do_not_track; }
   bool block_third_party_cookies_enabled() const { return settings_.block_third_party_cookies; }
   bool web_security_enabled() const { return settings_.enable_web_security; }
+  
+  // Location spoofing accessors for Tab's JavaScript injection
+  bool location_spoofing_enabled() const { return settings_.enable_location_spoofing; }
+  double spoofed_latitude() const { return settings_.spoofed_latitude; }
+  double spoofed_longitude() const { return settings_.spoofed_longitude; }
 
 protected:
   static std::filesystem::path SettingsDirectory();

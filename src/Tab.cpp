@@ -460,6 +460,70 @@ void Tab::OnWindowObjectReady(View *caller, uint64_t frame_id, bool is_main_fram
 })();
 )JS";
     caller->EvaluateScript(String(cryptoPolyfill), nullptr);
+
+    // Inject location spoofing if enabled in settings
+    // This overrides navigator.geolocation to report custom coordinates
+    if (ui_->location_spoofing_enabled())
+    {
+      double lat = ui_->spoofed_latitude();
+      double lng = ui_->spoofed_longitude();
+      std::ostringstream geoScript;
+      geoScript << R"JS(
+(function() {
+  'use strict';
+  var spoofedLat = )JS" << lat << R"JS(;
+  var spoofedLng = )JS" << lng << R"JS(;
+  
+  // Create a fake GeolocationPosition object
+  function createPosition() {
+    return {
+      coords: {
+        latitude: spoofedLat,
+        longitude: spoofedLng,
+        accuracy: 10,
+        altitude: null,
+        altitudeAccuracy: null,
+        heading: null,
+        speed: null
+      },
+      timestamp: Date.now()
+    };
+  }
+  
+  // Override getCurrentPosition
+  var originalGetCurrentPosition = navigator.geolocation.getCurrentPosition;
+  navigator.geolocation.getCurrentPosition = function(success, error, options) {
+    console.log('[Ultralight] Geolocation spoofed to:', spoofedLat, spoofedLng);
+    setTimeout(function() {
+      success(createPosition());
+    }, 100);
+  };
+  
+  // Override watchPosition
+  var watchId = 0;
+  var watches = {};
+  navigator.geolocation.watchPosition = function(success, error, options) {
+    var id = ++watchId;
+    console.log('[Ultralight] Geolocation watch spoofed to:', spoofedLat, spoofedLng);
+    watches[id] = setInterval(function() {
+      success(createPosition());
+    }, 1000);
+    return id;
+  };
+  
+  // Override clearWatch
+  navigator.geolocation.clearWatch = function(id) {
+    if (watches[id]) {
+      clearInterval(watches[id]);
+      delete watches[id];
+    }
+  };
+  
+  console.log('[Ultralight] Location spoofing enabled:', spoofedLat, spoofedLng);
+})();
+)JS";
+      caller->EvaluateScript(String(geoScript.str().c_str()), nullptr);
+    }
     
     // Inject Do Not Track (DNT) header simulation if enabled in settings
     // This overrides navigator.doNotTrack to report the user's preference
