@@ -3,6 +3,7 @@
 #include "Tab.h"
 #include "drm/DRMSettings.h"
 #include "ExtensionManager.h"
+#include "BookmarkStore.h"
 #include <map>
 #include <memory>
 #include <string>
@@ -194,6 +195,15 @@ public:
   void OnCreateExtension(const JSObject &obj, const JSArgs &args);
   void OnOpenExtensionsFolder(const JSObject &obj, const JSArgs &args);
 
+  // Bookmark Manager callbacks
+  ultralight::JSValue OnGetBookmarks(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnGetBookmarkBar(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnAddBookmark(const JSObject &obj, const JSArgs &args);
+  void OnRemoveBookmark(const JSObject &obj, const JSArgs &args);
+  ultralight::JSValue OnIsBookmarked(const JSObject &obj, const JSArgs &args);
+  void OnToggleBookmark(const JSObject &obj, const JSArgs &args);
+  void OnUpdateBookmark(const JSObject &obj, const JSArgs &args);
+
   // Password Manager callbacks
   ultralight::JSValue OnGetPasswords(const JSObject &obj, const JSArgs &args);
   ultralight::JSValue OnGetPasswordStats(const JSObject &obj, const JSArgs &args);
@@ -223,6 +233,7 @@ public:
   RefPtr<Window> window() { return window_; }
   DownloadManager *download_manager() { return download_manager_.get(); }
   password::PasswordManager *password_manager() { return password_manager_.get(); }
+  BookmarkStore *bookmark_store() { return bookmark_store_.get(); }
   AdBlocker *network_blocker() { return adblock_; }
   
   // Privacy settings accessors for Tab's JavaScript injection
@@ -251,6 +262,7 @@ protected:
   void SetCanGoForward(bool can_go_forward);
   void SetURL(const String &url);
   void SetCursor(Cursor cursor);
+  void UpdateBookmarkButtonState();
   std::string BuildDrmStatusPayload();
   void AdjustUIHeight(uint32_t new_height);
   void ShowMenuOverlay();
@@ -362,6 +374,7 @@ protected:
   AdBlocker *trackerblock_ = nullptr;
   std::unique_ptr<DownloadManager> download_manager_;
   std::unique_ptr<password::PasswordManager> password_manager_;
+  std::unique_ptr<BookmarkStore> bookmark_store_;
   bool downloads_overlay_had_active_ = false;
   bool downloads_overlay_user_dismissed_ = false;
   uint64_t downloads_last_sequence_seen_ = 0;

@@ -102,6 +102,14 @@ public:
   JSValue JS_IsDarkModeEnabled(const JSObject &obj, const JSArgs &args);
   JSValue JS_GetAppInfo(const JSObject &obj, const JSArgs &args);
 
+  // Bookmark bridge callbacks
+  JSValue JS_GetBookmarks(const JSObject &obj, const JSArgs &args);
+  JSValue JS_GetBookmarkBar(const JSObject &obj, const JSArgs &args);
+  JSValue JS_AddBookmark(const JSObject &obj, const JSArgs &args);
+  void JS_RemoveBookmark(const JSObject &obj, const JSArgs &args);
+  JSValue JS_IsBookmarked(const JSObject &obj, const JSArgs &args);
+  void JS_ToggleBookmark(const JSObject &obj, const JSArgs &args);
+
   // Downloads page callbacks
   JSValue OnDownloadsGetData(const JSObject &obj, const JSArgs &args);
   void OnDownloadsClear(const JSObject &obj, const JSArgs &args);
