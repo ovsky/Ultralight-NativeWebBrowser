@@ -302,14 +302,24 @@
     }
     
     /* Drag and drop styles */
+    .bookmark-item {
+      cursor: grab;
+    }
+    
     .bookmark-item.dragging {
       opacity: 0.5;
       background: rgba(100, 100, 255, 0.3);
+      cursor: grabbing;
     }
     
     .bookmark-item.drag-over {
-      border-left: 2px solid #6C63FF;
-      margin-left: -2px;
+      border-left: 3px solid #6C63FF;
+      padding-left: 7px;
+    }
+    
+    .bookmark-item.drag-over-right {
+      border-right: 3px solid #6C63FF;
+      padding-right: 7px;
     }
     
     .bookmark-bar.drag-active {
@@ -383,20 +393,24 @@
       }
     }
 
-    // Drag and drop state
-    let draggedElement = null;
-    let draggedBookmarkId = null;
-    let longPressTimer = null;
-    let isDragging = false;
+    // Mouse-based drag and drop state
+    let dragState = {
+      isDragging: false,
+      element: null,
+      bookmarkId: null,
+      startX: 0,
+      startY: 0,
+      offsetX: 0,
+      clone: null,
+      moved: false
+    };
 
-    // Create a bookmark element with drag support
+    // Create a bookmark element with mouse drag support
     function createBookmarkElement(bookmark) {
-      const item = document.createElement('a');
+      const item = document.createElement('div');
       item.className = 'bookmark-item';
-      item.href = bookmark.url;
-      item.title = bookmark.title || bookmark.url;
       item.dataset.bookmarkId = bookmark.id;
-      item.draggable = true;
+      item.dataset.url = bookmark.url;
 
       // Icon (favicon or default)
       if (bookmark.favicon && bookmark.favicon.startsWith('data:')) {
@@ -426,6 +440,9 @@
       const removeBtn = document.createElement('div');
       removeBtn.className = 'remove-btn';
       removeBtn.textContent = '×';
+      removeBtn.onmousedown = function(e) {
+        e.stopPropagation();
+      };
       removeBtn.onclick = function(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -436,94 +453,130 @@
       };
       item.appendChild(removeBtn);
 
-      // Drag events
-      item.addEventListener('dragstart', handleDragStart);
-      item.addEventListener('dragend', handleDragEnd);
-      item.addEventListener('dragover', handleDragOver);
-      item.addEventListener('dragenter', handleDragEnter);
-      item.addEventListener('dragleave', handleDragLeave);
-      item.addEventListener('drop', handleDrop);
-
-      // Long press for touch/mouse
+      // Mouse down to start drag
       item.addEventListener('mousedown', function(e) {
         if (e.button !== 0) return;
-        longPressTimer = setTimeout(() => {
-          isDragging = true;
-          item.classList.add('dragging');
-        }, 300);
+        if (e.target.classList.contains('remove-btn')) return;
+        
+        e.preventDefault();
+        
+        dragState.isDragging = true;
+        dragState.element = item;
+        dragState.bookmarkId = bookmark.id;
+        dragState.startX = e.clientX;
+        dragState.startY = e.clientY;
+        dragState.moved = false;
+        
+        const rect = item.getBoundingClientRect();
+        dragState.offsetX = e.clientX - rect.left;
+        
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
       });
 
-      item.addEventListener('mouseup', function() {
-        clearTimeout(longPressTimer);
-      });
-
+      // Click to navigate (only if not dragged)
       item.addEventListener('click', function(e) {
-        if (isDragging) {
+        if (dragState.moved) {
           e.preventDefault();
-          isDragging = false;
+          return;
         }
+        // Navigate to bookmark
+        window.location.href = bookmark.url;
       });
 
       return item;
     }
 
-    function handleDragStart(e) {
-      draggedElement = this;
-      draggedBookmarkId = this.dataset.bookmarkId;
-      this.classList.add('dragging');
-      document.getElementById('bookmarkBar').classList.add('drag-active');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', draggedBookmarkId);
-    }
-
-    function handleDragEnd(e) {
-      this.classList.remove('dragging');
-      document.getElementById('bookmarkBar').classList.remove('drag-active');
-      document.querySelectorAll('.bookmark-item').forEach(item => {
-        item.classList.remove('drag-over');
-      });
-      draggedElement = null;
-      draggedBookmarkId = null;
-      isDragging = false;
-    }
-
-    function handleDragOver(e) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-    }
-
-    function handleDragEnter(e) {
-      e.preventDefault();
-      if (this !== draggedElement) {
-        this.classList.add('drag-over');
+    function handleMouseMove(e) {
+      if (!dragState.isDragging || !dragState.element) return;
+      
+      const dx = e.clientX - dragState.startX;
+      const dy = e.clientY - dragState.startY;
+      
+      // Only start visual drag after moving a bit
+      if (!dragState.moved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+        dragState.moved = true;
+        dragState.element.classList.add('dragging');
+        document.getElementById('bookmarkBar').classList.add('drag-active');
+      }
+      
+      if (!dragState.moved) return;
+      
+      // Find the bookmark item we're hovering over
+      const bar = document.getElementById('bookmarkBar');
+      const items = Array.from(bar.querySelectorAll('.bookmark-item'));
+      
+      // Clear all drag-over states
+      items.forEach(item => item.classList.remove('drag-over', 'drag-over-right'));
+      
+      // Find which item we're over
+      for (const item of items) {
+        if (item === dragState.element) continue;
+        
+        const rect = item.getBoundingClientRect();
+        const midX = rect.left + rect.width / 2;
+        
+        if (e.clientX >= rect.left && e.clientX <= rect.right) {
+          if (e.clientX < midX) {
+            item.classList.add('drag-over');
+          } else {
+            item.classList.add('drag-over-right');
+          }
+          break;
+        }
       }
     }
 
-    function handleDragLeave(e) {
-      this.classList.remove('drag-over');
-    }
-
-    function handleDrop(e) {
-      e.preventDefault();
-      e.stopPropagation();
+    function handleMouseUp(e) {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
       
-      if (this === draggedElement) return;
+      if (!dragState.isDragging) return;
       
       const bar = document.getElementById('bookmarkBar');
       const items = Array.from(bar.querySelectorAll('.bookmark-item'));
-      const draggedIndex = items.indexOf(draggedElement);
-      const dropIndex = items.indexOf(this);
       
-      if (draggedIndex < dropIndex) {
-        this.parentNode.insertBefore(draggedElement, this.nextSibling);
-      } else {
-        this.parentNode.insertBefore(draggedElement, this);
+      // Find drop target
+      let dropTarget = null;
+      let insertAfter = false;
+      
+      for (const item of items) {
+        if (item.classList.contains('drag-over')) {
+          dropTarget = item;
+          insertAfter = false;
+          break;
+        }
+        if (item.classList.contains('drag-over-right')) {
+          dropTarget = item;
+          insertAfter = true;
+          break;
+        }
       }
       
-      this.classList.remove('drag-over');
+      // Move the element
+      if (dropTarget && dropTarget !== dragState.element && dragState.moved) {
+        if (insertAfter) {
+          dropTarget.parentNode.insertBefore(dragState.element, dropTarget.nextSibling);
+        } else {
+          dropTarget.parentNode.insertBefore(dragState.element, dropTarget);
+        }
+        // Save new order
+        saveBookmarkOrder();
+      }
       
-      // Save new order
-      saveBookmarkOrder();
+      // Clean up
+      items.forEach(item => {
+        item.classList.remove('dragging', 'drag-over', 'drag-over-right');
+      });
+      bar.classList.remove('drag-active');
+      
+      // Reset state after a short delay to prevent click from firing
+      setTimeout(() => {
+        dragState.isDragging = false;
+        dragState.element = null;
+        dragState.bookmarkId = null;
+        dragState.moved = false;
+      }, 10);
     }
 
     function saveBookmarkOrder() {
