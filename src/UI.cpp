@@ -501,6 +501,10 @@ UI::UI(RefPtr<Window> window)
   password_manager_ = std::make_unique<password::PasswordManager>();
   password_manager_->Initialize(SettingsDirectory());
 
+  // Initialize bookmark store
+  bookmark_store_ = std::make_unique<BookmarkStore>();
+  bookmark_store_->Initialize(SettingsDirectory());
+
   // Apply runtime toggles (visual sync happens on DOMReady via SyncSettingsStateToUI)
   ApplySettings(true, true);
 
@@ -556,6 +560,10 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
   // Initialize password manager
   password_manager_ = std::make_unique<password::PasswordManager>();
   password_manager_->Initialize(SettingsDirectory());
+
+  // Initialize bookmark store
+  bookmark_store_ = std::make_unique<BookmarkStore>();
+  bookmark_store_->Initialize(SettingsDirectory());
 
   // Apply runtime toggles (visual sync happens on DOMReady via SyncSettingsStateToUI)
   ApplySettings(true, true);
@@ -1424,6 +1432,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["GetDarkModeEnabled"] = BindJSCallbackWithRetval(&UI::OnGetDarkModeEnabled);
   global["OnToggleAdblock"] = BindJSCallback(&UI::OnToggleAdblock);
   global["GetAdblockEnabled"] = BindJSCallbackWithRetval(&UI::OnGetAdblockEnabled);
+  global["OnToggleBookmark"] = BindJSCallback(&UI::OnToggleBookmark);
   global["OnOpenSettingsPanel"] = BindJSCallback(&UI::OnOpenSettingsPanel);
   global["OnCloseSettingsPanel"] = BindJSCallback(&UI::OnCloseSettingsPanel);
   // Password save bar callback
@@ -1797,6 +1806,9 @@ void UI::OnActiveTabChange(const JSObject &obj, const JSArgs &args)
       SetCanGoForward(tab_view->CanGoBack());
       SetURL(tab_view->url());
     }
+    
+    // Update bookmark button state for the newly active tab
+    UpdateBookmarkButtonState();
   }
 }
 
@@ -2341,7 +2353,10 @@ void UI::UpdateTabURL(uint64_t id, const ultralight::String &url)
   }
 
   if (id == active_tab_id_ && !tabs_.empty())
+  {
     SetURL(url);
+    UpdateBookmarkButtonState();
+  }
 }
 
 void UI::UpdateTabNavigation(uint64_t id, bool is_loading, bool can_go_back, bool can_go_forward)
@@ -2422,6 +2437,25 @@ void UI::SetCursor(ultralight::Cursor cursor)
 {
   if (App::instance())
     window_->SetCursor(cursor);
+}
+
+void UI::UpdateBookmarkButtonState()
+{
+  if (!bookmark_store_ || !active_tab() || !active_tab()->view())
+    return;
+  
+  auto url = active_tab()->view()->url();
+  auto url_str = url.utf8();
+  std::string url_string = url_str.data() ? url_str.data() : "";
+  
+  bool is_bookmarked = bookmark_store_->IsBookmarked(url_string);
+  
+  RefPtr<JSContext> lock(view()->LockJSContext());
+  JSContextRef ctx = lock->ctx();
+  ultralight::String js = ultralight::String("if(typeof updateBookmarkButton === 'function') updateBookmarkButton(") +
+                          ultralight::String(is_bookmarked ? "true" : "false") +
+                          ultralight::String(");");
+  view()->EvaluateScript(js, nullptr);
 }
 
 String UI::GetFaviconURL(const String &page_url)
@@ -6292,4 +6326,173 @@ ultralight::JSValue UI::OnGetAutofillSuggestions(const JSObject &obj, const JSAr
 ultralight::JSValue UI::OnIsDarkModeEnabled(const JSObject &obj, const JSArgs &args)
 {
   return JSValue(dark_mode_enabled_);
+}
+
+// ============================================================================
+// Bookmark Manager Implementation
+// ============================================================================
+
+ultralight::JSValue UI::OnGetBookmarks(const JSObject &obj, const JSArgs &args)
+{
+  if (!bookmark_store_)
+    return JSValue(String("[]"));
+  return JSValue(String(bookmark_store_->ToJSON().c_str()));
+}
+
+ultralight::JSValue UI::OnGetBookmarkBar(const JSObject &obj, const JSArgs &args)
+{
+  if (!bookmark_store_)
+    return JSValue(String("[]"));
+  return JSValue(String(bookmark_store_->BookmarkBarToJSON().c_str()));
+}
+
+ultralight::JSValue UI::OnAddBookmark(const JSObject &obj, const JSArgs &args)
+{
+  if (!bookmark_store_ || args.empty())
+    return JSValue(0);
+  
+  ultralight::String url_ul = args[0].ToString();
+  auto url_str = url_ul.utf8();
+  std::string url = url_str.data() ? url_str.data() : "";
+  
+  std::string title;
+  if (args.size() > 1) {
+    ultralight::String title_ul = args[1].ToString();
+    auto title_str = title_ul.utf8();
+    title = title_str.data() ? title_str.data() : "";
+  }
+  
+  std::string favicon;
+  if (args.size() > 2) {
+    ultralight::String favicon_ul = args[2].ToString();
+    auto favicon_str = favicon_ul.utf8();
+    favicon = favicon_str.data() ? favicon_str.data() : "";
+  }
+  
+  bool show_on_bar = args.size() > 3 ? (bool)args[3] : true;
+  
+  uint64_t id = bookmark_store_->AddBookmark(url, title, favicon, show_on_bar);
+  return JSValue((double)id);
+}
+
+void UI::OnRemoveBookmark(const JSObject &obj, const JSArgs &args)
+{
+  if (!bookmark_store_ || args.empty())
+    return;
+  
+  uint64_t id = static_cast<uint64_t>((double)args[0]);
+  bookmark_store_->RemoveBookmark(id);
+}
+
+ultralight::JSValue UI::OnIsBookmarked(const JSObject &obj, const JSArgs &args)
+{
+  if (!bookmark_store_ || args.empty())
+    return JSValue(false);
+  
+  ultralight::String url_ul = args[0].ToString();
+  auto url_str = url_ul.utf8();
+  std::string url = url_str.data() ? url_str.data() : "";
+  return JSValue(bookmark_store_->IsBookmarked(url));
+}
+
+void UI::OnToggleBookmark(const JSObject &obj, const JSArgs &args)
+{
+  if (!bookmark_store_)
+    return;
+  
+  std::string url;
+  std::string title;
+  std::string favicon;
+  
+  // If no arguments provided, use the active tab's data
+  if (args.empty())
+  {
+    if (!active_tab())
+      return;
+    
+    auto tab_url = active_tab()->view()->url();
+    auto tab_url_str = tab_url.utf8();
+    url = tab_url_str.data() ? tab_url_str.data() : "";
+    
+    auto tab_title = active_tab()->view()->title();
+    auto tab_title_str = tab_title.utf8();
+    title = tab_title_str.data() ? tab_title_str.data() : "";
+    
+    // Get favicon URL via UI's helper
+    auto favicon_str_ul = GetFaviconURL(tab_url);
+    auto favicon_str = favicon_str_ul.utf8();
+    favicon = favicon_str.data() ? favicon_str.data() : "";
+  }
+  else
+  {
+    ultralight::String url_ul = args[0].ToString();
+    auto url_str = url_ul.utf8();
+    url = url_str.data() ? url_str.data() : "";
+    
+    if (args.size() > 1) {
+      ultralight::String title_ul = args[1].ToString();
+      auto title_str = title_ul.utf8();
+      title = title_str.data() ? title_str.data() : "";
+    }
+    
+    if (args.size() > 2) {
+      ultralight::String favicon_ul = args[2].ToString();
+      auto favicon_str = favicon_ul.utf8();
+      favicon = favicon_str.data() ? favicon_str.data() : "";
+    }
+  }
+  
+  if (url.empty())
+    return;
+  
+  bool was_bookmarked = bookmark_store_->IsBookmarked(url);
+  
+  if (was_bookmarked)
+  {
+    auto* bm = bookmark_store_->GetBookmarkByUrl(url);
+    if (bm)
+      bookmark_store_->RemoveBookmark(bm->id);
+  }
+  else
+  {
+    bookmark_store_->AddBookmark(url, title, favicon, true);
+  }
+  
+  // Update the bookmark button icon in the UI
+  RefPtr<JSContext> lock(view()->LockJSContext());
+  JSContextRef ctx = lock->ctx();
+  ultralight::String js = ultralight::String("if(typeof updateBookmarkButton === 'function') updateBookmarkButton(") +
+                          ultralight::String(was_bookmarked ? "false" : "true") +
+                          ultralight::String(");");
+  view()->EvaluateScript(js, nullptr);
+}
+
+void UI::OnUpdateBookmark(const JSObject &obj, const JSArgs &args)
+{
+  if (!bookmark_store_ || args.size() < 2)
+    return;
+  
+  uint64_t id = static_cast<uint64_t>((double)args[0]);
+  
+  ultralight::String url_ul = args[1].ToString();
+  auto url_str = url_ul.utf8();
+  std::string url = url_str.data() ? url_str.data() : "";
+  
+  std::string title;
+  if (args.size() > 2) {
+    ultralight::String title_ul = args[2].ToString();
+    auto title_str = title_ul.utf8();
+    title = title_str.data() ? title_str.data() : "";
+  }
+  
+  std::string favicon;
+  if (args.size() > 3) {
+    ultralight::String favicon_ul = args[3].ToString();
+    auto favicon_str = favicon_ul.utf8();
+    favicon = favicon_str.data() ? favicon_str.data() : "";
+  }
+  
+  bool show_on_bar = args.size() > 4 ? (bool)args[4] : true;
+  
+  bookmark_store_->UpdateBookmark(id, url, title, favicon, show_on_bar);
 }
