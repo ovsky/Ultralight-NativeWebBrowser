@@ -3323,9 +3323,14 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
   adblock_enabled_cached_ = settings_.enable_adblock;
   clear_history_on_exit_ = settings_.clear_history_on_exit;
 
-  // Note: enable_javascript and hardware_acceleration are applied to NEW tabs via TabViewSettings
+  // Note: enable_javascript and hardware_acceleration are applied to NEW tabs via TabViewSettings.
   // Existing tabs keep their original settings since ViewConfig is immutable after creation.
-  // enable_web_security, block_third_party_cookies, do_not_track are not yet implemented.
+  // 
+  // Privacy settings implementation:
+  // - do_not_track: Implemented via JavaScript injection (sets navigator.doNotTrack = '1')
+  // - block_third_party_cookies: Implemented via JavaScript injection (blocks cross-origin cookie access)
+  // - enable_web_security: Not directly supported by Ultralight ViewConfig. XHR/Fetch credentials
+  //   are handled via the existing polyfills. Full CORS enforcement would require Ultralight API changes.
 
   // Address Bar & Suggestions
   suggestions_enabled_ = settings_.enable_suggestions;

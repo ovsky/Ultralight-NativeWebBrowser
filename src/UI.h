@@ -214,6 +214,11 @@ public:
   DownloadManager *download_manager() { return download_manager_.get(); }
   password::PasswordManager *password_manager() { return password_manager_.get(); }
   AdBlocker *network_blocker() { return adblock_; }
+  
+  // Privacy settings accessors for Tab's JavaScript injection
+  bool do_not_track_enabled() const { return settings_.do_not_track; }
+  bool block_third_party_cookies_enabled() const { return settings_.block_third_party_cookies; }
+  bool web_security_enabled() const { return settings_.enable_web_security; }
 
 protected:
   static std::filesystem::path SettingsDirectory();
