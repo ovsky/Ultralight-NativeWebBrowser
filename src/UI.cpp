@@ -58,7 +58,7 @@ namespace
     bool default_value;
   };
 
-  constexpr std::array<SettingDescriptor, 30> kFallbackSettingsCatalog = {
+  constexpr std::array<SettingDescriptor, 31> kFallbackSettingsCatalog = {
       // Appearance
       SettingDescriptor{"launch_dark_theme", "Launch in dark theme",
                         "Start Ultralight with dark chrome, toolbars, and tabs by default.",
@@ -169,7 +169,12 @@ namespace
       // Networking / User Agent
       SettingDescriptor{"use_custom_user_agent", "Use custom user agent",
                         "When enabled, send a user agent string that you specify instead of the automatic Chromium-like default.",
-                        "privacy", nullptr, false, &UI::BrowserSettings::use_custom_user_agent, false}};
+                        "privacy", nullptr, false, &UI::BrowserSettings::use_custom_user_agent, false},
+
+      // Location Spoofing
+      SettingDescriptor{"enable_location_spoofing", "Location Spoofing",
+                        "Override navigator.geolocation to report custom GPS coordinates instead of your real location.",
+                        "privacy", nullptr, false, &UI::BrowserSettings::enable_location_spoofing, false}};
 
   struct ParsedCatalogEntry
   {
@@ -3135,6 +3140,55 @@ void UI::OnUpdateSetting(const JSObject &, const JSArgs &args)
     UpdateSettingsDirtyFlag();
     return;
   }
+
+  // Special-case: spoofed_latitude is a numeric value for location spoofing
+  if (key == "spoofed_latitude")
+  {
+    double val = 0.0;
+    if (args[1].IsNumber())
+    {
+      val = args[1].ToNumber();
+    }
+    else if (args[1].IsString())
+    {
+      ultralight::String str_ul = args[1].ToString();
+      auto str_data = str_ul.utf8();
+      std::string str = str_data.data() ? str_data.data() : "";
+      try { val = std::stod(str); } catch (...) { val = 0.0; }
+    }
+    // Clamp to valid latitude range
+    val = (std::max)(-90.0, (std::min)(90.0, val));
+    settings_.spoofed_latitude = val;
+    UpdateSettingsDirtyFlag();
+    ApplySettings(false, false);
+    UpdateSettingsDirtyFlag();
+    return;
+  }
+
+  // Special-case: spoofed_longitude is a numeric value for location spoofing
+  if (key == "spoofed_longitude")
+  {
+    double val = 0.0;
+    if (args[1].IsNumber())
+    {
+      val = args[1].ToNumber();
+    }
+    else if (args[1].IsString())
+    {
+      ultralight::String str_ul = args[1].ToString();
+      auto str_data = str_ul.utf8();
+      std::string str = str_data.data() ? str_data.data() : "";
+      try { val = std::stod(str); } catch (...) { val = 0.0; }
+    }
+    // Clamp to valid longitude range
+    val = (std::max)(-180.0, (std::min)(180.0, val));
+    settings_.spoofed_longitude = val;
+    UpdateSettingsDirtyFlag();
+    ApplySettings(false, false);
+    UpdateSettingsDirtyFlag();
+    return;
+  }
+
   bool value = false;
   if (args[1].IsBoolean())
   {
@@ -3591,6 +3645,9 @@ std::string UI::BuildSettingsPayload(bool snapshot_is_baseline) const
   ss << "\"target_user_agent\": \"" << util::EscapeJsonString(settings_.custom_user_agent.empty() ? active_user_agent_ : settings_.custom_user_agent) << "\",";
   // Expose dark_theme_excluded_sites as a separate field for the text input in settings UI
   ss << "\"dark_theme_excluded_sites\": \"" << util::EscapeJsonString(settings_.dark_theme_excluded_sites) << "\",";
+  // Expose location spoofing coordinates
+  ss << "\"spoofed_latitude\": " << settings_.spoofed_latitude << ",";
+  ss << "\"spoofed_longitude\": " << settings_.spoofed_longitude << ",";
   ss << "\"meta\": {";
   ss << "\"updated_at\": \"" << util::ToIso8601UTC(std::chrono::system_clock::now()) << "\",";
   ss << "\"dirty\": " << (settings_dirty_ ? "true" : "false") << ",";
