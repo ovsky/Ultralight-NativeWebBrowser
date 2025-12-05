@@ -174,7 +174,7 @@ namespace drm
 
     void DRMSettings::ResetToDefaults()
     {
-        enabled_ = true;
+        enabled_ = false;  // Default to disabled - user must opt-in
         site_rules_.clear();
 
         const std::string catalog_document = LoadCatalogDocument(*this);

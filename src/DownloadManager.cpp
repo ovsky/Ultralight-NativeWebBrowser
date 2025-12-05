@@ -370,10 +370,10 @@ bool DownloadManager::OpenDownload(DownloadId id) const
     auto result = ShellExecuteW(nullptr, L"open", wpath.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
     return reinterpret_cast<intptr_t>(result) > 32;
 #elif defined(__APPLE__)
-    std::string cmd = "open \"" + path_str + "\"";
+    std::string cmd = "open " + util::EscapeShellArg(path_str);
     return std::system(cmd.c_str()) == 0;
 #else
-    std::string cmd = "xdg-open \"" + path_str + "\"";
+    std::string cmd = "xdg-open " + util::EscapeShellArg(path_str);
     return std::system(cmd.c_str()) == 0;
 #endif
 }
@@ -394,10 +394,10 @@ bool DownloadManager::RevealDownload(DownloadId id) const
     auto result = ShellExecuteW(nullptr, L"open", L"explorer.exe", params.c_str(), nullptr, SW_SHOWNORMAL);
     return reinterpret_cast<intptr_t>(result) > 32;
 #elif defined(__APPLE__)
-    std::string cmd = "open -R \"" + rec->second.path.u8string() + "\"";
+    std::string cmd = "open -R " + util::EscapeShellArg(rec->second.path.u8string());
     return std::system(cmd.c_str()) == 0;
 #else
-    std::string cmd = "xdg-open \"" + folder_str + "\"";
+    std::string cmd = "xdg-open " + util::EscapeShellArg(folder_str);
     return std::system(cmd.c_str()) == 0;
 #endif
 }

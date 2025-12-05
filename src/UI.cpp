@@ -30,6 +30,8 @@
 #define NOMINMAX 1
 #endif
 #include <windows.h> // GetModuleFileNameW
+#include <dwmapi.h>  // DwmSetWindowAttribute for window theming
+#pragma comment(lib, "dwmapi.lib")
 #else
 #include <sys/stat.h> // mkdir
 #include <unistd.h>   // getcwd
@@ -484,6 +486,11 @@ UI::UI(RefPtr<Window> window)
   // Apply runtime toggles (visual sync happens on DOMReady via SyncSettingsStateToUI)
   ApplySettings(true, true);
 
+  // Pre-load start page HTML for instant new tab creation
+  LoadCachedStartPage();
+  // Pre-load internal browser pages for instant loading
+  LoadCachedInternalPages();
+
   // Load keyboard shortcuts mapping
   LoadShortcuts();
 
@@ -529,6 +536,11 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
 
   // Apply runtime toggles (visual sync happens on DOMReady via SyncSettingsStateToUI)
   ApplySettings(true, true);
+
+  // Pre-load start page HTML for instant new tab creation
+  LoadCachedStartPage();
+  // Pre-load internal browser pages for instant loading
+  LoadCachedInternalPages();
 
   // Load keyboard shortcuts mapping
   LoadShortcuts();
@@ -957,6 +969,70 @@ static void trim(std::string &s)
   s = s.substr(a, b - a + 1);
 }
 
+void UI::LoadCachedStartPage()
+{
+  // Pre-load the start page HTML into memory for instant tab creation
+  // This eliminates file I/O delay when opening new tabs
+  std::ifstream in("assets/static-sties/google-static.html", std::ios::in | std::ios::binary);
+  if (!in.is_open())
+  {
+    // Fallback to a minimal dark page if file not found
+    cached_start_page_html_ = R"(<!DOCTYPE html><html><head><title>New Tab</title>
+      <style>body,html{margin:0;padding:0;height:100%;background:#202124;}</style>
+      </head><body></body></html>)";
+    return;
+  }
+  std::ostringstream ss;
+  ss << in.rdbuf();
+  cached_start_page_html_ = ss.str();
+  in.close();
+}
+
+void UI::LoadCachedInternalPages()
+{
+  // Pre-load frequently used internal pages for instant loading
+  static const char* pages[] = {
+    "assets/settings.html",
+    "assets/history.html",
+    "assets/downloads.html",
+    "assets/passwords.html",
+    "assets/extensions.html",
+    "assets/about.html",
+    "assets/new_tab_page.html"
+  };
+  
+  static const char* urls[] = {
+    "file:///settings.html",
+    "file:///history.html",
+    "file:///downloads.html",
+    "file:///passwords.html",
+    "file:///extensions.html",
+    "file:///about.html",
+    "file:///new_tab_page.html"
+  };
+  
+  for (size_t i = 0; i < sizeof(pages) / sizeof(pages[0]); ++i)
+  {
+    std::ifstream in(pages[i], std::ios::in | std::ios::binary);
+    if (in.is_open())
+    {
+      std::ostringstream ss;
+      ss << in.rdbuf();
+      cached_internal_pages_[urls[i]] = ss.str();
+      in.close();
+    }
+  }
+}
+
+const std::string& UI::GetCachedPageHTML(const std::string& url) const
+{
+  static const std::string empty;
+  auto it = cached_internal_pages_.find(url);
+  if (it != cached_internal_pages_.end())
+    return it->second;
+  return empty;
+}
+
 void UI::LoadShortcuts()
 {
   // Defaults
@@ -1015,6 +1091,11 @@ bool UI::RunShortcutAction(const std::string &action)
     CreateNewTab();
     return true;
   }
+  if (action == "new-window")
+  {
+    OnRequestNewWindow({}, {});
+    return true;
+  }
   if (action == "close-tab")
   {
     if (active_tab())
@@ -1027,13 +1108,8 @@ bool UI::RunShortcutAction(const std::string &action)
   if (action == "open-history")
   {
     // Open History in a NEW tab instead of replacing current
-    RefPtr<View> child = CreateNewTabForChildView(String("file:///history.html"));
-    if (child)
-    {
-      child->LoadURL("file:///history.html");
-      return true;
-    }
-    return false;
+    CreateNewTabForChildView(String("file:///history.html"));
+    return true;
   }
   if (action == "focus-address")
   {
@@ -1055,24 +1131,20 @@ bool UI::RunShortcutAction(const std::string &action)
   if (action == "open-extensions")
   {
     // Open Extensions in a new tab
-    RefPtr<View> child = CreateNewTabForChildView(String("file:///extensions.html"));
-    if (child)
-    {
-      child->LoadURL("file:///extensions.html");
-      return true;
-    }
-    return false;
+    CreateNewTabForChildView(String("file:///extensions.html"));
+    return true;
+  }
+  if (action == "open-passwords")
+  {
+    // Open Passwords in a new tab
+    CreateNewTabForChildView(String("file:///passwords.html"));
+    return true;
   }
   if (action == "open-settings")
   {
     // Open Settings in a NEW tab (like Ctrl+H opens history)
-    RefPtr<View> child = CreateNewTabForChildView(String("file:///settings.html"));
-    if (child)
-    {
-      child->LoadURL("file:///settings.html");
-      return true;
-    }
-    return false;
+    CreateNewTabForChildView(String("file:///settings.html"));
+    return true;
   }
   return false;
 }
@@ -1369,6 +1441,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
     }
   }
   global["OnRequestNewTab"] = BindJSCallback(&UI::OnRequestNewTab);
+  global["OnRequestNewWindow"] = BindJSCallback(&UI::OnRequestNewWindow);
   global["OnRequestTabClose"] = BindJSCallback(&UI::OnRequestTabClose);
   global["OnActiveTabChange"] = BindJSCallback(&UI::OnActiveTabChange);
   global["OnRequestChangeURL"] = BindJSCallback(&UI::OnRequestChangeURL);
@@ -1549,6 +1622,32 @@ void UI::OnRequestNewTab(const JSObject &obj, const JSArgs &args)
   CreateNewTab();
 }
 
+void UI::OnRequestNewWindow(const JSObject &obj, const JSArgs &args)
+{
+#if defined(_WIN32)
+  // Get the executable path
+  wchar_t exePath[MAX_PATH];
+  GetModuleFileNameW(NULL, exePath, MAX_PATH);
+  
+  // Launch new instance
+  STARTUPINFOW si = {sizeof(si)};
+  PROCESS_INFORMATION pi;
+  if (CreateProcessW(exePath, NULL, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+  {
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+  }
+#else
+  // For non-Windows platforms, spawn a new process
+  std::string exePath = std::filesystem::read_symlink("/proc/self/exe").string();
+  if (fork() == 0)
+  {
+    execl(exePath.c_str(), exePath.c_str(), nullptr);
+    exit(0);
+  }
+#endif
+}
+
 void UI::OnRequestTabClose(const JSObject &obj, const JSArgs &args)
 {
   if (args.size() == 1)
@@ -1680,17 +1779,6 @@ void UI::OnRequestChangeURL(const JSObject &obj, const JSArgs &args)
 
 void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
 {
-  // DEBUG: Log that we got here
-  std::ofstream debug("debug_navigate.txt", std::ios::app);
-  debug << "OnAddressBarNavigate called with " << args.size() << " args\n";
-  if (args.size() > 0) {
-    ultralight::String url = args[0];
-    auto url_data = url.utf8();
-    if (url_data.data())
-      debug << "URL: " << url_data.data() << "\n";
-  }
-  debug.close();
-  
   if (args.size() == 1)
   {
     ultralight::String url = args[0];
@@ -1774,30 +1862,22 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
 
 void UI::OnOpenHistoryNewTab(const JSObject &obj, const JSArgs &args)
 {
-  RefPtr<View> child = CreateNewTabForChildView(String("file:///history.html"));
-  if (child)
-    child->LoadURL("file:///history.html");
+  CreateNewTabForChildView(String("file:///history.html"));
 }
 
 void UI::OnOpenDownloadsNewTab(const JSObject &obj, const JSArgs &args)
 {
-  RefPtr<View> child = CreateNewTabForChildView(String("file:///downloads.html"));
-  if (child)
-    child->LoadURL("file:///downloads.html");
+  CreateNewTabForChildView(String("file:///downloads.html"));
 }
 
 void UI::OnOpenPasswordsNewTab(const JSObject &obj, const JSArgs &args)
 {
-  RefPtr<View> child = CreateNewTabForChildView(String("file:///passwords.html"));
-  if (child)
-    child->LoadURL("file:///passwords.html");
+  CreateNewTabForChildView(String("file:///passwords.html"));
 }
 
 void UI::OnOpenExtensionsNewTab(const JSObject &obj, const JSArgs &args)
 {
-  RefPtr<View> child = CreateNewTabForChildView(String("file:///extensions.html"));
-  if (child)
-    child->LoadURL("file:///extensions.html");
+  CreateNewTabForChildView(String("file:///extensions.html"));
 }
 
 // ============================================================================
@@ -2079,10 +2159,10 @@ void UI::OnOpenExtensionsFolder(const JSObject &obj, const JSArgs &args)
   std::wstring wide_path(ext_dir.begin(), ext_dir.end());
   ShellExecuteW(NULL, L"explore", wide_path.c_str(), NULL, NULL, SW_SHOWNORMAL);
 #elif defined(__APPLE__)
-  std::string cmd = "open \"" + ext_dir + "\"";
+  std::string cmd = "open " + util::EscapeShellArg(ext_dir);
   system(cmd.c_str());
 #else
-  std::string cmd = "xdg-open \"" + ext_dir + "\"";
+  std::string cmd = "xdg-open " + util::EscapeShellArg(ext_dir);
   system(cmd.c_str());
 #endif
 }
@@ -2104,13 +2184,22 @@ void UI::CreateNewTab()
   view_settings.hardware_acceleration = settings_.hardware_acceleration;
   
   tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_, view_settings);
-  // Load local static start page
-  const char *kStartPage = "file:///static-sties/google-static.html";
-  tabs_[id]->view()->LoadURL(kStartPage);
+  
+  // Use cached HTML for instant page display (no file I/O delay)
+  // This eliminates the white flash before page content loads
+  const char *kStartPageURL = "file:///static-sties/google-static.html";
+  if (!cached_start_page_html_.empty())
+  {
+    tabs_[id]->view()->LoadHTML(String(cached_start_page_html_.c_str()), String(kStartPageURL));
+  }
+  else
+  {
+    tabs_[id]->view()->LoadURL(kStartPageURL);
+  }
 
   {
     RefPtr<JSContext> lock(view()->LockJSContext());
-    addTab({id, "New Tab", GetFaviconURL(kStartPage), tabs_[id]->view()->is_loading()});
+    addTab({id, "New Tab", GetFaviconURL(kStartPageURL), tabs_[id]->view()->is_loading()});
   }
   UpdateDrmBadge(id, false);
 }
@@ -2133,6 +2222,21 @@ RefPtr<View> UI::CreateNewTabForChildView(const String &url)
   
   tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_, view_settings);
 
+  // Try to use cached HTML for instant loading of internal pages
+  auto url_utf8 = url.utf8();
+  std::string url_str(url_utf8.data() ? url_utf8.data() : "");
+  const std::string& cached_html = GetCachedPageHTML(url_str);
+  if (!cached_html.empty())
+  {
+    // Use cached HTML for instant display
+    tabs_[id]->view()->LoadHTML(String(cached_html.c_str()), url);
+  }
+  else
+  {
+    // Fall back to regular URL loading for non-cached pages
+    tabs_[id]->view()->LoadURL(url);
+  }
+
   {
     RefPtr<JSContext> lock(view()->LockJSContext());
     addTab({id, "", GetFaviconURL(url), tabs_[id]->view()->is_loading()});
@@ -2153,7 +2257,8 @@ void UI::UpdateTabTitle(uint64_t id, const ultralight::String &title)
   {
     auto url_u = tabs_[id]->view()->url().utf8();
     const char *cur = url_u.data();
-    if (cur && strncmp(cur, "file://", 7) == 0)
+    std::string_view cur_view(cur ? cur : "");
+    if (cur && cur_view.size() >= 7 && cur_view.substr(0, 7) == "file://")
     {
       updateURL({title});
     }
@@ -2199,6 +2304,16 @@ void UI::UpdateTabNavigation(uint64_t id, bool is_loading, bool can_go_back, boo
     SetCanGoBack(can_go_back);
     SetCanGoForward(can_go_forward);
   }
+}
+
+void UI::UpdateTabFavicon(uint64_t id, const String &favicon_data_url)
+{
+  if (tabs_.empty() || tabs_.find(id) == tabs_.end())
+    return;
+
+  RefPtr<JSContext> lock(view()->LockJSContext());
+  // Update tab with the new favicon data URL
+  updateTab({id, tabs_[id]->view()->title(), favicon_data_url, tabs_[id]->view()->is_loading()});
 }
 
 void UI::SetLoading(bool is_loading)
@@ -2251,13 +2366,63 @@ void UI::SetCursor(ultralight::Cursor cursor)
 String UI::GetFaviconURL(const String &page_url)
 {
   // Best-effort: use origin + "/favicon.ico" for http/https URLs.
+  // For browser internal pages, return custom favicons.
   // Cache by origin so multiple tabs/pages from the same site reuse it.
   auto utf8 = page_url.utf8();
   const char *url = utf8.data();
   if (!url)
     return String("");
 
-  if (strncmp(url, "http://", 7) != 0 && strncmp(url, "https://", 8) != 0)
+  std::string_view url_view(url);
+  
+  // Handle browser internal pages with custom favicons (base64-encoded SVGs for CSS compatibility)
+  if (url_view.find("file:///") == 0)
+  {
+    // Start page / Google static page - home icon
+    if (url_view.find("static-sties/") != std::string_view::npos ||
+        url_view.find("google-static") != std::string_view::npos)
+      return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTEwIDIwdi02aDR2Nmg1di04aDNMMTIgMyAyIDEyaDN2OHonLz48L3N2Zz4=");
+    
+    // Settings page - gear icon
+    if (url_view.find("settings.html") != std::string_view::npos)
+      return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTE5LjE0IDEyLjk0Yy4wNC0uMzEuMDYtLjYzLjA2LS45NCAwLS4zMS0uMDItLjYzLS4wNi0uOTRsMi4wMy0xLjU4YS40OS40OSAwIDAwLjEyLS42MWwtMS45Mi0zLjMyYS40OS40OSAwIDAwLS41OS0uMjJsLTIuMzkuOTZjLS41LS4zOC0xLjAzLS43LTEuNjItLjk0bC0uMzYtMi41NGEuNDg0LjQ4NCAwIDAwLS40OC0uNDFoLTMuODRjLS4yNCAwLS40My4xNy0uNDcuNDFsLS4zNiAyLjU0Yy0uNTkuMjQtMS4xMy41Ny0xLjYyLjk0bC0yLjM5LS45NmEuNDkuNDkgMCAwMC0uNTkuMjJMMi43NCA4Ljg3Yy0uMTIuMjEtLjA4LjQ3LjEyLjYxbDIuMDMgMS41OGMtLjA0LjMxLS4wNi42My0uMDYuOTRzLjAyLjYzLjA2Ljk0bC0yLjAzIDEuNThhLjQ5LjQ5IDAgMDAtLjEyLjYxbDEuOTIgMy4zMmMuMTIuMjIuMzcuMjkuNTkuMjJsMi4zOS0uOTZjLjUuMzggMS4wMy43IDEuNjIuOTRsLjM2IDIuNTRjLjA1LjI0LjI0LjQxLjQ4LjQxaDMuODRjLjI0IDAgLjQ0LS4xNy40Ny0uNDFsLjM2LTIuNTRjLjU5LS4yNCAxLjEzLS41NiAxLjYyLS45NGwyLjM5Ljk2Yy4yMi4wOC40NyAwIC41OS0uMjJsMS45Mi0zLjMyYy4xMi0uMjIuMDctLjQ3LS4xMi0uNjFsLTIuMDEtMS41OHpNMTIgMTUuNmMtMS45OCAwLTMuNi0xLjYyLTMuNi0zLjZzMS42Mi0zLjYgMy42LTMuNiAzLjYgMS42MiAzLjYgMy42LTEuNjIgMy42LTMuNiAzLjZ6Jy8+PC9zdmc+");
+    
+    // History page - clock icon
+    if (url_view.find("history.html") != std::string_view::npos)
+      return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTEzIDNhOSA5IDAgMDAtOSA5SDFsMy44OSAzLjg5LjA3LjE0TDkgMTJINmMwLTMuODcgMy4xMy03IDctN3M3IDMuMTMgNyA3LTMuMTMgNy03IDdjLTEuOTMgMC0zLjY4LS43OS00Ljk0LTIuMDZsLTEuNDIgMS40MkE4Ljk1NCA4Ljk1NCAwIDAwMTMgMjFhOSA5IDAgMDAwLTE4em0tMSA1djVsNC4yOCAyLjU0LjcyLTEuMjEtMy41LTIuMDhWOEgxMnonLz48L3N2Zz4=");
+    
+    // Downloads page - download icon
+    if (url_view.find("downloads.html") != std::string_view::npos ||
+        url_view.find("downloads-panel.html") != std::string_view::npos)
+      return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTE5IDloLTRWM0g5djZINWw3IDcgNy03ek01IDE4djJoMTR2LTJINXonLz48L3N2Zz4=");
+    
+    // Passwords page - key icon
+    if (url_view.find("passwords.html") != std::string_view::npos)
+      return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTEyLjY1IDEwQTUuOTkgNS45OSAwIDAwNyA2Yy0zLjMxIDAtNiAyLjY5LTYgNnMyLjY5IDYgNiA2YTUuOTkgNS45OSAwIDAwNS42NS00SDE3djRoNHYtNGgydi00SDEyLjY1ek03IDE0Yy0xLjEgMC0yLS45LTItMnMuOS0yIDItMiAyIC45IDIgMi0uOSAyLTIgMnonLz48L3N2Zz4=");
+    
+    // Extensions page - puzzle piece icon
+    if (url_view.find("extensions.html") != std::string_view::npos)
+      return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTIwLjUgMTFIMTlWN2MwLTEuMS0uOS0yLTItMmgtNFYzLjVDMTMgMi4xMiAxMS44OCAxIDEwLjUgMVM4IDIuMTIgOCAzLjVWNUg0Yy0xLjEgMC0xLjk5LjktMS45OSAydjMuOEgzLjVjMS40OSAwIDIuNyAxLjIxIDIuNyAyLjdzLTEuMjEgMi43LTIuNyAyLjdIMlYyMGMwIDEuMS45IDIgMiAyaDMuOHYtMS41YzAtMS40OSAxLjIxLTIuNyAyLjctMi43IDEuNDkgMCAyLjcgMS4yMSAyLjcgMi43VjIySDE3YzEuMSAwIDItLjkgMi0ydi00aDEuNWMxLjM4IDAgMi41LTEuMTIgMi41LTIuNVMyMS44OCAxMSAyMC41IDExeicvPjwvc3ZnPg==");
+    
+    // About page - info icon
+    if (url_view.find("about.html") != std::string_view::npos)
+      return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTEgMTVoLTJ2LTZoMnY2em0wLThoLTJWN2gydjJ6Jy8+PC9zdmc+");
+    
+    // New tab page - home icon
+    if (url_view.find("new_tab_page.html") != std::string_view::npos)
+      return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTEwIDIwdi02aDR2Nmg1di04aDNMMTIgMyAyIDEyaDN2OHonLz48L3N2Zz4=");
+    
+    // Release notes - document icon
+    if (url_view.find("release_notes.html") != std::string_view::npos)
+      return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTE0IDJINMM0LjkgMCA0LjAxLjkgNC4wMSAyTDQgMjBjMCAxLjEuODkgMiAxLjk5IDJIMTHJMS4xIDAgMi0uOSAyLTJWOGwtNi02em0yIDE2SDh2LTJoOHYyem0wLTRIOHYtMmg4djJ6bS0zLTVWMy41TDE4LjUgOUgxM3onLz48L3N2Zz4=");
+    
+    // Default for other file:// URLs - globe icon
+    return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bS0xIDE3LjkzYy0zLjk1LS40OS03LTMuODUtNy03LjkzIDAtLjYyLjA4LTEuMjEuMjEtMS43OUw5IDE1djFjMCAxLjEuOSAyIDIgMnYxLjkzem02LjktMi41NGMtLjI2LS44MS0xLTEuMzktMS45LTEuMzloLTF2LTNjMC0uNTUtLjQ1LTEtMS0xSDh2LTJoMmMuNTUgMCAxLS40NSAxLTFWN2gyYzEuMSAwIDItLjkgMi0ydi0uNDFjMi45MyAxLjE5IDUgNC4wNiA1IDcuNDEgMCAyLjA4LS44IDMuOTctMi4xIDUuMzl6Jy8+PC9zdmc+");
+  }
+  
+  if (url_view.size() < 7 || 
+      (url_view.substr(0, 7) != "http://" && 
+       (url_view.size() < 8 || url_view.substr(0, 8) != "https://")))
     return String("");
 
   const char *scheme_sep = strstr(url, "://");
@@ -2277,15 +2442,23 @@ String UI::GetFaviconURL(const String &page_url)
     origin_str.assign(url, (size_t)(slash_after_host - url));
   }
 
+  // Check disk cache first (contains data URIs that actually work)
+  auto it_file = favicon_file_cache_.find(origin_str);
+  if (it_file != favicon_file_cache_.end() && !it_file->second.empty())
+  {
+    return String(it_file->second.c_str());
+  }
+
+  // Check memory cache
   auto it = favicon_cache_.find(origin_str);
   if (it != favicon_cache_.end())
   {
     return String(it->second.c_str());
   }
 
-  std::string favicon = origin_str + "/favicon.ico";
-  favicon_cache_[origin_str] = favicon;
-  return String(favicon.c_str());
+  // Return empty to use default favicon - the /favicon.ico URLs don't work in CSS
+  // The favicon will be fetched and cached when user interacts with suggestions
+  return String("");
 }
 
 // --- History helpers ---
@@ -2297,7 +2470,10 @@ void UI::RecordHistory(const String &url, const String &title)
     return;
 
   // Only record http(s)
-  if (strncmp(c_url, "http://", 7) != 0 && strncmp(c_url, "https://", 8) != 0)
+  std::string_view url_view(c_url);
+  if (url_view.size() < 7 || 
+      (url_view.substr(0, 7) != "http://" && 
+       (url_view.size() < 8 || url_view.substr(0, 8) != "https://")))
     return;
 
   // Basic cap to avoid unbounded growth later (we'll prune oldest when exceeding)
@@ -2688,9 +2864,7 @@ void UI::OnToggleDarkMode(const JSObject &obj, const JSArgs &args)
 void UI::OnOpenSettingsPanel(const JSObject &, const JSArgs &)
 {
   HideMenuOverlay();
-  RefPtr<View> child = CreateNewTabForChildView(String("file:///settings.html"));
-  if (child)
-    child->LoadURL("file:///settings.html");
+  CreateNewTabForChildView(String("file:///settings.html"));
 }
 
 void UI::OnCloseSettingsPanel(const JSObject &, const JSArgs &)
@@ -2894,6 +3068,22 @@ void UI::OnUpdateSetting(const JSObject &, const JSArgs &args)
     UpdateSettingsDirtyFlag();
     return;
   }
+
+  // Special-case: dark_theme_excluded_sites is a string value containing
+  // newline-separated URL patterns for sites where dark theme should be disabled.
+  if (key == "dark_theme_excluded_sites")
+  {
+    if (!args[1].IsString())
+      return;
+    ultralight::String sites_ul = args[1].ToString();
+    auto sites_str = sites_ul.utf8();
+    std::string sites = sites_str.data() ? sites_str.data() : "";
+    settings_.dark_theme_excluded_sites = sites;
+    UpdateSettingsDirtyFlag();
+    ApplySettings(false, false);
+    UpdateSettingsDirtyFlag();
+    return;
+  }
   bool value = false;
   if (args[1].IsBoolean())
   {
@@ -3083,8 +3273,22 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
 {
   // Appearance
   SetDarkModeEnabled(settings_.launch_dark_theme);
+  
+  // Vibrant window theme - changes title bar color
+  bool was_vibrant = vibrant_window_theme_enabled_;
   vibrant_window_theme_enabled_ = settings_.vibrant_window_theme;
+  if (was_vibrant != vibrant_window_theme_enabled_ || initial)
+  {
+    ApplyVibrantWindowTheme(vibrant_window_theme_enabled_);
+  }
+  
+  // Transparent toolbar - applies CSS to UI overlay
+  bool was_transparent = experimental_transparent_toolbar_enabled_;
   experimental_transparent_toolbar_enabled_ = settings_.experimental_transparent_toolbar;
+  if (was_transparent != experimental_transparent_toolbar_enabled_ || initial)
+  {
+    ApplyTransparentToolbar(experimental_transparent_toolbar_enabled_);
+  }
 
   // Handle compact tabs mode - adjust UI height and trigger resize
   bool was_compact = experimental_compact_tabs_enabled_;
@@ -3136,11 +3340,48 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
 
   // Performance
   // enable_javascript and hardware_acceleration are applied during Tab creation (see CreateNewTab)
-  // smooth_scrolling, local_storage, database - would require additional Ultralight session config
+  // Smooth scrolling - apply CSS to all tab views
+  bool was_smooth = smooth_scrolling_enabled_;
+  smooth_scrolling_enabled_ = settings_.smooth_scrolling;
+  if (was_smooth != smooth_scrolling_enabled_ || initial)
+  {
+    for (auto &entry : tabs_)
+    {
+      if (entry.second)
+      {
+        if (smooth_scrolling_enabled_)
+          ApplySmoothScrollingToView(entry.second->view());
+        else
+          RemoveSmoothScrollingFromView(entry.second->view());
+      }
+    }
+  }
 
   // Accessibility
   reduce_motion_enabled_ = settings_.reduce_motion;
   high_contrast_ui_enabled_ = settings_.high_contrast_ui;
+  
+  // Apply accessibility CSS to all views
+  auto apply_accessibility = [&](RefPtr<View> v)
+  {
+    if (!v)
+      return;
+    if (reduce_motion_enabled_)
+      ApplyReduceMotionToView(v);
+    else
+      RemoveReduceMotionFromView(v);
+    if (high_contrast_ui_enabled_)
+      ApplyHighContrastToView(v);
+    else
+      RemoveHighContrastFromView(v);
+  };
+
+  apply_accessibility(view());
+  for (auto &entry : tabs_)
+  {
+    if (entry.second)
+      apply_accessibility(entry.second->view());
+  }
   // enable_caret_browsing would require page-level script injection
 
   // Developer
@@ -3292,6 +3533,8 @@ std::string UI::BuildSettingsPayload(bool snapshot_is_baseline) const
   // Settings page can always display the UA that will actually be used.
   // Also expose the raw custom_user_agent for the input field when use_custom_user_agent is enabled.
   ss << "\"target_user_agent\": \"" << util::EscapeJsonString(settings_.custom_user_agent.empty() ? active_user_agent_ : settings_.custom_user_agent) << "\",";
+  // Expose dark_theme_excluded_sites as a separate field for the text input in settings UI
+  ss << "\"dark_theme_excluded_sites\": \"" << util::EscapeJsonString(settings_.dark_theme_excluded_sites) << "\",";
   ss << "\"meta\": {";
   ss << "\"updated_at\": \"" << util::ToIso8601UTC(std::chrono::system_clock::now()) << "\",";
   ss << "\"dirty\": " << (settings_dirty_ ? "true" : "false") << ",";
@@ -3572,9 +3815,7 @@ void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
   if (action == "open_tab" && args.size() >= 2)
   {
     ultralight::String url = args[1];
-    RefPtr<View> child = CreateNewTabForChildView(url);
-    if (child)
-      child->LoadURL(url);
+    CreateNewTabForChildView(url);  // Handles loading internally
     HideContextMenuOverlay();
     return;
   }
@@ -3679,12 +3920,73 @@ void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
   HideContextMenuOverlay();
 }
 
+bool UI::IsBrowserInternalPage(const std::string &url)
+{
+  // Fast check for browser internal pages - called from C++ to skip JS execution
+  if (url.find("file:///") != 0)
+    return false;
+  
+  // List of browser internal pages that have their own dark styling
+  static const char* internal_pages[] = {
+    "settings.html",
+    "passwords.html",
+    "extensions.html",
+    "downloads.html",
+    "history.html",
+    "ui.html",
+    "menu.html",
+    "contextmenu.html",
+    "suggestions.html",
+    "quick-inspector.html",
+    "downloads-panel.html",
+    "about.html",
+    "new_tab_page.html",
+    "release_notes.html",
+    "static-sties/"
+  };
+  
+  for (const char* page : internal_pages)
+  {
+    if (url.find(page) != std::string::npos)
+      return true;
+  }
+  return false;
+}
+
 void UI::ApplyDarkModeToView(RefPtr<View> v)
 {
   if (!v)
     return;
+  
+  // Fast C++ check: skip dark mode injection entirely for browser internal pages
+  // This avoids expensive JS execution for pages that don't need it
+  auto url = v->url().utf8();
+  if (url.data() && IsBrowserInternalPage(std::string(url.data())))
+    return;
+  
+  // Build excluded sites list from settings
+  std::string excluded_patterns = settings_.dark_theme_excluded_sites;
+  
   const char *js = R"JS((function(){
     try{
+      var url = window.location.href;
+
+      // Check user-defined excluded sites
+      var excludedPatterns = %s;
+      if(excludedPatterns && excludedPatterns.length > 0){
+        for(var i=0; i<excludedPatterns.length; i++){
+          var pattern = excludedPatterns[i].trim();
+          if(!pattern) continue;
+          // Simple wildcard matching
+          var regex = pattern.replace(/\*/g, '.*').replace(/\?/g, '.');
+          try{
+            if(new RegExp(regex, 'i').test(url)){
+              return false; // Skip dark mode for this excluded site
+            }
+          }catch(e){}
+        }
+      }
+
       var sid='__ul_auto_dark';
       var prev=document.getElementById(sid);
       if(prev) prev.remove();
@@ -3728,7 +4030,31 @@ void UI::ApplyDarkModeToView(RefPtr<View> v)
       return true;
     }catch(e){return false;}
   })())JS";
-  v->EvaluateScript(js, nullptr);
+  
+  // Parse excluded patterns into JSON array
+  std::string patterns_json = "[]";
+  if (!excluded_patterns.empty()) {
+    std::stringstream ss;
+    ss << "[";
+    bool first = true;
+    std::istringstream iss(excluded_patterns);
+    std::string line;
+    while (std::getline(iss, line)) {
+      line.erase(0, line.find_first_not_of(" \t\r\n"));
+      line.erase(line.find_last_not_of(" \t\r\n") + 1);
+      if (!line.empty() && line[0] != '#') {
+        if (!first) ss << ",";
+        ss << "\"" << line << "\"";
+        first = false;
+      }
+    }
+    ss << "]";
+    patterns_json = ss.str();
+  }
+  
+  char buffer[8192];
+  snprintf(buffer, sizeof(buffer), js, patterns_json.c_str());
+  v->EvaluateScript(buffer, nullptr);
 }
 
 void UI::RemoveDarkModeFromView(RefPtr<View> v)
@@ -3748,6 +4074,165 @@ void UI::RemoveDarkModeFromView(RefPtr<View> v)
     }catch(e){return false;}
   })())JS";
   v->EvaluateScript(js, nullptr);
+}
+
+void UI::ApplyReduceMotionToView(RefPtr<View> v)
+{
+  if (!v)
+    return;
+  const char *js = R"JS((function(){
+    try{
+      var sid='__ul_reduce_motion';
+      if(document.getElementById(sid)) return false;
+      var css = '*, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }';
+      var s=document.createElement('style');
+      s.id=sid;
+      s.type='text/css';
+      s.appendChild(document.createTextNode(css));
+      (document.head||document.documentElement).appendChild(s);
+      return true;
+    }catch(e){return false;}
+  })())JS";
+  v->EvaluateScript(js, nullptr);
+}
+
+void UI::RemoveReduceMotionFromView(RefPtr<View> v)
+{
+  if (!v)
+    return;
+  const char *js = R"JS((function(){
+    try{
+      var s=document.getElementById('__ul_reduce_motion'); if(s) s.remove();
+      return true;
+    }catch(e){return false;}
+  })())JS";
+  v->EvaluateScript(js, nullptr);
+}
+
+void UI::ApplyHighContrastToView(RefPtr<View> v)
+{
+  if (!v)
+    return;
+  const char *js = R"JS((function(){
+    try{
+      var sid='__ul_high_contrast';
+      if(document.getElementById(sid)) return false;
+      var css = '* { border-color: currentColor !important; outline-color: currentColor !important; }\n';
+      css += 'a, a:visited { text-decoration: underline !important; }\n';
+      css += 'button, input, select, textarea { border: 2px solid currentColor !important; }\n';
+      css += ':focus { outline: 3px solid #0066ff !important; outline-offset: 2px !important; }';
+      var s=document.createElement('style');
+      s.id=sid;
+      s.type='text/css';
+      s.appendChild(document.createTextNode(css));
+      (document.head||document.documentElement).appendChild(s);
+      return true;
+    }catch(e){return false;}
+  })())JS";
+  v->EvaluateScript(js, nullptr);
+}
+
+void UI::RemoveHighContrastFromView(RefPtr<View> v)
+{
+  if (!v)
+    return;
+  const char *js = R"JS((function(){
+    try{
+      var s=document.getElementById('__ul_high_contrast'); if(s) s.remove();
+      return true;
+    }catch(e){return false;}
+  })())JS";
+  v->EvaluateScript(js, nullptr);
+}
+
+void UI::ApplyVibrantWindowTheme(bool enabled)
+{
+#if defined(_WIN32)
+  HWND hwnd = (HWND)window_->native_handle();
+  if (hwnd)
+  {
+    // Use DWM attribute for caption color (DWMWA_CAPTION_COLOR = 35)
+    // Vibrant purple: brighter accent color, Dark: standard dark purple
+    COLORREF color = enabled ? RGB(120, 100, 200) : RGB(42, 33, 60);
+    DwmSetWindowAttribute(hwnd, 35, &color, sizeof(color));
+  }
+#endif
+  (void)enabled; // Suppress unused parameter warning on non-Windows
+}
+
+void UI::ApplySmoothScrollingToView(RefPtr<View> v)
+{
+  if (!v)
+    return;
+  const char *js = R"JS((function(){
+    try{
+      if(document.getElementById('__ul_smooth_scroll')) return true;
+      var s=document.createElement('style');
+      s.id='__ul_smooth_scroll';
+      s.textContent='html, body { scroll-behavior: smooth !important; } * { scroll-behavior: smooth !important; }';
+      (document.head||document.documentElement).appendChild(s);
+      return true;
+    }catch(e){return false;}
+  })())JS";
+  v->EvaluateScript(js, nullptr);
+}
+
+void UI::RemoveSmoothScrollingFromView(RefPtr<View> v)
+{
+  if (!v)
+    return;
+  const char *js = R"JS((function(){
+    try{
+      var s=document.getElementById('__ul_smooth_scroll'); if(s) s.remove();
+      return true;
+    }catch(e){return false;}
+  })())JS";
+  v->EvaluateScript(js, nullptr);
+}
+
+void UI::ApplyTransparentToolbar(bool enabled)
+{
+  // Apply transparent/translucent effect to toolbar UI
+  if (!overlay_)
+    return;
+  
+  RefPtr<View> ui_view = overlay_->view();
+  if (!ui_view)
+    return;
+  
+  const char *js_enable = R"JS((function(){
+    try{
+      if(document.getElementById('__ul_transparent_toolbar')) return true;
+      var s=document.createElement('style');
+      s.id='__ul_transparent_toolbar';
+      s.textContent=`
+        .toolbar, .tab-bar, nav, header, .browser-toolbar {
+          background: rgba(30, 30, 46, 0.85) !important;
+          backdrop-filter: blur(10px) !important;
+          -webkit-backdrop-filter: blur(10px) !important;
+        }
+        .tab-content, .url-bar, .address-bar {
+          background: rgba(42, 33, 60, 0.9) !important;
+        }
+      `;
+      (document.head||document.documentElement).appendChild(s);
+      return true;
+    }catch(e){return false;}
+  })())JS";
+
+  const char *js_disable = R"JS((function(){
+    try{
+      var s=document.getElementById('__ul_transparent_toolbar'); if(s) s.remove();
+      return true;
+    }catch(e){return false;}
+  })())JS";
+
+  ui_view->EvaluateScript(enabled ? js_enable : js_disable, nullptr);
+}
+
+void UI::RemoveTransparentToolbar()
+{
+  ApplyTransparentToolbar(false);
 }
 
 // --- URL Suggestions Implementation ---
@@ -4648,9 +5133,7 @@ void UI::OnSuggestionPick(const JSObject &obj, const JSArgs &args)
   }
   if (open_new_tab)
   {
-    RefPtr<View> child = CreateNewTabForChildView(s);
-    if (child)
-      child->LoadURL(s);
+    CreateNewTabForChildView(s);  // Handles loading internally
     return;
   }
   if (!tabs_.empty())
@@ -4688,6 +5171,7 @@ void UI::OnNewDownloadStarted()
 bool UI::BrowserSettings::operator==(const BrowserSettings &other) const
 {
   return launch_dark_theme == other.launch_dark_theme &&
+         dark_theme_excluded_sites == other.dark_theme_excluded_sites &&
          vibrant_window_theme == other.vibrant_window_theme &&
          experimental_transparent_toolbar == other.experimental_transparent_toolbar &&
          experimental_compact_tabs == other.experimental_compact_tabs &&
@@ -4967,6 +5451,8 @@ void UI::OnImportPasswords(const JSObject &obj, const JSArgs &args)
   std::filesystem::path temp_path = SettingsDirectory() / ("temp_import." + format);
   {
     std::ofstream out(temp_path, std::ios::binary);
+    if (!out.is_open())
+      return;
     out << content;
   }
 
@@ -5081,7 +5567,7 @@ void UI::OnDrmPromptResponse(const JSObject &obj, const JSArgs &args)
 
   ultralight::String action_ul = args[0].ToString();
   ultralight::String url_ul = args[1].ToString();
-  int tab_id_int = args[2].ToInteger();
+  int64_t tab_id_int = args[2].ToInteger();
 
   auto action_str = action_ul.utf8();
   auto url_str = url_ul.utf8();

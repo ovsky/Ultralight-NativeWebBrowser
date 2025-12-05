@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23c2bce8'%3E%3Cpath d='M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z'/%3E%3C/svg%3E">
     <style>
         * {
             box-sizing: border-box;
@@ -443,6 +444,46 @@
             cursor: default;
         }
 
+        /* Dark Theme Excluded Sites styles */
+        .dark-sites-row {
+            margin: 32px 0 24px;
+            padding: 20px;
+            border-radius: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .dark-sites-label {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .dark-sites-textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-size: 12px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            resize: vertical;
+        }
+
+        .dark-sites-textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .dark-sites-help {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            margin-top: 8px;
+        }
+
         /* Scrollbar styling */
         ::-webkit-scrollbar {
             width: 8px;
@@ -513,6 +554,12 @@
             </div>
             <pre id="drm-log" class="drm-log">Requesting DRM status...</pre>
         </section>
+        <!-- Dark Theme Excluded Sites section -->
+        <div id="dark-sites-section" class="dark-sites-row">
+            <div class="dark-sites-label">Dark Theme Excluded Sites</div>
+            <textarea id="dark-sites-textarea" class="dark-sites-textarea" spellcheck="false" autocomplete="off" placeholder="Enter URL patterns (one per line)&#10;Example:&#10;*.example.com&#10;https://specific-site.com/*&#10;# Use # for comments"></textarea>
+            <div class="dark-sites-help">Enter URL patterns for sites where dark theme should be disabled (one per line). Supports wildcards (*) and comments starting with #. Browser internal pages (settings, history, etc.) are automatically excluded.</div>
+        </div>
         <!-- Custom User Agent section lives at the very bottom of settings -->
         <div id="ua-section" class="ua-row">
             <div class="ua-label">Target User Agent String</div>
@@ -619,6 +666,7 @@
 
         let currentSettings = {}, originalSettings = {}, isDirty = false;
         let targetUserAgent = '', originalTargetUserAgent = '';
+        let darkThemeExcludedSites = '', originalDarkThemeExcludedSites = '';
         const drmElements = {};
         let drmStatusSnapshot = null;
 
@@ -676,6 +724,14 @@
                         targetUserAgent = '';
                         originalTargetUserAgent = '';
                     }
+                    // Hydrate dark theme excluded sites from payload
+                    if (typeof data.dark_theme_excluded_sites === 'string') {
+                        darkThemeExcludedSites = data.dark_theme_excluded_sites;
+                        originalDarkThemeExcludedSites = data.dark_theme_excluded_sites;
+                    } else {
+                        darkThemeExcludedSites = '';
+                        originalDarkThemeExcludedSites = '';
+                    }
                     if (data.meta && data.meta.storage_path) {
                         document.getElementById('storage-path').textContent = 'Storage: ' + data.meta.storage_path;
                     }
@@ -689,6 +745,7 @@
                     }
                     renderSettings();
                     hydrateUserAgentEditor();
+                    hydrateDarkThemeExcludedSitesEditor();
                     updateDirtyState();
                     loadDrmStatus(true);
                 }
@@ -782,6 +839,9 @@
             if (!isDirty && targetUserAgent !== originalTargetUserAgent) {
                 isDirty = true;
             }
+            if (!isDirty && darkThemeExcludedSites !== originalDarkThemeExcludedSites) {
+                isDirty = true;
+            }
             document.getElementById('btn-save').disabled = !isDirty;
         }
 
@@ -790,6 +850,8 @@
             if (typeof window.OnSaveSettings === 'function') {
                 window.OnSaveSettings();
                 originalSettings = { ...currentSettings };
+                originalTargetUserAgent = targetUserAgent;
+                originalDarkThemeExcludedSites = darkThemeExcludedSites;
                 isDirty = false;
                 document.getElementById('btn-save').disabled = true;
                 log('Saved');
@@ -812,8 +874,16 @@
                             targetUserAgent = '';
                             originalTargetUserAgent = '';
                         }
+                        if (typeof data.dark_theme_excluded_sites === 'string') {
+                            darkThemeExcludedSites = data.dark_theme_excluded_sites;
+                            originalDarkThemeExcludedSites = data.dark_theme_excluded_sites;
+                        } else {
+                            darkThemeExcludedSites = '';
+                            originalDarkThemeExcludedSites = '';
+                        }
                         renderSettings();
                         hydrateUserAgentEditor();
+                        hydrateDarkThemeExcludedSitesEditor();
                         updateDirtyState();
                         loadDrmStatus(true);
                         log('Restored');
@@ -836,6 +906,25 @@
                 targetUserAgent = newVal;
                 if (typeof window.OnUpdateSetting === 'function') {
                     window.OnUpdateSetting('target_user_agent', newVal);
+                }
+                updateDirtyState();
+                const autoSave = !!currentSettings.auto_save_settings;
+                if (autoSave && typeof window.OnSaveSettings === 'function') {
+                    window.OnSaveSettings();
+                }
+            };
+        }
+        function hydrateDarkThemeExcludedSitesEditor() {
+            const sitesTextarea = document.getElementById('dark-sites-textarea');
+            if (!sitesTextarea) return;
+            sitesTextarea.value = darkThemeExcludedSites || '';
+            // Ensure we don't attach multiple listeners on re-render.
+            sitesTextarea.oninput = null;
+            sitesTextarea.oninput = () => {
+                const newVal = sitesTextarea.value || '';
+                darkThemeExcludedSites = newVal;
+                if (typeof window.OnUpdateSetting === 'function') {
+                    window.OnUpdateSetting('dark_theme_excluded_sites', newVal);
                 }
                 updateDirtyState();
                 const autoSave = !!currentSettings.auto_save_settings;

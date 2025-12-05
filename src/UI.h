@@ -49,6 +49,7 @@ public:
   {
     // Appearance
     bool launch_dark_theme = false;
+    std::string dark_theme_excluded_sites; // URL patterns where dark theme should NOT be applied (newline-separated)
     bool vibrant_window_theme = false;
     bool experimental_transparent_toolbar = false;
     bool experimental_compact_tabs = false;
@@ -125,6 +126,7 @@ public:
   void OnStop(const JSObject &obj, const JSArgs &args);
   void OnToggleTools(const JSObject &obj, const JSArgs &args);
   void OnRequestNewTab(const JSObject &obj, const JSArgs &args);
+  void OnRequestNewWindow(const JSObject &obj, const JSArgs &args);
   void OnRequestTabClose(const JSObject &obj, const JSArgs &args);
   void OnActiveTabChange(const JSObject &obj, const JSArgs &args);
   void OnRequestChangeURL(const JSObject &obj, const JSArgs &args);
@@ -222,6 +224,7 @@ protected:
   void UpdateTabTitle(uint64_t id, const String &title);
   void UpdateTabURL(uint64_t id, const String &url);
   void UpdateTabNavigation(uint64_t id, bool is_loading, bool can_go_back, bool can_go_forward);
+  void UpdateTabFavicon(uint64_t id, const String &favicon_data_url);
 
   void SetLoading(bool is_loading);
   void SetCanGoBack(bool can_go_back);
@@ -363,6 +366,7 @@ protected:
   bool reduce_motion_enabled_ = false;
   bool high_contrast_ui_enabled_ = false;
   bool vibrant_window_theme_enabled_ = false;
+  bool smooth_scrolling_enabled_ = true;
 
   JSFunction updateBack;
   JSFunction updateForward;
@@ -406,10 +410,36 @@ protected:
   bool suggestion_favicons_enabled_ = true;
   void LoadSuggestionsFaviconsFlag();
 
+  // Check if URL is a browser internal page (settings, history, etc.)
+  static bool IsBrowserInternalPage(const std::string &url);
+
   // Auto Dark Mode state
   bool dark_mode_enabled_ = false;
   void ApplyDarkModeToView(RefPtr<View> v);
   void RemoveDarkModeFromView(RefPtr<View> v);
+
+  // Accessibility CSS injections
+  void ApplyReduceMotionToView(RefPtr<View> v);
+  void RemoveReduceMotionFromView(RefPtr<View> v);
+  void ApplyHighContrastToView(RefPtr<View> v);
+  void RemoveHighContrastFromView(RefPtr<View> v);
+
+  // Performance CSS injections
+  void ApplySmoothScrollingToView(RefPtr<View> v);
+  void RemoveSmoothScrollingFromView(RefPtr<View> v);
+
+  // Window appearance
+  void ApplyVibrantWindowTheme(bool enabled);
+  void ApplyTransparentToolbar(bool enabled);
+  void RemoveTransparentToolbar();
+
+  // Cached page HTML for instant loading (avoids file I/O delay)
+  std::string cached_start_page_html_;
+  std::unordered_map<std::string, std::string> cached_internal_pages_;
+  void LoadCachedStartPage();
+  void LoadCachedInternalPages();
+  // Get cached HTML for a file:/// URL, or empty if not cached
+  const std::string& GetCachedPageHTML(const std::string& url) const;
 
   // Cached user agent string currently applied to outgoing requests.
   std::string active_user_agent_;

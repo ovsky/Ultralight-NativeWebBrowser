@@ -146,6 +146,7 @@ bool SettingsManager::LoadSettingsFromDisk(UI &ui)
     }
     // Parse string settings
     ui.settings_.custom_user_agent = ParseStringLenient(content, "custom_user_agent", "");
+    ui.settings_.dark_theme_excluded_sites = ParseStringLenient(content, "dark_theme_excluded_sites", "");
     ui.settings_storage_path_ = (migrated ? legacy_path.string() : primary_path.string());
   }
   else
@@ -180,6 +181,7 @@ bool SettingsManager::SaveSettingsToDisk(UI &ui)
   doc << "{\n";
   doc << "  \"values\": " << ui.BuildSettingsJSON() << ",\n";
   doc << "  \"custom_user_agent\": \"" << util::EscapeJsonString(ui.settings_.custom_user_agent) << "\",\n";
+  doc << "  \"dark_theme_excluded_sites\": \"" << util::EscapeJsonString(ui.settings_.dark_theme_excluded_sites) << "\",\n";
   doc << "  \"meta\": {\n";
   doc << "    \"updated_at\": \"" << util::ToIso8601UTC(std::chrono::system_clock::now()) << "\",\n";
   doc << "    \"dirty\": false,\n";
