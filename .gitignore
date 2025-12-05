@@ -22,3 +22,5 @@ debug_log*
 debug_*
 .vscode/tasks.json
 /.vscode
+data/session.json
+.vscode/

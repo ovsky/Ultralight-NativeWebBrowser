@@ -301,3 +301,109 @@ body.compact-tabs .icon {
 body.compact-tabs #toggle-downloads .downloads-badge {
      top: 0;
 }
+
+/* Session Restore Bar */
+#session-restore-bar {
+     display: none;
+     position: fixed;
+     top: 0;
+     left: 0;
+     right: 0;
+     background: linear-gradient(180deg, #2d4a6f 0%, #1e3a5f 100%);
+     border-bottom: 1px solid #3d6a9f;
+     padding: 8px 16px;
+     z-index: 9999;
+     align-items: center;
+     justify-content: space-between;
+     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+     animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+     from {
+          transform: translateY(-100%);
+          opacity: 0;
+     }
+     to {
+          transform: translateY(0);
+          opacity: 1;
+     }
+}
+
+#session-restore-bar.visible {
+     display: flex;
+}
+
+#session-restore-bar .restore-message {
+     display: flex;
+     align-items: center;
+     gap: 10px;
+     color: #e0e8f0;
+     font-size: 13px;
+}
+
+#session-restore-bar .restore-icon {
+     width: 20px;
+     height: 20px;
+     fill: #7cb3e0;
+}
+
+#session-restore-bar .restore-actions {
+     display: flex;
+     gap: 8px;
+}
+
+#session-restore-bar .restore-btn {
+     padding: 6px 14px;
+     border-radius: 4px;
+     border: none;
+     font-size: 12px;
+     font-weight: 500;
+     cursor: pointer;
+     transition: background-color 0.2s, transform 0.1s;
+}
+
+#session-restore-bar .restore-btn:hover {
+     transform: translateY(-1px);
+}
+
+#session-restore-bar .restore-btn:active {
+     transform: translateY(0);
+}
+
+#session-restore-bar .restore-btn.primary {
+     background: #4a9eff;
+     color: white;
+}
+
+#session-restore-bar .restore-btn.primary:hover {
+     background: #5aadff;
+}
+
+#session-restore-bar .restore-btn.secondary {
+     background: rgba(255, 255, 255, 0.1);
+     color: #c0d0e0;
+     border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+#session-restore-bar .restore-btn.secondary:hover {
+     background: rgba(255, 255, 255, 0.15);
+}
+
+#session-restore-bar .dismiss-btn {
+     background: none;
+     border: none;
+     color: #8090a0;
+     cursor: pointer;
+     padding: 4px;
+     margin-left: 8px;
+     border-radius: 50%;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+}
+
+#session-restore-bar .dismiss-btn:hover {
+     background: rgba(255, 255, 255, 0.1);
+     color: #c0d0e0;
+}
