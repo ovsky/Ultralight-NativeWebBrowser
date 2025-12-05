@@ -314,7 +314,8 @@
             const list = document.getElementById('downloads-list');
             const empty = document.getElementById('downloads-empty');
             list.innerHTML = '';
-            const items = (data && Array.isArray(data.items)) ? data.items.slice().reverse() : [];
+            // Ultralight DownloadManager returns items newest-first; keep that order
+            const items = (data && Array.isArray(data.items)) ? data.items.slice() : [];
             if (!items.length) {
                 empty.style.display = 'block';
                 return;
