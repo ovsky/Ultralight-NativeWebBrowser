@@ -265,7 +265,7 @@ tar -xzf Ultralight-WebBrowser-*.tar.gz -C ~/.local/opt
 
 ## 🆕 Recent Updates
 
-### v0.9.6 (Latest Development)
+### v0.9.6 (In Development)
 
 #### New Features
 - **Location Spoofing** – Override browser geolocation with custom coordinates
