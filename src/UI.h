@@ -365,6 +365,7 @@ protected:
   bool reduce_motion_enabled_ = false;
   bool high_contrast_ui_enabled_ = false;
   bool vibrant_window_theme_enabled_ = false;
+  bool smooth_scrolling_enabled_ = true;
 
   JSFunction updateBack;
   JSFunction updateForward;
@@ -412,6 +413,21 @@ protected:
   bool dark_mode_enabled_ = false;
   void ApplyDarkModeToView(RefPtr<View> v);
   void RemoveDarkModeFromView(RefPtr<View> v);
+
+  // Accessibility CSS injections
+  void ApplyReduceMotionToView(RefPtr<View> v);
+  void RemoveReduceMotionFromView(RefPtr<View> v);
+  void ApplyHighContrastToView(RefPtr<View> v);
+  void RemoveHighContrastFromView(RefPtr<View> v);
+
+  // Performance CSS injections
+  void ApplySmoothScrollingToView(RefPtr<View> v);
+  void RemoveSmoothScrollingFromView(RefPtr<View> v);
+
+  // Window appearance
+  void ApplyVibrantWindowTheme(bool enabled);
+  void ApplyTransparentToolbar(bool enabled);
+  void RemoveTransparentToolbar();
 
   // Cached user agent string currently applied to outgoing requests.
   std::string active_user_agent_;

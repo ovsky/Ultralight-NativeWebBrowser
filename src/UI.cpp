@@ -30,6 +30,8 @@
 #define NOMINMAX 1
 #endif
 #include <windows.h> // GetModuleFileNameW
+#include <dwmapi.h>  // DwmSetWindowAttribute for window theming
+#pragma comment(lib, "dwmapi.lib")
 #else
 #include <sys/stat.h> // mkdir
 #include <unistd.h>   // getcwd
@@ -3138,8 +3140,22 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
 {
   // Appearance
   SetDarkModeEnabled(settings_.launch_dark_theme);
+  
+  // Vibrant window theme - changes title bar color
+  bool was_vibrant = vibrant_window_theme_enabled_;
   vibrant_window_theme_enabled_ = settings_.vibrant_window_theme;
+  if (was_vibrant != vibrant_window_theme_enabled_ || initial)
+  {
+    ApplyVibrantWindowTheme(vibrant_window_theme_enabled_);
+  }
+  
+  // Transparent toolbar - applies CSS to UI overlay
+  bool was_transparent = experimental_transparent_toolbar_enabled_;
   experimental_transparent_toolbar_enabled_ = settings_.experimental_transparent_toolbar;
+  if (was_transparent != experimental_transparent_toolbar_enabled_ || initial)
+  {
+    ApplyTransparentToolbar(experimental_transparent_toolbar_enabled_);
+  }
 
   // Handle compact tabs mode - adjust UI height and trigger resize
   bool was_compact = experimental_compact_tabs_enabled_;
@@ -3191,11 +3207,48 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
 
   // Performance
   // enable_javascript and hardware_acceleration are applied during Tab creation (see CreateNewTab)
-  // smooth_scrolling, local_storage, database - would require additional Ultralight session config
+  // Smooth scrolling - apply CSS to all tab views
+  bool was_smooth = smooth_scrolling_enabled_;
+  smooth_scrolling_enabled_ = settings_.smooth_scrolling;
+  if (was_smooth != smooth_scrolling_enabled_ || initial)
+  {
+    for (auto &entry : tabs_)
+    {
+      if (entry.second)
+      {
+        if (smooth_scrolling_enabled_)
+          ApplySmoothScrollingToView(entry.second->view());
+        else
+          RemoveSmoothScrollingFromView(entry.second->view());
+      }
+    }
+  }
 
   // Accessibility
   reduce_motion_enabled_ = settings_.reduce_motion;
   high_contrast_ui_enabled_ = settings_.high_contrast_ui;
+  
+  // Apply accessibility CSS to all views
+  auto apply_accessibility = [&](RefPtr<View> v)
+  {
+    if (!v)
+      return;
+    if (reduce_motion_enabled_)
+      ApplyReduceMotionToView(v);
+    else
+      RemoveReduceMotionFromView(v);
+    if (high_contrast_ui_enabled_)
+      ApplyHighContrastToView(v);
+    else
+      RemoveHighContrastFromView(v);
+  };
+
+  apply_accessibility(view());
+  for (auto &entry : tabs_)
+  {
+    if (entry.second)
+      apply_accessibility(entry.second->view());
+  }
   // enable_caret_browsing would require page-level script injection
 
   // Developer
@@ -3870,6 +3923,165 @@ void UI::RemoveDarkModeFromView(RefPtr<View> v)
     }catch(e){return false;}
   })())JS";
   v->EvaluateScript(js, nullptr);
+}
+
+void UI::ApplyReduceMotionToView(RefPtr<View> v)
+{
+  if (!v)
+    return;
+  const char *js = R"JS((function(){
+    try{
+      var sid='__ul_reduce_motion';
+      if(document.getElementById(sid)) return false;
+      var css = '*, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }';
+      var s=document.createElement('style');
+      s.id=sid;
+      s.type='text/css';
+      s.appendChild(document.createTextNode(css));
+      (document.head||document.documentElement).appendChild(s);
+      return true;
+    }catch(e){return false;}
+  })())JS";
+  v->EvaluateScript(js, nullptr);
+}
+
+void UI::RemoveReduceMotionFromView(RefPtr<View> v)
+{
+  if (!v)
+    return;
+  const char *js = R"JS((function(){
+    try{
+      var s=document.getElementById('__ul_reduce_motion'); if(s) s.remove();
+      return true;
+    }catch(e){return false;}
+  })())JS";
+  v->EvaluateScript(js, nullptr);
+}
+
+void UI::ApplyHighContrastToView(RefPtr<View> v)
+{
+  if (!v)
+    return;
+  const char *js = R"JS((function(){
+    try{
+      var sid='__ul_high_contrast';
+      if(document.getElementById(sid)) return false;
+      var css = '* { border-color: currentColor !important; outline-color: currentColor !important; }\n';
+      css += 'a, a:visited { text-decoration: underline !important; }\n';
+      css += 'button, input, select, textarea { border: 2px solid currentColor !important; }\n';
+      css += ':focus { outline: 3px solid #0066ff !important; outline-offset: 2px !important; }';
+      var s=document.createElement('style');
+      s.id=sid;
+      s.type='text/css';
+      s.appendChild(document.createTextNode(css));
+      (document.head||document.documentElement).appendChild(s);
+      return true;
+    }catch(e){return false;}
+  })())JS";
+  v->EvaluateScript(js, nullptr);
+}
+
+void UI::RemoveHighContrastFromView(RefPtr<View> v)
+{
+  if (!v)
+    return;
+  const char *js = R"JS((function(){
+    try{
+      var s=document.getElementById('__ul_high_contrast'); if(s) s.remove();
+      return true;
+    }catch(e){return false;}
+  })())JS";
+  v->EvaluateScript(js, nullptr);
+}
+
+void UI::ApplyVibrantWindowTheme(bool enabled)
+{
+#if defined(_WIN32)
+  HWND hwnd = (HWND)window_->native_handle();
+  if (hwnd)
+  {
+    // Use DWM attribute for caption color (DWMWA_CAPTION_COLOR = 35)
+    // Vibrant purple: brighter accent color, Dark: standard dark purple
+    COLORREF color = enabled ? RGB(120, 100, 200) : RGB(42, 33, 60);
+    DwmSetWindowAttribute(hwnd, 35, &color, sizeof(color));
+  }
+#endif
+  (void)enabled; // Suppress unused parameter warning on non-Windows
+}
+
+void UI::ApplySmoothScrollingToView(RefPtr<View> v)
+{
+  if (!v)
+    return;
+  const char *js = R"JS((function(){
+    try{
+      if(document.getElementById('__ul_smooth_scroll')) return true;
+      var s=document.createElement('style');
+      s.id='__ul_smooth_scroll';
+      s.textContent='html, body { scroll-behavior: smooth !important; } * { scroll-behavior: smooth !important; }';
+      (document.head||document.documentElement).appendChild(s);
+      return true;
+    }catch(e){return false;}
+  })())JS";
+  v->EvaluateScript(js, nullptr);
+}
+
+void UI::RemoveSmoothScrollingFromView(RefPtr<View> v)
+{
+  if (!v)
+    return;
+  const char *js = R"JS((function(){
+    try{
+      var s=document.getElementById('__ul_smooth_scroll'); if(s) s.remove();
+      return true;
+    }catch(e){return false;}
+  })())JS";
+  v->EvaluateScript(js, nullptr);
+}
+
+void UI::ApplyTransparentToolbar(bool enabled)
+{
+  // Apply transparent/translucent effect to toolbar UI
+  if (!overlay_)
+    return;
+  
+  RefPtr<View> ui_view = overlay_->view();
+  if (!ui_view)
+    return;
+  
+  const char *js_enable = R"JS((function(){
+    try{
+      if(document.getElementById('__ul_transparent_toolbar')) return true;
+      var s=document.createElement('style');
+      s.id='__ul_transparent_toolbar';
+      s.textContent=`
+        .toolbar, .tab-bar, nav, header, .browser-toolbar {
+          background: rgba(30, 30, 46, 0.85) !important;
+          backdrop-filter: blur(10px) !important;
+          -webkit-backdrop-filter: blur(10px) !important;
+        }
+        .tab-content, .url-bar, .address-bar {
+          background: rgba(42, 33, 60, 0.9) !important;
+        }
+      `;
+      (document.head||document.documentElement).appendChild(s);
+      return true;
+    }catch(e){return false;}
+  })())JS";
+
+  const char *js_disable = R"JS((function(){
+    try{
+      var s=document.getElementById('__ul_transparent_toolbar'); if(s) s.remove();
+      return true;
+    }catch(e){return false;}
+  })())JS";
+
+  ui_view->EvaluateScript(enabled ? js_enable : js_disable, nullptr);
+}
+
+void UI::RemoveTransparentToolbar()
+{
+  ApplyTransparentToolbar(false);
 }
 
 // --- URL Suggestions Implementation ---
