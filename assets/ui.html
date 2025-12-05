@@ -94,7 +94,26 @@
         </span>
     </div>
 
-    
+    <!-- Session Restore Bar -->
+    <div id="session-restore-bar" role="alert" aria-live="polite">
+        <div class="restore-message">
+            <svg class="restore-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9z" fill="currentColor"/>
+                <path d="M12 8v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" fill="currentColor"/>
+            </svg>
+            <span id="restore-message-text">Your previous session was interrupted. Would you like to restore your tabs?</span>
+        </div>
+        <div class="restore-actions">
+            <button class="restore-btn primary" id="restore-session-btn">Restore</button>
+            <button class="restore-btn secondary" id="dismiss-session-btn">Start Fresh</button>
+            <button class="dismiss-btn" id="close-restore-bar" aria-label="Close">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
     <div id="menu-dropdown" class="menu-dropdown hidden" role="menu" aria-hidden="true">
         <div class="menu-item" data-action="new-tab">New tab [Ctrl+T]</div>
         <div class="menu-item" data-action="new-window">New window [Ctrl+N]</div>
@@ -136,6 +155,56 @@
             const tab = document.querySelector("[data-tab-id='" + id + "']");
             if (tab)
                 chromeTabs.removeTab(tab);
+        }
+
+        // Session Restore Bar Functions
+        function showSessionRestoreBar(tabCount, wasCrash) {
+            const bar = document.getElementById('session-restore-bar');
+            const msgText = document.getElementById('restore-message-text');
+            if (!bar || !msgText) return;
+            
+            if (wasCrash) {
+                msgText.textContent = `Your previous session was interrupted. Restore ${tabCount} tab${tabCount !== 1 ? 's' : ''}?`;
+            } else {
+                msgText.textContent = `Would you like to restore ${tabCount} tab${tabCount !== 1 ? 's' : ''} from your last session?`;
+            }
+            
+            bar.classList.add('visible');
+            
+            // Set up event handlers
+            const restoreBtn = document.getElementById('restore-session-btn');
+            const dismissBtn = document.getElementById('dismiss-session-btn');
+            const closeBtn = document.getElementById('close-restore-bar');
+            
+            const hideBar = () => {
+                bar.classList.remove('visible');
+            };
+            
+            if (restoreBtn) {
+                restoreBtn.onclick = () => {
+                    hideBar();
+                    if (window.OnRestoreSession) OnRestoreSession();
+                };
+            }
+            
+            if (dismissBtn) {
+                dismissBtn.onclick = () => {
+                    hideBar();
+                    if (window.OnDismissSession) OnDismissSession();
+                };
+            }
+            
+            if (closeBtn) {
+                closeBtn.onclick = () => {
+                    hideBar();
+                    if (window.OnDismissSession) OnDismissSession();
+                };
+            }
+        }
+        
+        function hideSessionRestoreBar() {
+            const bar = document.getElementById('session-restore-bar');
+            if (bar) bar.classList.remove('visible');
         }
 
         function bindCallbacks() {

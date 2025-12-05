@@ -460,6 +460,81 @@ void Tab::OnWindowObjectReady(View *caller, uint64_t frame_id, bool is_main_fram
 })();
 )JS";
     caller->EvaluateScript(String(cryptoPolyfill), nullptr);
+    
+    // Inject Do Not Track (DNT) header simulation if enabled in settings
+    // This overrides navigator.doNotTrack to report the user's preference
+    if (ui_->do_not_track_enabled())
+    {
+      const char* dntScript = R"JS(
+(function() {
+  'use strict';
+  // Set Do Not Track property to '1' (enabled)
+  // This tells websites the user prefers not to be tracked
+  try {
+    Object.defineProperty(Navigator.prototype, 'doNotTrack', {
+      value: '1',
+      writable: false,
+      configurable: false,
+      enumerable: true
+    });
+    // Also set the older msDoNotTrack property for IE compatibility
+    if (typeof navigator.msDoNotTrack === 'undefined') {
+      Object.defineProperty(Navigator.prototype, 'msDoNotTrack', {
+        value: '1',
+        writable: false,
+        configurable: false,
+        enumerable: true
+      });
+    }
+    console.log('[Ultralight] Do Not Track enabled');
+  } catch(e) {
+    console.warn('[Ultralight] Failed to set DNT:', e);
+  }
+})();
+)JS";
+      caller->EvaluateScript(String(dntScript), nullptr);
+    }
+    
+    // Block third-party cookie access if enabled in settings
+    // This is a best-effort approach since true cookie blocking requires network-level control
+    if (ui_->block_third_party_cookies_enabled())
+    {
+      const char* cookieBlockScript = R"JS(
+(function() {
+  'use strict';
+  // Monitor and log third-party cookie attempts
+  var originalDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie');
+  var topOrigin = window.top.location.origin;
+  
+  Object.defineProperty(document, 'cookie', {
+    get: function() {
+      return originalDescriptor.get.call(this);
+    },
+    set: function(value) {
+      try {
+        // Check if this is a cross-origin iframe attempting to set cookies
+        if (window !== window.top) {
+          var currentOrigin = window.location.origin;
+          if (currentOrigin !== topOrigin) {
+            console.warn('[Ultralight] Blocked third-party cookie set from:', currentOrigin);
+            return; // Block the cookie
+          }
+        }
+      } catch(e) {
+        // Cross-origin frame access might throw, in which case this is third-party
+        console.warn('[Ultralight] Blocked third-party cookie set (cross-origin iframe)');
+        return;
+      }
+      return originalDescriptor.set.call(this, value);
+    },
+    configurable: true,
+    enumerable: true
+  });
+  console.log('[Ultralight] Third-party cookie blocking enabled');
+})();
+)JS";
+      caller->EvaluateScript(String(cookieBlockScript), nullptr);
+    }
   }
 }
 

@@ -102,6 +102,10 @@ public:
     // DRM WebView subsystem toggle (disabled by default, user must opt-in)
     bool enable_drm_webview = false;
 
+    // Session restore settings
+    bool restore_session_on_startup = true;  // Restore previous session tabs on startup
+    bool save_session_continuously = true;   // Save session state continuously (crash recovery)
+
     bool operator==(const BrowserSettings &other) const;
     bool operator!=(const BrowserSettings &other) const { return !(*this == other); }
   };
@@ -214,6 +218,11 @@ public:
   DownloadManager *download_manager() { return download_manager_.get(); }
   password::PasswordManager *password_manager() { return password_manager_.get(); }
   AdBlocker *network_blocker() { return adblock_; }
+  
+  // Privacy settings accessors for Tab's JavaScript injection
+  bool do_not_track_enabled() const { return settings_.do_not_track; }
+  bool block_third_party_cookies_enabled() const { return settings_.block_third_party_cookies; }
+  bool web_security_enabled() const { return settings_.enable_web_security; }
 
 protected:
   static std::filesystem::path SettingsDirectory();
@@ -248,6 +257,20 @@ protected:
   void RecordHistory(const String &url, const String &title);
   String GetHistoryJSON();
   void ClearHistory();
+
+  // Session management (crash recovery / restore tabs)
+  void SaveSessionToDisk();
+  void SaveSessionToDiskWithCleanExit();
+  void LoadSessionFromDisk();
+  bool HasSavedSession() const;
+  void ClearSavedSession();
+  void RestoreSavedSession();
+  void ShowSessionRestoreBar();  // Show restore prompt in UI
+  void OnRestoreSession(const JSObject &obj, const JSArgs &args);  // User clicked restore
+  void OnDismissSession(const JSObject &obj, const JSArgs &args);  // User clicked dismiss
+  int GetSavedSessionTabCount() const;  // Get number of saved tabs
+  int GetMeaningfulSavedTabCount() const;  // Get count of non-internal tabs
+  bool IsInternalBrowserPage(const std::string &url) const;  // Check if URL is internal
 
   // Downloads management helpers
   String GetDownloadsJSON();
@@ -367,6 +390,12 @@ protected:
   bool high_contrast_ui_enabled_ = false;
   bool vibrant_window_theme_enabled_ = false;
   bool smooth_scrolling_enabled_ = true;
+  
+  // Session restore state
+  bool session_restore_pending_ = false;  // True if we should prompt to restore session
+  bool session_was_clean_exit_ = false;   // True if last exit was clean (not crash/ALT+F4)
+  bool session_restore_bar_visible_ = false;  // True while restore bar is shown (prevents session saving)
+  std::string session_file_path_;         // Path to session.json
 
   JSFunction updateBack;
   JSFunction updateForward;
