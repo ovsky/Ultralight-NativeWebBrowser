@@ -1,5 +1,6 @@
 {
   "Ctrl+T": "new-tab",
+  "Ctrl+N": "new-window",
   "Ctrl+W": "close-tab",
   "Ctrl+H": "open-history",
   "Ctrl+J": "open-downloads",
