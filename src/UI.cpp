@@ -3724,6 +3724,27 @@ void UI::ApplyDarkModeToView(RefPtr<View> v)
     return;
   const char *js = R"JS((function(){
     try{
+      // Don't apply dark mode to browser internal pages (they have their own dark styling)
+      var url = window.location.href;
+      if(url.startsWith('file:///') && 
+         (url.includes('settings.html') || 
+          url.includes('passwords.html') || 
+          url.includes('extensions.html') || 
+          url.includes('downloads.html') || 
+          url.includes('history.html') || 
+          url.includes('ui.html') || 
+          url.includes('menu.html') || 
+          url.includes('contextmenu.html') || 
+          url.includes('suggestions.html') || 
+          url.includes('quick-inspector.html') || 
+          url.includes('downloads-panel.html') || 
+          url.includes('about.html') || 
+          url.includes('new_tab_page.html') || 
+          url.includes('release_notes.html') ||
+          url.includes('static-sties/'))){
+        return false; // Skip dark mode for these pages
+      }
+
       var sid='__ul_auto_dark';
       var prev=document.getElementById(sid);
       if(prev) prev.remove();
