@@ -1149,6 +1149,12 @@ bool UI::RunShortcutAction(const std::string &action)
     CreateNewTabForChildView(String("file:///history.html"));
     return true;
   }
+  if (action == "open-bookmarks")
+  {
+    // Open Bookmarks in a NEW tab
+    CreateNewTabForChildView(String("file:///bookmarks.html"));
+    return true;
+  }
   if (action == "focus-address")
   {
     if (focusAddressBar)
