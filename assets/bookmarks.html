@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <title>Bookmarks</title>
-    
+
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23FFD700'%3E%3Cpath d='M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z'/%3E%3C/svg%3E" />
     <link rel="stylesheet" type="text/css" href="ui.css">
@@ -235,21 +235,27 @@
                 --bg: #1a1a1f;
                 --fg: #e8e8e8;
             }
+
             .btn {
                 background: #2a2a32;
                 border-color: rgba(255, 255, 255, 0.1);
             }
+
             .btn:hover {
                 background: #3a3a42;
             }
+
             li.item:hover {
                 background: rgba(255, 255, 255, 0.05);
             }
+
             .action-btn:hover {
                 background: rgba(255, 255, 255, 0.1);
                 color: #e8e8e8;
             }
-            .muted, .url {
+
+            .muted,
+            .url {
                 color: #999;
             }
         }
@@ -261,7 +267,8 @@
         <header>
             <h1>
                 <svg viewBox="0 0 24 24" fill="#FFD700">
-                    <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+                    <path
+                        d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
                 </svg>
                 Bookmarks
             </h1>
@@ -273,7 +280,7 @@
 
         <div id="emptyState" class="empty-state" style="display: none;">
             <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+                <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
             </svg>
             <h2>No bookmarks yet</h2>
             <p>Click the ★ icon in the address bar to bookmark pages</p>
@@ -294,10 +301,10 @@
 
         function formatDate(timestamp) {
             const date = new Date(timestamp);
-            return date.toLocaleDateString(undefined, { 
-                year: 'numeric', 
-                month: 'short', 
-                day: 'numeric' 
+            return date.toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
             });
         }
 
@@ -311,7 +318,7 @@
             if (bookmark.favicon && bookmark.favicon.startsWith('data:')) {
                 const img = document.createElement('img');
                 img.src = bookmark.favicon;
-                img.onerror = function() {
+                img.onerror = function () {
                     favicon.textContent = getFirstLetter(bookmark.url);
                     this.remove();
                 };
@@ -324,17 +331,17 @@
             // Info
             const info = document.createElement('div');
             info.className = 'info';
-            
+
             const title = document.createElement('div');
             title.className = 'title';
             title.textContent = bookmark.title || bookmark.url;
             info.appendChild(title);
-            
+
             const url = document.createElement('div');
             url.className = 'url';
             url.textContent = bookmark.url;
             info.appendChild(url);
-            
+
             li.appendChild(info);
 
             // Bar indicator
@@ -354,7 +361,7 @@
             openBtn.className = 'action-btn';
             openBtn.title = 'Open in new tab';
             openBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
-            openBtn.onclick = function(e) {
+            openBtn.onclick = function (e) {
                 e.stopPropagation();
                 if (window.__ul_newTab) {
                     window.__ul_newTab(bookmark.url);
@@ -367,7 +374,7 @@
             deleteBtn.className = 'action-btn delete';
             deleteBtn.title = 'Delete bookmark';
             deleteBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
-            deleteBtn.onclick = function(e) {
+            deleteBtn.onclick = function (e) {
                 e.stopPropagation();
                 if (window.removeBookmark) {
                     window.removeBookmark(bookmark.id);
@@ -379,7 +386,7 @@
             li.appendChild(actions);
 
             // Click to navigate
-            li.onclick = function() {
+            li.onclick = function () {
                 window.location.href = bookmark.url;
             };
 
@@ -422,13 +429,13 @@
             }
         }
 
-        document.getElementById('clearAll').onclick = function() {
+        document.getElementById('clearAll').onclick = function () {
             if (confirm('Are you sure you want to delete all bookmarks? This cannot be undone.')) {
                 let bookmarks = [];
                 if (window.getBookmarks) {
                     try {
                         bookmarks = JSON.parse(window.getBookmarks());
-                    } catch (e) {}
+                    } catch (e) { }
                 }
                 bookmarks.forEach(bm => {
                     if (window.removeBookmark) {
@@ -440,7 +447,7 @@
         };
 
         // Load bookmarks when page is ready
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             setTimeout(loadBookmarks, 100);
         });
 

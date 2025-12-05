@@ -180,10 +180,27 @@
   </style>
 
   <style>
-    @keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
-    @-webkit-keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes ul_fade_in {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    @-webkit-keyframes ul_fade_in {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
   </style>
-  
+
   <style>
     /* Bookmark Bar Styles */
     .bookmark-bar {
@@ -205,15 +222,15 @@
       overflow-x: auto;
       overflow-y: hidden;
     }
-    
+
     .bookmark-bar::-webkit-scrollbar {
       height: 4px;
     }
-    
+
     .bookmark-bar::-webkit-scrollbar-track {
       background: transparent;
     }
-    
+
     .bookmark-bar::-webkit-scrollbar-thumb {
       background: rgba(255, 255, 255, 0.2);
       border-radius: 2px;
@@ -300,32 +317,32 @@
     .bookmark-item .remove-btn:hover {
       background: rgba(255, 60, 60, 1);
     }
-    
+
     /* Drag and drop styles */
     .bookmark-item {
       cursor: grab;
     }
-    
+
     .bookmark-item.dragging {
       opacity: 0.5;
       background: rgba(100, 100, 255, 0.3);
       cursor: grabbing;
     }
-    
+
     .bookmark-item.drag-over {
       border-left: 3px solid #6C63FF;
       padding-left: 7px;
     }
-    
+
     .bookmark-item.drag-over-right {
       border-right: 3px solid #6C63FF;
       padding-right: 7px;
     }
-    
+
     .bookmark-bar.drag-active {
       background: rgba(29, 29, 33, 0.98);
     }
-    
+
     /* Adjust main container for bookmark bar */
     .main-container {
       padding-top: 50px;
@@ -417,7 +434,7 @@
         const img = document.createElement('img');
         img.src = bookmark.favicon;
         img.draggable = false;
-        img.onerror = function() {
+        img.onerror = function () {
           const defaultIcon = document.createElement('div');
           defaultIcon.className = 'default-icon';
           defaultIcon.textContent = getFirstLetter(bookmark.url);
@@ -440,10 +457,10 @@
       const removeBtn = document.createElement('div');
       removeBtn.className = 'remove-btn';
       removeBtn.textContent = '×';
-      removeBtn.onmousedown = function(e) {
+      removeBtn.onmousedown = function (e) {
         e.stopPropagation();
       };
-      removeBtn.onclick = function(e) {
+      removeBtn.onclick = function (e) {
         e.preventDefault();
         e.stopPropagation();
         if (window.removeBookmark) {
@@ -454,28 +471,28 @@
       item.appendChild(removeBtn);
 
       // Mouse down to start drag
-      item.addEventListener('mousedown', function(e) {
+      item.addEventListener('mousedown', function (e) {
         if (e.button !== 0) return;
         if (e.target.classList.contains('remove-btn')) return;
-        
+
         e.preventDefault();
-        
+
         dragState.isDragging = true;
         dragState.element = item;
         dragState.bookmarkId = bookmark.id;
         dragState.startX = e.clientX;
         dragState.startY = e.clientY;
         dragState.moved = false;
-        
+
         const rect = item.getBoundingClientRect();
         dragState.offsetX = e.clientX - rect.left;
-        
+
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
       });
 
       // Middle click opens in new tab
-      item.addEventListener('auxclick', function(e) {
+      item.addEventListener('auxclick', function (e) {
         if (e.button === 1) { // Middle mouse button
           e.preventDefault();
           openInNewTab(bookmark.url);
@@ -483,7 +500,7 @@
       });
 
       // Click to navigate (only if not dragged)
-      item.addEventListener('click', function(e) {
+      item.addEventListener('click', function (e) {
         if (dragState.moved) {
           e.preventDefault();
           return;
@@ -516,33 +533,33 @@
 
     function handleMouseMove(e) {
       if (!dragState.isDragging || !dragState.element) return;
-      
+
       const dx = e.clientX - dragState.startX;
       const dy = e.clientY - dragState.startY;
-      
+
       // Only start visual drag after moving a bit
       if (!dragState.moved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
         dragState.moved = true;
         dragState.element.classList.add('dragging');
         document.getElementById('bookmarkBar').classList.add('drag-active');
       }
-      
+
       if (!dragState.moved) return;
-      
+
       // Find the bookmark item we're hovering over
       const bar = document.getElementById('bookmarkBar');
       const items = Array.from(bar.querySelectorAll('.bookmark-item'));
-      
+
       // Clear all drag-over states
       items.forEach(item => item.classList.remove('drag-over', 'drag-over-right'));
-      
+
       // Find which item we're over
       for (const item of items) {
         if (item === dragState.element) continue;
-        
+
         const rect = item.getBoundingClientRect();
         const midX = rect.left + rect.width / 2;
-        
+
         if (e.clientX >= rect.left && e.clientX <= rect.right) {
           if (e.clientX < midX) {
             item.classList.add('drag-over');
@@ -557,16 +574,16 @@
     function handleMouseUp(e) {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      
+
       if (!dragState.isDragging) return;
-      
+
       const bar = document.getElementById('bookmarkBar');
       const items = Array.from(bar.querySelectorAll('.bookmark-item'));
-      
+
       // Find drop target
       let dropTarget = null;
       let insertAfter = false;
-      
+
       for (const item of items) {
         if (item.classList.contains('drag-over')) {
           dropTarget = item;
@@ -579,7 +596,7 @@
           break;
         }
       }
-      
+
       // Move the element
       if (dropTarget && dropTarget !== dragState.element && dragState.moved) {
         if (insertAfter) {
@@ -590,13 +607,13 @@
         // Save new order
         saveBookmarkOrder();
       }
-      
+
       // Clean up
       items.forEach(item => {
         item.classList.remove('dragging', 'drag-over', 'drag-over-right');
       });
       bar.classList.remove('drag-active');
-      
+
       // Reset state after a short delay to prevent click from firing
       setTimeout(() => {
         dragState.isDragging = false;
@@ -610,7 +627,7 @@
       const bar = document.getElementById('bookmarkBar');
       const items = bar.querySelectorAll('.bookmark-item');
       const orderedIds = Array.from(items).map(item => parseInt(item.dataset.bookmarkId));
-      
+
       if (window.reorderBookmarks && orderedIds.length > 0) {
         window.reorderBookmarks(JSON.stringify(orderedIds));
       }
@@ -620,9 +637,9 @@
     function loadBookmarks() {
       const bar = document.getElementById('bookmarkBar');
       const emptyMsg = document.getElementById('emptyMessage');
-      
+
       bar.querySelectorAll('.bookmark-item').forEach(el => el.remove());
-      
+
       let bookmarks = [];
       if (window.getBookmarkBar) {
         try {
@@ -632,7 +649,7 @@
           console.error('Error parsing bookmarks:', e);
         }
       }
-      
+
       if (bookmarks.length === 0) {
         emptyMsg.style.display = 'block';
       } else {
@@ -645,7 +662,7 @@
     }
 
     // Load bookmarks when page is ready
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
       setTimeout(loadBookmarks, 100);
     });
 
