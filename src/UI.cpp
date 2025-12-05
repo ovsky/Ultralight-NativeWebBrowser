@@ -58,7 +58,7 @@ namespace
     bool default_value;
   };
 
-  constexpr std::array<SettingDescriptor, 31> kFallbackSettingsCatalog = {
+  constexpr std::array<SettingDescriptor, 32> kFallbackSettingsCatalog = {
       // Appearance
       SettingDescriptor{"launch_dark_theme", "Launch in dark theme",
                         "Start Ultralight with dark chrome, toolbars, and tabs by default.",
@@ -114,6 +114,9 @@ namespace
       SettingDescriptor{"ask_download_location", "Ask where to save downloads",
                         "Show a file picker dialog for each download instead of using default location.",
                         "downloads", nullptr, false, &UI::BrowserSettings::ask_download_location, false},
+      SettingDescriptor{"convert_webp_to_png", "Convert WebP to PNG",
+                        "Automatically convert downloaded WebP images to PNG format for better compatibility.",
+                        "downloads", nullptr, false, &UI::BrowserSettings::convert_webp_to_png, false},
 
       // Performance
       SettingDescriptor{"smooth_scrolling", "Smooth scrolling",
@@ -491,6 +494,8 @@ UI::UI(RefPtr<Window> window)
   download_manager_ = std::make_unique<DownloadManager>();
   download_manager_->SetOnChangeCallback([this]()
                                          { NotifyDownloadsChanged(); });
+  download_manager_->SetWebPConversionCallback([this]()
+                                         { return settings_.convert_webp_to_png; });
 
   // Initialize password manager
   password_manager_ = std::make_unique<password::PasswordManager>();
@@ -545,6 +550,8 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
   download_manager_ = std::make_unique<DownloadManager>();
   download_manager_->SetOnChangeCallback([this]()
                                          { NotifyDownloadsChanged(); });
+  download_manager_->SetWebPConversionCallback([this]()
+                                         { return settings_.convert_webp_to_png; });
 
   // Initialize password manager
   password_manager_ = std::make_unique<password::PasswordManager>();
