@@ -148,7 +148,7 @@ endif()
 # Download and configure WebView2 SDK via FetchContent.
 if(WIN32 AND MSVC)
 	include(FetchContent)
-	
+
 	# Download WebView2 SDK from NuGet
 	FetchContent_Declare(
 		webview2
@@ -156,11 +156,11 @@ if(WIN32 AND MSVC)
 		DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 	)
 	FetchContent_MakeAvailable(webview2)
-	
+
 	# WebView2 headers and libs from NuGet package
 	set(WEBVIEW2_INCLUDE_DIR "${webview2_SOURCE_DIR}/build/native/include")
 	set(WEBVIEW2_LIB_DIR "${webview2_SOURCE_DIR}/build/native/x64")
-	
+
 	if(EXISTS "${WEBVIEW2_INCLUDE_DIR}/WebView2.h")
 		message(STATUS "Building DRM Windows WebView using Microsoft WebView2 SDK")
 		target_include_directories(Ultralight-WebBrowser PRIVATE ${WEBVIEW2_INCLUDE_DIR})
@@ -190,7 +190,7 @@ endif()
 	 find_library(ULTRALIGHT_LIB NAMES Ultralight PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
 	 find_library(ULTRALIGHT_CORE_LIB NAMES UltralightCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
 	 find_library(WEB_CORE_LIB NAMES WebCore PATHS "${ULTRALIGHT_SDK_ROOT}/lib" "${ULTRALIGHT_SDK_ROOT}/bin" NO_DEFAULT_PATH)
-	 
+
 	 if(APP_CORE_LIB AND ULTRALIGHT_LIB)
 		 add_executable(UtilsTest tests/UtilsTest.cpp src/Utils.cpp)
 		 target_link_libraries(UtilsTest PRIVATE ${APP_CORE_LIB} ${ULTRALIGHT_LIB} ${ULTRALIGHT_CORE_LIB} ${WEB_CORE_LIB})
@@ -474,7 +474,7 @@ if(WIN32)
 		set(CPACK_NSIS_MUI_ICON "${APP_ICON_ICO}")
 		set(CPACK_NSIS_MUI_UNIICON "${APP_ICON_ICO}")
 	endif()
-	
+
 	# Configure Start Menu shortcuts to point to the correct executable
 	set(CPACK_NSIS_INSTALLED_ICON_NAME "${INSTALL_DIR_NAME}\\\\Ultralight-WebBrowser.exe")
 	set(CPACK_NSIS_CREATE_ICONS_EXTRA "
