@@ -687,6 +687,7 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
     global["isBookmarked"] = BindJSCallbackWithRetval(&Tab::JS_IsBookmarked);
     global["toggleBookmark"] = BindJSCallback(&Tab::JS_ToggleBookmark);
     global["reorderBookmarks"] = BindJSCallback(&Tab::JS_ReorderBookmarks);
+    global["updateBookmark"] = BindJSCallbackWithRetval(&Tab::JS_UpdateBookmark);
 
     const char *attachScript = R"JS((function(){
       try{
@@ -1727,6 +1728,35 @@ void Tab::JS_ReorderBookmarks(const JSObject &obj, const JSArgs &args)
   {
     ui_->bookmark_store()->ReorderBookmarks(ordered_ids);
   }
+}
+
+JSValue Tab::JS_UpdateBookmark(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || !ui_->bookmark_store() || args.size() < 3)
+    return JSValue(false);
+  
+  // Args: id, url, title
+  uint64_t id = static_cast<uint64_t>((double)args[0]);
+  
+  ultralight::String url_ul = args[1].ToString();
+  auto url_str = url_ul.utf8();
+  std::string url = url_str.data() ? url_str.data() : "";
+  
+  ultralight::String title_ul = args[2].ToString();
+  auto title_str = title_ul.utf8();
+  std::string title = title_str.data() ? title_str.data() : "";
+  
+  // Keep existing favicon and show_in_bar settings
+  std::string favicon;
+  bool show_in_bar = true;
+  
+  auto* existing = ui_->bookmark_store()->GetBookmarkById(id);
+  if (existing) {
+    favicon = existing->favicon_url;
+    show_in_bar = existing->show_in_bar;
+  }
+  
+  return JSValue(ui_->bookmark_store()->UpdateBookmark(id, url, title, favicon, show_in_bar));
 }
 
 JSValue Tab::OnDownloadsGetData(const JSObject &obj, const JSArgs &args)
