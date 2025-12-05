@@ -409,6 +409,9 @@ protected:
   bool suggestion_favicons_enabled_ = true;
   void LoadSuggestionsFaviconsFlag();
 
+  // Check if URL is a browser internal page (settings, history, etc.)
+  static bool IsBrowserInternalPage(const std::string &url);
+
   // Auto Dark Mode state
   bool dark_mode_enabled_ = false;
   void ApplyDarkModeToView(RefPtr<View> v);

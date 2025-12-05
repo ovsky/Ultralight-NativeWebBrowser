@@ -3789,9 +3789,48 @@ void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
   HideContextMenuOverlay();
 }
 
+bool UI::IsBrowserInternalPage(const std::string &url)
+{
+  // Fast check for browser internal pages - called from C++ to skip JS execution
+  if (url.find("file:///") != 0)
+    return false;
+  
+  // List of browser internal pages that have their own dark styling
+  static const char* internal_pages[] = {
+    "settings.html",
+    "passwords.html",
+    "extensions.html",
+    "downloads.html",
+    "history.html",
+    "ui.html",
+    "menu.html",
+    "contextmenu.html",
+    "suggestions.html",
+    "quick-inspector.html",
+    "downloads-panel.html",
+    "about.html",
+    "new_tab_page.html",
+    "release_notes.html",
+    "static-sties/"
+  };
+  
+  for (const char* page : internal_pages)
+  {
+    if (url.find(page) != std::string::npos)
+      return true;
+  }
+  return false;
+}
+
 void UI::ApplyDarkModeToView(RefPtr<View> v)
 {
   if (!v)
+    return;
+  
+  // Fast C++ check: skip dark mode injection entirely for browser internal pages
+  // This avoids expensive JS execution for pages that don't need it
+  auto url = v->url().utf8();
+  if (url.data() && IsBrowserInternalPage(std::string(url.data())))
     return;
   
   // Build excluded sites list from settings
@@ -3799,26 +3838,7 @@ void UI::ApplyDarkModeToView(RefPtr<View> v)
   
   const char *js = R"JS((function(){
     try{
-      // Don't apply dark mode to browser internal pages (they have their own dark styling)
       var url = window.location.href;
-      if(url.startsWith('file:///') && 
-         (url.includes('settings.html') || 
-          url.includes('passwords.html') || 
-          url.includes('extensions.html') || 
-          url.includes('downloads.html') || 
-          url.includes('history.html') || 
-          url.includes('ui.html') || 
-          url.includes('menu.html') || 
-          url.includes('contextmenu.html') || 
-          url.includes('suggestions.html') || 
-          url.includes('quick-inspector.html') || 
-          url.includes('downloads-panel.html') || 
-          url.includes('about.html') || 
-          url.includes('new_tab_page.html') || 
-          url.includes('release_notes.html') ||
-          url.includes('static-sties/'))){
-        return false; // Skip dark mode for these pages
-      }
 
       // Check user-defined excluded sites
       var excludedPatterns = %s;
