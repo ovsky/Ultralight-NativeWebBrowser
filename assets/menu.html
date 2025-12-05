@@ -159,8 +159,7 @@
                         if (window.OnRequestNewTab) OnRequestNewTab();
                         break;
                     case 'new-window':
-                        // Placeholder: open a new tab as "new window" is not implemented
-                        if (window.OnRequestNewTab) OnRequestNewTab();
+                        if (window.OnRequestNewWindow) OnRequestNewWindow();
                         break;
                     case 'toggle-dark-mode':
                         if (window.OnToggleDarkMode) {
