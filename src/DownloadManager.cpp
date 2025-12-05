@@ -16,6 +16,8 @@
 #include <system_error>
 #include <algorithm>
 #include <cctype>
+#include <vector>
+#include <cstdio>
 
 namespace
 {
@@ -118,6 +120,9 @@ DownloadManager::DownloadManager(std::filesystem::path download_dir)
     : download_dir_(std::move(download_dir))
 {
     EnsureDirectoryExists();
+    history_file_ = download_dir_ / ".download_history";
+    LoadHistoryFromDisk();
+    TrimHistoryLocked(kMaxHistoryEntries);
 }
 
 DownloadManager::~DownloadManager()
@@ -150,7 +155,13 @@ bool DownloadManager::OnRequestDownload(ultralight::View *caller, DownloadId id,
         return false;
 
     std::unique_lock<std::mutex> lock(mutex_);
-    auto &record = GetOrCreateRecordLocked(id);
+    
+    // Generate our own unique internal ID to avoid collisions
+    // (Ultralight may reuse external IDs across different downloads)
+    DownloadId internal_id = next_id_++;
+    external_to_internal_id_[id] = internal_id;
+    
+    auto &record = GetOrCreateRecordLocked(internal_id);
     record.url = std::move(url_str);
     record.status = Status::Requested;
     record.error.clear();
@@ -180,7 +191,19 @@ void DownloadManager::OnBeginDownload(ultralight::View *caller, DownloadId id, c
         return;
 
     std::unique_lock<std::mutex> lock(mutex_);
-    auto &record = GetOrCreateRecordLocked(id);
+    
+    // Get or create internal ID mapping
+    DownloadId internal_id;
+    auto map_it = external_to_internal_id_.find(id);
+    if (map_it != external_to_internal_id_.end()) {
+        internal_id = map_it->second;
+    } else {
+        // OnRequestDownload wasn't called, create mapping now
+        internal_id = next_id_++;
+        external_to_internal_id_[id] = internal_id;
+    }
+    
+    auto &record = GetOrCreateRecordLocked(internal_id);
     if (record.url.empty())
         record.url = url_str;
 
@@ -265,7 +288,8 @@ void DownloadManager::OnReceiveDataForDownload(ultralight::View *caller, Downloa
 void DownloadManager::OnFinishDownload(ultralight::View *caller, DownloadId id)
 {
     std::unique_lock<std::mutex> lock(mutex_);
-    auto rec = FindRecordLocked(id);
+    DownloadId internal_id = GetInternalIdLocked(id);
+    auto rec = FindRecordLocked(internal_id);
     if (rec)
     {
         if (rec->status != Status::Failed && rec->status != Status::Cancelled)
@@ -274,6 +298,10 @@ void DownloadManager::OnFinishDownload(ultralight::View *caller, DownloadId id)
             rec->received_bytes = rec->expected_bytes;
         if (rec->display_name.empty())
             rec->display_name = SanitizeFilename(DeriveFilename(rec->url, ""));
+        // Ensure the record is visible in the UI even if OnBeginDownload
+        // was not called previously (some downloads may not trigger Begin).
+        rec->suppress_ui = false;
+        rec->placeholder = false;
         rec->finished_at = std::chrono::system_clock::now();
     }
 
@@ -284,13 +312,17 @@ void DownloadManager::OnFinishDownload(ultralight::View *caller, DownloadId id)
 void DownloadManager::OnFailDownload(ultralight::View *caller, DownloadId id)
 {
     std::unique_lock<std::mutex> lock(mutex_);
-    auto rec = FindRecordLocked(id);
+    DownloadId internal_id = GetInternalIdLocked(id);
+    auto rec = FindRecordLocked(internal_id);
     if (rec)
     {
         rec->status = Status::Failed;
         rec->error = "Download failed";
         if (rec->display_name.empty())
             rec->display_name = SanitizeFilename(DeriveFilename(rec->url, ""));
+        // Make sure failed downloads are shown so user can inspect/ retry
+        rec->suppress_ui = false;
+        rec->placeholder = false;
         rec->finished_at = std::chrono::system_clock::now();
         rec->path.clear();
     }
@@ -338,7 +370,8 @@ std::string DownloadManager::GetDownloadsJSON()
 
 void DownloadManager::ClearFinishedDownloads()
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> lock(mutex_);
+    bool any_removed = false;
     for (auto it = records_.begin(); it != records_.end();)
     {
         if (it->second.status == Status::Completed || it->second.status == Status::Failed || it->second.status == Status::Cancelled)
@@ -346,11 +379,14 @@ void DownloadManager::ClearFinishedDownloads()
             if (active_.find(it->first) == active_.end())
             {
                 it = records_.erase(it);
+                any_removed = true;
                 continue;
             }
         }
         ++it;
     }
+    if (any_removed)
+        NotifyChangeLocked(lock);
 }
 
 bool DownloadManager::OpenDownload(DownloadId id) const
@@ -591,8 +627,28 @@ void DownloadManager::EnsureDirectoryExists()
 
 void DownloadManager::NotifyChangeLocked(std::unique_lock<std::mutex> &lock)
 {
+    TrimHistoryLocked(kMaxHistoryEntries);
+    std::string history_snapshot;
+    bool has_visible_records = false;
+    if (!history_file_.empty())
+    {
+        history_snapshot = BuildHistorySnapshotLocked(kMaxHistoryEntries);
+        has_visible_records = !history_snapshot.empty();
+    }
     auto callback = on_change_;
     lock.unlock();
+    if (!history_file_.empty())
+    {
+        if (has_visible_records)
+        {
+            SaveHistorySnapshotUnlocked(history_snapshot);
+        }
+        else
+        {
+            std::error_code ec;
+            std::filesystem::remove(history_file_, ec);
+        }
+    }
     if (callback)
         callback();
     lock.lock();
@@ -609,6 +665,14 @@ DownloadManager::DownloadRecord &DownloadManager::GetOrCreateRecordLocked(Downlo
         it = records_.emplace(id, std::move(rec)).first;
     }
     return it->second;
+}
+
+DownloadManager::DownloadId DownloadManager::GetInternalIdLocked(DownloadId external_id) const
+{
+    auto it = external_to_internal_id_.find(external_id);
+    if (it != external_to_internal_id_.end())
+        return it->second;
+    return external_id;  // Fallback to external ID if no mapping exists
 }
 
 DownloadManager::DownloadRecord *DownloadManager::FindRecordLocked(DownloadId id)
@@ -628,10 +692,244 @@ void DownloadManager::CloseStreamLocked(DownloadId id, bool remove_file)
             it->second.stream->close();
         active_.erase(it);
     }
-    auto rec = records_.find(id);
+    
+    DownloadId internal_id = GetInternalIdLocked(id);
+    // Clean up the ID mapping for this external ID (after we've used it)
+    external_to_internal_id_.erase(id);
+    
+    auto rec = records_.find(internal_id);
     if (remove_file && rec != records_.end() && !rec->second.path.empty())
     {
         std::error_code ec;
         std::filesystem::remove(rec->second.path, ec);
+    }
+}
+
+std::string DownloadManager::EncodeField(const std::string &value)
+{
+    std::string out;
+    out.reserve(value.size());
+    for (unsigned char c : value)
+    {
+        if (c == '\t' || c == '\n' || c == '\r' || c == '%' || c == '\\')
+        {
+            char buf[4];
+            std::snprintf(buf, sizeof(buf), "%%%02X", c);
+            out += buf;
+        }
+        else
+        {
+            out += static_cast<char>(c);
+        }
+    }
+    return out;
+}
+
+static int HexValue(char c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'a' && c <= 'f')
+        return 10 + (c - 'a');
+    if (c >= 'A' && c <= 'F')
+        return 10 + (c - 'A');
+    return -1;
+}
+
+bool DownloadManager::DecodeField(const std::string &value, std::string &out)
+{
+    out.clear();
+    out.reserve(value.size());
+    for (size_t i = 0; i < value.size(); ++i)
+    {
+        if (value[i] == '%' && i + 2 < value.size())
+        {
+            int hi = HexValue(value[i + 1]);
+            int lo = HexValue(value[i + 2]);
+            if (hi >= 0 && lo >= 0)
+            {
+                out.push_back(static_cast<char>((hi << 4) | lo));
+                i += 2;
+                continue;
+            }
+        }
+        out.push_back(value[i]);
+    }
+    return true;
+}
+
+DownloadManager::Status DownloadManager::StatusFromString(const std::string &value)
+{
+    std::string lower = value;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char ch)
+                   { return static_cast<char>(std::tolower(ch)); });
+    if (lower == "requested")
+        return Status::Requested;
+    if (lower == "in-progress")
+        return Status::InProgress;
+    if (lower == "completed")
+        return Status::Completed;
+    if (lower == "failed")
+        return Status::Failed;
+    if (lower == "cancelled")
+        return Status::Cancelled;
+    return Status::Requested;
+}
+
+int64_t DownloadManager::TimePointToMillis(const std::chrono::system_clock::time_point &tp)
+{
+    if (tp.time_since_epoch().count() == 0)
+        return 0;
+    return std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count();
+}
+
+std::chrono::system_clock::time_point DownloadManager::MillisToTimePoint(int64_t ms)
+{
+    if (ms <= 0)
+        return std::chrono::system_clock::time_point{};
+    return std::chrono::system_clock::time_point(std::chrono::milliseconds(ms));
+}
+
+void DownloadManager::LoadHistoryFromDisk()
+{
+    if (history_file_.empty())
+        return;
+
+    std::ifstream in(history_file_, std::ios::binary);
+    if (!in.is_open())
+        return;
+
+    std::string line;
+    while (std::getline(in, line))
+    {
+        if (line.empty())
+            continue;
+
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+
+        std::vector<std::string> fields;
+        size_t pos = 0;
+        while (pos <= line.size())
+        {
+            size_t next = line.find('\t', pos);
+            if (next == std::string::npos)
+            {
+                fields.emplace_back(line.substr(pos));
+                break;
+            }
+            fields.emplace_back(line.substr(pos, next - pos));
+            pos = next + 1;
+        }
+
+        if (fields.size() < 10)
+            continue;
+
+        DownloadRecord rec;
+        rec.id = static_cast<DownloadId>(std::strtoull(fields[0].c_str(), nullptr, 10));
+        rec.status = StatusFromString(fields[1]);
+        DecodeField(fields[2], rec.url);
+        DecodeField(fields[3], rec.display_name);
+        std::string path_str;
+        DecodeField(fields[4], path_str);
+        if (!path_str.empty())
+            rec.path = std::filesystem::path(path_str);
+        rec.expected_bytes = std::strtoll(fields[5].c_str(), nullptr, 10);
+        rec.received_bytes = std::strtoll(fields[6].c_str(), nullptr, 10);
+        rec.started_at = MillisToTimePoint(std::strtoll(fields[7].c_str(), nullptr, 10));
+        rec.finished_at = MillisToTimePoint(std::strtoll(fields[8].c_str(), nullptr, 10));
+        DecodeField(fields[9], rec.error);
+        rec.suppress_ui = false;
+        rec.placeholder = false;
+
+        records_[rec.id] = std::move(rec);
+    }
+
+    if (!records_.empty())
+    {
+        next_id_ = (std::max)(next_id_, records_.rbegin()->first + 1);
+    }
+}
+
+void DownloadManager::SaveHistorySnapshotUnlocked(const std::string &snapshot)
+{
+    if (history_file_.empty())
+        return;
+    std::ofstream out(history_file_, std::ios::binary | std::ios::trunc);
+    if (!out.is_open())
+        return;
+    out << snapshot;
+}
+
+std::string DownloadManager::BuildHistorySnapshotLocked(size_t max_entries) const
+{
+    if (history_file_.empty())
+        return {};
+    std::string out;
+    size_t count = 0;
+    for (auto it = records_.rbegin(); it != records_.rend(); ++it)
+    {
+        const auto &rec = it->second;
+        if (rec.suppress_ui)
+            continue;
+        if (max_entries && count >= max_entries)
+            break;
+        if (!out.empty())
+            out += '\n';
+        out += std::to_string(rec.id);
+        out += '\t';
+        out += EncodeField(StatusToString(rec.status));
+        out += '\t';
+        out += EncodeField(rec.url);
+        out += '\t';
+        out += EncodeField(rec.display_name);
+        out += '\t';
+        out += EncodeField(rec.path.string());
+        out += '\t';
+        out += std::to_string(rec.expected_bytes);
+        out += '\t';
+        out += std::to_string(rec.received_bytes);
+        out += '\t';
+        out += std::to_string(TimePointToMillis(rec.started_at));
+        out += '\t';
+        out += std::to_string(TimePointToMillis(rec.finished_at));
+        out += '\t';
+        out += EncodeField(rec.error);
+        ++count;
+    }
+    return out;
+}
+
+void DownloadManager::TrimHistoryLocked(size_t max_entries)
+{
+    if (!max_entries)
+        return;
+
+    size_t visible = 0;
+    for (auto it = records_.rbegin(); it != records_.rend(); ++it)
+    {
+        const auto &rec = it->second;
+        if (rec.suppress_ui)
+            continue;
+        ++visible;
+    }
+
+    if (visible <= max_entries)
+        return;
+
+    size_t to_remove = visible - max_entries;
+    for (auto it = records_.begin(); it != records_.end() && to_remove > 0;)
+    {
+        auto status = it->second.status;
+        bool is_finished = (status == Status::Completed || status == Status::Failed || status == Status::Cancelled);
+        if (!it->second.suppress_ui && is_finished)
+        {
+            it = records_.erase(it);
+            --to_remove;
+        }
+        else
+        {
+            ++it;
+        }
     }
 }
