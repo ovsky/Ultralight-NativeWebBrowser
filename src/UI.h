@@ -125,6 +125,7 @@ public:
   void OnStop(const JSObject &obj, const JSArgs &args);
   void OnToggleTools(const JSObject &obj, const JSArgs &args);
   void OnRequestNewTab(const JSObject &obj, const JSArgs &args);
+  void OnRequestNewWindow(const JSObject &obj, const JSArgs &args);
   void OnRequestTabClose(const JSObject &obj, const JSArgs &args);
   void OnActiveTabChange(const JSObject &obj, const JSArgs &args);
   void OnRequestChangeURL(const JSObject &obj, const JSArgs &args);
