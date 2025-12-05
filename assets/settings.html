@@ -443,6 +443,46 @@
             cursor: default;
         }
 
+        /* Dark Theme Excluded Sites styles */
+        .dark-sites-row {
+            margin: 32px 0 24px;
+            padding: 20px;
+            border-radius: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .dark-sites-label {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .dark-sites-textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-size: 12px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            resize: vertical;
+        }
+
+        .dark-sites-textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .dark-sites-help {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            margin-top: 8px;
+        }
+
         /* Scrollbar styling */
         ::-webkit-scrollbar {
             width: 8px;
@@ -513,6 +553,12 @@
             </div>
             <pre id="drm-log" class="drm-log">Requesting DRM status...</pre>
         </section>
+        <!-- Dark Theme Excluded Sites section -->
+        <div id="dark-sites-section" class="dark-sites-row">
+            <div class="dark-sites-label">Dark Theme Excluded Sites</div>
+            <textarea id="dark-sites-textarea" class="dark-sites-textarea" spellcheck="false" autocomplete="off" placeholder="Enter URL patterns (one per line)&#10;Example:&#10;*.example.com&#10;https://specific-site.com/*&#10;# Use # for comments"></textarea>
+            <div class="dark-sites-help">Enter URL patterns for sites where dark theme should be disabled (one per line). Supports wildcards (*) and comments starting with #. Browser internal pages (settings, history, etc.) are automatically excluded.</div>
+        </div>
         <!-- Custom User Agent section lives at the very bottom of settings -->
         <div id="ua-section" class="ua-row">
             <div class="ua-label">Target User Agent String</div>
@@ -619,6 +665,7 @@
 
         let currentSettings = {}, originalSettings = {}, isDirty = false;
         let targetUserAgent = '', originalTargetUserAgent = '';
+        let darkThemeExcludedSites = '', originalDarkThemeExcludedSites = '';
         const drmElements = {};
         let drmStatusSnapshot = null;
 
@@ -676,6 +723,14 @@
                         targetUserAgent = '';
                         originalTargetUserAgent = '';
                     }
+                    // Hydrate dark theme excluded sites from payload
+                    if (typeof data.dark_theme_excluded_sites === 'string') {
+                        darkThemeExcludedSites = data.dark_theme_excluded_sites;
+                        originalDarkThemeExcludedSites = data.dark_theme_excluded_sites;
+                    } else {
+                        darkThemeExcludedSites = '';
+                        originalDarkThemeExcludedSites = '';
+                    }
                     if (data.meta && data.meta.storage_path) {
                         document.getElementById('storage-path').textContent = 'Storage: ' + data.meta.storage_path;
                     }
@@ -689,6 +744,7 @@
                     }
                     renderSettings();
                     hydrateUserAgentEditor();
+                    hydrateDarkThemeExcludedSitesEditor();
                     updateDirtyState();
                     loadDrmStatus(true);
                 }
@@ -782,6 +838,9 @@
             if (!isDirty && targetUserAgent !== originalTargetUserAgent) {
                 isDirty = true;
             }
+            if (!isDirty && darkThemeExcludedSites !== originalDarkThemeExcludedSites) {
+                isDirty = true;
+            }
             document.getElementById('btn-save').disabled = !isDirty;
         }
 
@@ -790,6 +849,8 @@
             if (typeof window.OnSaveSettings === 'function') {
                 window.OnSaveSettings();
                 originalSettings = { ...currentSettings };
+                originalTargetUserAgent = targetUserAgent;
+                originalDarkThemeExcludedSites = darkThemeExcludedSites;
                 isDirty = false;
                 document.getElementById('btn-save').disabled = true;
                 log('Saved');
@@ -812,8 +873,16 @@
                             targetUserAgent = '';
                             originalTargetUserAgent = '';
                         }
+                        if (typeof data.dark_theme_excluded_sites === 'string') {
+                            darkThemeExcludedSites = data.dark_theme_excluded_sites;
+                            originalDarkThemeExcludedSites = data.dark_theme_excluded_sites;
+                        } else {
+                            darkThemeExcludedSites = '';
+                            originalDarkThemeExcludedSites = '';
+                        }
                         renderSettings();
                         hydrateUserAgentEditor();
+                        hydrateDarkThemeExcludedSitesEditor();
                         updateDirtyState();
                         loadDrmStatus(true);
                         log('Restored');
@@ -836,6 +905,25 @@
                 targetUserAgent = newVal;
                 if (typeof window.OnUpdateSetting === 'function') {
                     window.OnUpdateSetting('target_user_agent', newVal);
+                }
+                updateDirtyState();
+                const autoSave = !!currentSettings.auto_save_settings;
+                if (autoSave && typeof window.OnSaveSettings === 'function') {
+                    window.OnSaveSettings();
+                }
+            };
+        }
+        function hydrateDarkThemeExcludedSitesEditor() {
+            const sitesTextarea = document.getElementById('dark-sites-textarea');
+            if (!sitesTextarea) return;
+            sitesTextarea.value = darkThemeExcludedSites || '';
+            // Ensure we don't attach multiple listeners on re-render.
+            sitesTextarea.oninput = null;
+            sitesTextarea.oninput = () => {
+                const newVal = sitesTextarea.value || '';
+                darkThemeExcludedSites = newVal;
+                if (typeof window.OnUpdateSetting === 'function') {
+                    window.OnUpdateSetting('dark_theme_excluded_sites', newVal);
                 }
                 updateDirtyState();
                 const autoSave = !!currentSettings.auto_save_settings;
