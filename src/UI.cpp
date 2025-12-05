@@ -1271,12 +1271,9 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
 
   if (evt.type == MouseEvent::kType_MouseDown)
   {
-    // Click occurred outside the UI overlay (handled above), switch focus to page
-    if (downloads_overlay_)
-    {
-      downloads_overlay_user_dismissed_ = true;
-      HideDownloadsOverlay();
-    }
+    // Click occurred outside the UI overlay (handled above), switch focus to page.
+    // Do NOT auto-close the downloads overlay here; let the user dismiss it explicitly
+    // via the Close button, clicking the overlay background, or pressing Escape.
     address_bar_is_focused_ = false;
     if (active_tab())
     {
@@ -2694,7 +2691,9 @@ void UI::NotifyDownloadsChanged()
 {
   if (download_manager_)
   {
-    download_manager_->PruneStaleRequests();
+    // Do not aggressively prune pending download placeholders here; keep
+    // completed downloads visible until the user explicitly clears them.
+    // Only notify about new downloads by sequence change.
     uint64_t latest_sequence = download_manager_->last_started_sequence();
     if (latest_sequence != 0 && latest_sequence != downloads_last_sequence_seen_)
     {
