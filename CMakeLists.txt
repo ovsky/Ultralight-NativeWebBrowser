@@ -241,6 +241,70 @@ if(WIN32)
 	endif()
 endif()
 
+# Linux: include SDK shared libraries (.so) and resources
+if(UNIX AND NOT APPLE)
+	file(GLOB ULTRALIGHT_SOS "${ULTRALIGHT_SDK_ROOT}/lib/*.so*")
+	list(LENGTH ULTRALIGHT_SOS _so_count)
+	if(_so_count GREATER 0)
+		install(FILES ${ULTRALIGHT_SOS} DESTINATION ${INSTALL_DIR_NAME})
+	endif()
+
+	# Also check for libraries in bin directory (some SDK layouts)
+	file(GLOB ULTRALIGHT_BIN_SOS "${ULTRALIGHT_SDK_ROOT}/bin/*.so*")
+	list(LENGTH ULTRALIGHT_BIN_SOS _bin_so_count)
+	if(_bin_so_count GREATER 0)
+		install(FILES ${ULTRALIGHT_BIN_SOS} DESTINATION ${INSTALL_DIR_NAME})
+	endif()
+
+	# ICU data files (check multiple possible locations)
+	file(GLOB ICU_FILES_LIB "${ULTRALIGHT_SDK_ROOT}/lib/ICU/icudt*.dat" "${ULTRALIGHT_SDK_ROOT}/lib/ICU/cacert.pem")
+	file(GLOB ICU_FILES_BIN "${ULTRALIGHT_SDK_ROOT}/bin/ICU/icudt*.dat" "${ULTRALIGHT_SDK_ROOT}/bin/ICU/cacert.pem")
+	file(GLOB ICU_FILES_RES "${ULTRALIGHT_SDK_ROOT}/resources/icudt*.dat" "${ULTRALIGHT_SDK_ROOT}/resources/cacert.pem")
+	set(ICU_FILES ${ICU_FILES_LIB} ${ICU_FILES_BIN} ${ICU_FILES_RES})
+	list(LENGTH ICU_FILES _icu_count)
+	if(_icu_count GREATER 0)
+		install(FILES ${ICU_FILES} DESTINATION ${INSTALL_DIR_NAME}/assets/resources)
+	endif()
+
+	# Include resources directory if it exists
+	if(EXISTS "${ULTRALIGHT_SDK_ROOT}/resources")
+		install(DIRECTORY "${ULTRALIGHT_SDK_ROOT}/resources/" DESTINATION ${INSTALL_DIR_NAME}/assets/resources
+			FILES_MATCHING PATTERN "*" PATTERN "*.dat" PATTERN "*.pem" PATTERN "*.bin")
+	endif()
+endif()
+
+# macOS: include SDK dynamic libraries (.dylib) and resources
+if(APPLE)
+	file(GLOB ULTRALIGHT_DYLIBS "${ULTRALIGHT_SDK_ROOT}/lib/*.dylib*")
+	list(LENGTH ULTRALIGHT_DYLIBS _dylib_count)
+	if(_dylib_count GREATER 0)
+		install(FILES ${ULTRALIGHT_DYLIBS} DESTINATION ${INSTALL_DIR_NAME})
+	endif()
+
+	# Also check for libraries in bin directory (some SDK layouts)
+	file(GLOB ULTRALIGHT_BIN_DYLIBS "${ULTRALIGHT_SDK_ROOT}/bin/*.dylib*")
+	list(LENGTH ULTRALIGHT_BIN_DYLIBS _bin_dylib_count)
+	if(_bin_dylib_count GREATER 0)
+		install(FILES ${ULTRALIGHT_BIN_DYLIBS} DESTINATION ${INSTALL_DIR_NAME})
+	endif()
+
+	# ICU data files (check multiple possible locations)
+	file(GLOB ICU_FILES_LIB "${ULTRALIGHT_SDK_ROOT}/lib/ICU/icudt*.dat" "${ULTRALIGHT_SDK_ROOT}/lib/ICU/cacert.pem")
+	file(GLOB ICU_FILES_BIN "${ULTRALIGHT_SDK_ROOT}/bin/ICU/icudt*.dat" "${ULTRALIGHT_SDK_ROOT}/bin/ICU/cacert.pem")
+	file(GLOB ICU_FILES_RES "${ULTRALIGHT_SDK_ROOT}/resources/icudt*.dat" "${ULTRALIGHT_SDK_ROOT}/resources/cacert.pem")
+	set(ICU_FILES ${ICU_FILES_LIB} ${ICU_FILES_BIN} ${ICU_FILES_RES})
+	list(LENGTH ICU_FILES _icu_count)
+	if(_icu_count GREATER 0)
+		install(FILES ${ICU_FILES} DESTINATION ${INSTALL_DIR_NAME}/assets/resources)
+	endif()
+
+	# Include resources directory if it exists
+	if(EXISTS "${ULTRALIGHT_SDK_ROOT}/resources")
+		install(DIRECTORY "${ULTRALIGHT_SDK_ROOT}/resources/" DESTINATION ${INSTALL_DIR_NAME}/assets/resources
+			FILES_MATCHING PATTERN "*" PATTERN "*.dat" PATTERN "*.pem" PATTERN "*.bin")
+	endif()
+endif()
+
 # Post-build: copy assets and runtime files next to the exe for running from build dir
 if(WIN32)
 	add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
@@ -260,6 +324,108 @@ if(WIN32)
 	add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ULTRALIGHT_SDK_ROOT}/bin/ICU/cacert.pem" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/cacert.pem"
 	)
+endif()
+
+# Post-build: copy assets and runtime files for Linux
+if(UNIX AND NOT APPLE)
+	add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets"
+	)
+	# Copy shared libraries from lib directory
+	file(GLOB _linux_sos "${ULTRALIGHT_SDK_ROOT}/lib/*.so*")
+	foreach(_so ${_linux_sos})
+		add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_so}" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/"
+		)
+	endforeach()
+	# Also check bin directory
+	file(GLOB _linux_bin_sos "${ULTRALIGHT_SDK_ROOT}/bin/*.so*")
+	foreach(_so ${_linux_bin_sos})
+		add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_so}" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/"
+		)
+	endforeach()
+	add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources"
+	)
+	# Copy ICU files from various possible locations
+	if(EXISTS "${ULTRALIGHT_SDK_ROOT}/bin/ICU/icudt67l.dat")
+		add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ULTRALIGHT_SDK_ROOT}/bin/ICU/icudt67l.dat" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/icudt67l.dat"
+		)
+	elseif(EXISTS "${ULTRALIGHT_SDK_ROOT}/lib/ICU/icudt67l.dat")
+		add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ULTRALIGHT_SDK_ROOT}/lib/ICU/icudt67l.dat" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/icudt67l.dat"
+		)
+	elseif(EXISTS "${ULTRALIGHT_SDK_ROOT}/resources/icudt67l.dat")
+		add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ULTRALIGHT_SDK_ROOT}/resources/icudt67l.dat" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/icudt67l.dat"
+		)
+	endif()
+	if(EXISTS "${ULTRALIGHT_SDK_ROOT}/bin/ICU/cacert.pem")
+		add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ULTRALIGHT_SDK_ROOT}/bin/ICU/cacert.pem" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/cacert.pem"
+		)
+	elseif(EXISTS "${ULTRALIGHT_SDK_ROOT}/lib/ICU/cacert.pem")
+		add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ULTRALIGHT_SDK_ROOT}/lib/ICU/cacert.pem" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/cacert.pem"
+		)
+	elseif(EXISTS "${ULTRALIGHT_SDK_ROOT}/resources/cacert.pem")
+		add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ULTRALIGHT_SDK_ROOT}/resources/cacert.pem" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/cacert.pem"
+		)
+	endif()
+endif()
+
+# Post-build: copy assets and runtime files for macOS
+if(APPLE)
+	add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets"
+	)
+	# Copy dynamic libraries from lib directory
+	file(GLOB _macos_dylibs "${ULTRALIGHT_SDK_ROOT}/lib/*.dylib*")
+	foreach(_dylib ${_macos_dylibs})
+		add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_dylib}" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/"
+		)
+	endforeach()
+	# Also check bin directory
+	file(GLOB _macos_bin_dylibs "${ULTRALIGHT_SDK_ROOT}/bin/*.dylib*")
+	foreach(_dylib ${_macos_bin_dylibs})
+		add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_dylib}" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/"
+		)
+	endforeach()
+	add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources"
+	)
+	# Copy ICU files from various possible locations
+	if(EXISTS "${ULTRALIGHT_SDK_ROOT}/bin/ICU/icudt67l.dat")
+		add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ULTRALIGHT_SDK_ROOT}/bin/ICU/icudt67l.dat" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/icudt67l.dat"
+		)
+	elseif(EXISTS "${ULTRALIGHT_SDK_ROOT}/lib/ICU/icudt67l.dat")
+		add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ULTRALIGHT_SDK_ROOT}/lib/ICU/icudt67l.dat" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/icudt67l.dat"
+		)
+	elseif(EXISTS "${ULTRALIGHT_SDK_ROOT}/resources/icudt67l.dat")
+		add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ULTRALIGHT_SDK_ROOT}/resources/icudt67l.dat" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/icudt67l.dat"
+		)
+	endif()
+	if(EXISTS "${ULTRALIGHT_SDK_ROOT}/bin/ICU/cacert.pem")
+		add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ULTRALIGHT_SDK_ROOT}/bin/ICU/cacert.pem" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/cacert.pem"
+		)
+	elseif(EXISTS "${ULTRALIGHT_SDK_ROOT}/lib/ICU/cacert.pem")
+		add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ULTRALIGHT_SDK_ROOT}/lib/ICU/cacert.pem" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/cacert.pem"
+		)
+	elseif(EXISTS "${ULTRALIGHT_SDK_ROOT}/resources/cacert.pem")
+		add_custom_command(TARGET Ultralight-WebBrowser POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ULTRALIGHT_SDK_ROOT}/resources/cacert.pem" "$<TARGET_FILE_DIR:Ultralight-WebBrowser>/assets/resources/cacert.pem"
+		)
+	endif()
 endif()
 
 # CPack (global scope)
