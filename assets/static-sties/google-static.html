@@ -183,9 +183,137 @@
     @keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
     @-webkit-keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
   </style>
+  
+  <style>
+    /* Bookmark Bar Styles */
+    .bookmark-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: rgba(32, 33, 36, 0.95);
+      padding: 6px 16px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: nowrap;
+      min-height: 36px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(95, 99, 104, 0.3);
+      z-index: 1000;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    
+    .bookmark-bar::-webkit-scrollbar {
+      height: 4px;
+    }
+    
+    .bookmark-bar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .bookmark-bar::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+    }
+
+    .bookmark-bar-empty {
+      color: #9aa0a6;
+      font-size: 0.8em;
+      padding: 4px 8px;
+      white-space: nowrap;
+    }
+
+    .bookmark-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      text-decoration: none;
+      color: #e8eaed;
+      font-size: 0.8em;
+      transition: all 0.15s ease;
+      max-width: 160px;
+      background: transparent;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .bookmark-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+    }
+
+    .bookmark-item:active {
+      transform: scale(0.97);
+    }
+
+    .bookmark-item img {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .bookmark-item .default-icon {
+      width: 16px;
+      height: 16px;
+      background: linear-gradient(135deg, #4285f4, #5e35b1);
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      color: white;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .bookmark-item span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .bookmark-item .remove-btn {
+      display: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: rgba(255, 100, 100, 0.8);
+      color: white;
+      font-size: 10px;
+      line-height: 14px;
+      text-align: center;
+      cursor: pointer;
+      margin-left: 2px;
+      flex-shrink: 0;
+    }
+
+    .bookmark-item:hover .remove-btn {
+      display: block;
+    }
+
+    .bookmark-item .remove-btn:hover {
+      background: rgba(255, 60, 60, 1);
+    }
+    
+    /* Adjust main container for bookmark bar */
+    .main-container {
+      padding-top: 50px;
+    }
+  </style>
 </head>
 
 <body>
+
+  <!-- Bookmark Bar -->
+  <div class="bookmark-bar" id="bookmarkBar">
+    <span class="bookmark-bar-empty" id="emptyMessage">Click the ★ icon to add bookmarks</span>
+  </div>
 
   <div class="main-container">
     <!-- Official Google Logo Geometry (SVG) -->
@@ -229,7 +357,101 @@
     </a>
   </footer>
 
-  
+  <script>
+    // Helper to get first letter of domain for default icon
+    function getFirstLetter(url) {
+      try {
+        const hostname = new URL(url).hostname;
+        return hostname.replace('www.', '').charAt(0).toUpperCase();
+      } catch (e) {
+        return url.charAt(0).toUpperCase();
+      }
+    }
+
+    // Create a bookmark element
+    function createBookmarkElement(bookmark) {
+      const item = document.createElement('a');
+      item.className = 'bookmark-item';
+      item.href = bookmark.url;
+      item.title = bookmark.title || bookmark.url;
+
+      // Icon (favicon or default)
+      if (bookmark.favicon && bookmark.favicon.startsWith('data:')) {
+        const img = document.createElement('img');
+        img.src = bookmark.favicon;
+        img.onerror = function() {
+          const defaultIcon = document.createElement('div');
+          defaultIcon.className = 'default-icon';
+          defaultIcon.textContent = getFirstLetter(bookmark.url);
+          this.replaceWith(defaultIcon);
+        };
+        item.appendChild(img);
+      } else {
+        const defaultIcon = document.createElement('div');
+        defaultIcon.className = 'default-icon';
+        defaultIcon.textContent = getFirstLetter(bookmark.url);
+        item.appendChild(defaultIcon);
+      }
+
+      // Title
+      const title = document.createElement('span');
+      title.textContent = bookmark.title || bookmark.url;
+      item.appendChild(title);
+
+      // Remove button
+      const removeBtn = document.createElement('div');
+      removeBtn.className = 'remove-btn';
+      removeBtn.textContent = '×';
+      removeBtn.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.removeBookmark) {
+          window.removeBookmark(bookmark.id);
+          loadBookmarks();
+        }
+      };
+      item.appendChild(removeBtn);
+
+      return item;
+    }
+
+    // Load and display bookmarks
+    function loadBookmarks() {
+      const bar = document.getElementById('bookmarkBar');
+      const emptyMsg = document.getElementById('emptyMessage');
+      
+      bar.querySelectorAll('.bookmark-item').forEach(el => el.remove());
+      
+      let bookmarks = [];
+      if (window.getBookmarkBar) {
+        try {
+          const json = window.getBookmarkBar();
+          bookmarks = JSON.parse(json);
+        } catch (e) {
+          console.error('Error parsing bookmarks:', e);
+        }
+      }
+      
+      if (bookmarks.length === 0) {
+        emptyMsg.style.display = 'block';
+      } else {
+        emptyMsg.style.display = 'none';
+        bookmarks.forEach(bm => {
+          const item = createBookmarkElement(bm);
+          bar.appendChild(item);
+        });
+      }
+    }
+
+    // Load bookmarks when page is ready
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(loadBookmarks, 100);
+    });
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      setTimeout(loadBookmarks, 100);
+    }
+  </script>
 
 </body>
 
