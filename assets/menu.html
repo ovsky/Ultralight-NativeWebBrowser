@@ -88,6 +88,10 @@
                 <span class="menu-label">History</span>
                 <span class="shortcut-badge">Ctrl+H</span>
             </div>
+            <div class="menu-item" data-action="bookmarks">
+                <span class="menu-label">Bookmarks</span>
+                <span class="shortcut-badge">Ctrl+B</span>
+            </div>
             <div class="menu-item" data-action="downloads">
                 <span class="menu-label">Downloads</span>
                 <span class="shortcut-badge">Ctrl+J</span>
@@ -175,6 +179,9 @@
                         return; // Don't close menu on toggle
                     case 'history':
                         if (window.OnOpenHistoryNewTab) OnOpenHistoryNewTab();
+                        break;
+                    case 'bookmarks':
+                        if (window.OnOpenBookmarksNewTab) OnOpenBookmarksNewTab();
                         break;
                     case 'downloads':
                         if (window.OnOpenDownloadsNewTab) OnOpenDownloadsNewTab();
