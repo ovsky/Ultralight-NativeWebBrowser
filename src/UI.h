@@ -71,6 +71,7 @@ public:
     bool show_download_badge = true;
     bool auto_open_download_panel = true;
     bool ask_download_location = false;
+    bool convert_webp_to_png = false;       // Convert downloaded WebP images to PNG format
 
     // Performance
     bool smooth_scrolling = true;
