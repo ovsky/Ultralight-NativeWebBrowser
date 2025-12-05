@@ -948,6 +948,17 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
     // Reuse UI helpers via the view
     ui_->ApplyDarkModeToView(caller);
   }
+
+  // Accessibility: Apply reduce motion and high contrast CSS if enabled
+  if (ui_)
+  {
+    if (ui_->reduce_motion_enabled_)
+      ui_->ApplyReduceMotionToView(caller);
+    if (ui_->high_contrast_ui_enabled_)
+      ui_->ApplyHighContrastToView(caller);
+    if (ui_->smooth_scrolling_enabled_)
+      ui_->ApplySmoothScrollingToView(caller);
+  }
 }
 
 void Tab::OnQuickInspectorClose(const JSObject &obj, const JSArgs &args)
