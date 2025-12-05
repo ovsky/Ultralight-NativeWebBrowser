@@ -148,6 +148,28 @@ svg#icon_defs path {
      fill: #8a83ff;
 }
 
+/* Bookmark toggle coloring: highlight when page is bookmarked */
+#toggle-bookmark {
+     color: #b6b3c9;
+     fill: #b6b3c9;
+     transition: color 0.075s ease, fill 0.075s ease;
+}
+
+#toggle-bookmark:hover {
+     color: #cbc9d8;
+     fill: #cbc9d8;
+}
+
+#toggle-bookmark.bookmarked {
+     color: #FFD700;
+     fill: #FFD700;
+}
+
+#toggle-bookmark.bookmarked:hover {
+     color: #ffe44d;
+     fill: #ffe44d;
+}
+
 /* Dropdown menu styles */
 .menu-dropdown {
      position: absolute;
