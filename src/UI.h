@@ -224,6 +224,7 @@ protected:
   void UpdateTabTitle(uint64_t id, const String &title);
   void UpdateTabURL(uint64_t id, const String &url);
   void UpdateTabNavigation(uint64_t id, bool is_loading, bool can_go_back, bool can_go_forward);
+  void UpdateTabFavicon(uint64_t id, const String &favicon_data_url);
 
   void SetLoading(bool is_loading);
   void SetCanGoBack(bool can_go_back);

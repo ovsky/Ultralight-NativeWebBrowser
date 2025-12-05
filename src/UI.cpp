@@ -2306,6 +2306,16 @@ void UI::UpdateTabNavigation(uint64_t id, bool is_loading, bool can_go_back, boo
   }
 }
 
+void UI::UpdateTabFavicon(uint64_t id, const String &favicon_data_url)
+{
+  if (tabs_.empty() || tabs_.find(id) == tabs_.end())
+    return;
+
+  RefPtr<JSContext> lock(view()->LockJSContext());
+  // Update tab with the new favicon data URL
+  updateTab({id, tabs_[id]->view()->title(), favicon_data_url, tabs_[id]->view()->is_loading()});
+}
+
 void UI::SetLoading(bool is_loading)
 {
   RefPtr<JSContext> lock(view()->LockJSContext());
@@ -2432,15 +2442,23 @@ String UI::GetFaviconURL(const String &page_url)
     origin_str.assign(url, (size_t)(slash_after_host - url));
   }
 
+  // Check disk cache first (contains data URIs that actually work)
+  auto it_file = favicon_file_cache_.find(origin_str);
+  if (it_file != favicon_file_cache_.end() && !it_file->second.empty())
+  {
+    return String(it_file->second.c_str());
+  }
+
+  // Check memory cache
   auto it = favicon_cache_.find(origin_str);
   if (it != favicon_cache_.end())
   {
     return String(it->second.c_str());
   }
 
-  std::string favicon = origin_str + "/favicon.ico";
-  favicon_cache_[origin_str] = favicon;
-  return String(favicon.c_str());
+  // Return empty to use default favicon - the /favicon.ico URLs don't work in CSS
+  // The favicon will be fetched and cached when user interacts with suggestions
+  return String("");
 }
 
 // --- History helpers ---
