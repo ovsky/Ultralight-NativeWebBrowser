@@ -942,16 +942,20 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
     }
   }
 
-  // Auto Dark Mode: if enabled, inject dark styling in this document
-  if (ui_ && ui_->dark_mode_enabled_)
+  // Skip all CSS injections for browser internal pages - they have their own styling
+  // This significantly speeds up internal page loading
+  auto page_url = caller->url().utf8();
+  bool is_internal = page_url.data() && UI::IsBrowserInternalPage(std::string(page_url.data()));
+  
+  if (!is_internal && ui_)
   {
-    // Reuse UI helpers via the view
-    ui_->ApplyDarkModeToView(caller);
-  }
+    // Auto Dark Mode: if enabled, inject dark styling in this document
+    if (ui_->dark_mode_enabled_)
+    {
+      ui_->ApplyDarkModeToView(caller);
+    }
 
-  // Accessibility: Apply reduce motion and high contrast CSS if enabled
-  if (ui_)
-  {
+    // Accessibility: Apply reduce motion and high contrast CSS if enabled
     if (ui_->reduce_motion_enabled_)
       ui_->ApplyReduceMotionToView(caller);
     if (ui_->high_contrast_ui_enabled_)
