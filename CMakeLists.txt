@@ -69,6 +69,8 @@ set(SOURCES
 	"src/Browser.cpp"
 	"src/AdBlocker.h"
 	"src/AdBlocker.cpp"
+	"src/BookmarkStore.h"
+	"src/BookmarkStore.cpp"
 	"src/DownloadManager.h"
 	"src/DownloadManager.cpp"
 	"src/ExtensionManager.h"
