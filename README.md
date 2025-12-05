@@ -209,6 +209,10 @@ tar -xzf Ultralight-WebBrowser-*.tar.gz -C ~/.local/opt
   - Always allowed: `file://`, `data:`
   - Toggle via toolbar icon or Settings
   - Requires SDK network interception capabilities
+- **Location Spoofing** – Override geolocation with custom coordinates
+  - Configurable latitude/longitude values
+  - Preset city buttons (New York, London, Tokyo, Sydney, Paris)
+  - Per-site geolocation override via JavaScript injection
 - **Do Not Track (DNT)** – Configurable header setting
 - **Clear History on Exit** – Optional automatic cleanup
 - **Web Security Controls** – JavaScript, cookies, storage permissions
@@ -221,11 +225,14 @@ tar -xzf Ultralight-WebBrowser-*.tar.gz -C ~/.local/opt
 - **Bookmark System** – Save favorite sites with toolbar star icon and bookmarks bar
 - **Bookmark Manager** – Organize bookmarks with folder support and quick access
 - **Download Manager** – Full-featured UI with progress tracking and notifications
+  - WebP to PNG conversion – Automatic conversion of downloaded WebP images
+  - Configurable download location prompts
+  - Download history and status tracking
 - **Settings Panel** – Comprehensive configuration across 7+ categories:
   - Appearance (Dark Mode, Vibrant Window, Transparent Toolbar, Compact Tabs)
-  - Privacy & Security (AdBlock, Trackers, JavaScript, Web Security, Cookies, DNT, History)
+  - Privacy & Security (AdBlock, Trackers, JavaScript, Web Security, Cookies, DNT, History, Location Spoofing)
   - Address Bar & Suggestions (Autocompletion, Favicons)
-  - Downloads (Badge, Auto-open Panel, Ask Location)
+  - Downloads (Badge, Auto-open Panel, Ask Location, WebP to PNG Conversion)
   - Performance (Smooth Scrolling, Hardware Acceleration, Local Storage, Database)
   - Accessibility (Reduce Motion, High Contrast, Caret Browsing)
   - Developer (Remote Inspector, Performance Overlay)
@@ -258,7 +265,37 @@ tar -xzf Ultralight-WebBrowser-*.tar.gz -C ~/.local/opt
 
 ## 🆕 Recent Updates
 
-### Latest Merged Features (dev → main)
+### v0.9.6 (Latest Development)
+
+#### New Features
+- **Location Spoofing** – Override browser geolocation with custom coordinates
+  - Configurable latitude/longitude in Settings → Privacy
+  - Preset city buttons: New York, London, Tokyo, Sydney, Paris
+  - JavaScript geolocation API override for privacy protection
+- **WebP to PNG Conversion** – Automatic conversion of downloaded WebP images
+  - Windows Imaging Component (WIC) based conversion
+  - Toggle in Settings → Downloads
+  - Preserves original filename with PNG extension
+- **Session Restore** – Restore tabs and state from previous browsing session
+- **Password Manager** – Secure credential storage and autofill
+
+#### Improvements
+- Enhanced download manager with format conversion support
+- Expanded settings catalog (30+ options)
+- Improved privacy controls with geolocation override
+
+### v0.9.5 (Previous Release)
+
+#### Major Features
+- **Dark Mode** – Global theme toggle with persistent preferences
+- **Settings Panel** – 26+ configurable options across 7 categories
+- **Download Manager** – Full-featured UI with progress tracking
+- **ARM64 Support** – Native builds for Apple Silicon and ARM Linux
+- **URL Suggestions** – Intelligent autocompletion with popular sites
+- **Quick Inspector** – Built-in development tools
+- **Keyboard Shortcuts** – Customizable shortcut mapping system
+
+### Earlier Merged Features (dev → main)
 
 #### PR #45: Implement Features from Dev into Main
 Major feature sync bringing all development improvements to the stable branch.
@@ -324,7 +361,7 @@ Major feature sync bringing all development improvements to the stable branch.
 - Ad & Tracker Blocking
 - Download Manager
 - Bookmark System
-- Settings Panel (26+ options)
+- Settings Panel (30+ options)
 - Dark Mode & Themes
 - DRM WebView (all platforms)
 - ARM64 Support
@@ -332,6 +369,10 @@ Major feature sync bringing all development improvements to the stable branch.
 - Custom User Agent
 - Settings Search
 - Compact Tabs Mode
+- Location Spoofing
+- WebP to PNG Conversion
+- Session Restore
+- Password Manager
 
 </td>
 <td width="33%" valign="top">
@@ -347,7 +388,14 @@ Major feature sync bringing all development improvements to the stable branch.
 <td width="33%" valign="top">
 
 ### 🔮 Planned
-- Session Restore
+- Extension/Plugin API
+- Persistent History
+- Multi-Profile Support
+- Tab Groups
+- Reader Mode
+- Screenshot Tool
+- Custom Themes
+- Sync Service
 - Extension/Plugin API
 - Persistent History
 - Multi-Profile Support
@@ -508,6 +556,34 @@ The DRM WebView subsystem provides native WebView integration for playing protec
 </details>
 
 <details>
+<summary><b>📍 Location Spoofing</b></summary>
+
+Override the browser's geolocation API with custom coordinates for privacy protection.
+
+**Configuration:**
+1. Open **Settings** → **Privacy & Security**
+2. Enable **Location Spoofing**
+3. Enter custom **Latitude** and **Longitude** values
+4. Or use preset city buttons: New York, London, Tokyo, Sydney, Paris
+
+**How It Works:**
+- Overrides `navigator.geolocation.getCurrentPosition()`
+- Overrides `navigator.geolocation.watchPosition()`
+- Returns spoofed coordinates to all web pages
+- Does not affect actual device location
+
+**Preset Coordinates:**
+| City | Latitude | Longitude |
+|------|----------|-----------|
+| New York | 40.7128 | -74.0060 |
+| London | 51.5074 | -0.1278 |
+| Tokyo | 35.6762 | 139.6503 |
+| Sydney | -33.8688 | 151.2093 |
+| Paris | 48.8566 | 2.3522 |
+
+</details>
+
+<details>
 <summary><b>🛡️ Ad Blocking</b></summary>
 
 Rules loaded from:
@@ -535,9 +611,9 @@ Toggle via toolbar icon or Settings → Privacy → Enable AdBlock
 | Category | Options |
 |----------|---------|
 | **Appearance** | Dark Mode, Vibrant Window, Transparent Toolbar, Compact Tabs |
-| **Privacy & Security** | AdBlock, Tracker Blocking, JavaScript, Cookies, DNT, Clear History |
+| **Privacy & Security** | AdBlock, Tracker Blocking, JavaScript, Cookies, DNT, Clear History, Location Spoofing |
 | **Address Bar** | Autocompletion, Favicons, Suggestions |
-| **Downloads** | Badge, Auto-open Panel, Location Prompt |
+| **Downloads** | Badge, Auto-open Panel, Location Prompt, WebP to PNG Conversion |
 | **Performance** | Smooth Scrolling, Hardware Acceleration, Local Storage |
 | **Accessibility** | Reduce Motion, High Contrast, Caret Browsing |
 | **Developer** | Remote Inspector, Performance Overlay |
