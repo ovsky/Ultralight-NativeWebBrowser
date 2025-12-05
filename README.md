@@ -360,7 +360,6 @@ Major feature sync bringing all development improvements to the stable branch.
 - Multi-Tab Interface
 - Ad & Tracker Blocking
 - Download Manager
-- Bookmark System
 - Settings Panel (30+ options)
 - Dark Mode & Themes
 - DRM WebView (all platforms)
@@ -373,38 +372,31 @@ Major feature sync bringing all development improvements to the stable branch.
 - WebP to PNG Conversion
 - Session Restore
 - Password Manager
+- Extension/Plugin API
+- Persistent History
 
 </td>
 <td width="33%" valign="top">
 
 ### 🚧 In Progress
-- Bookmark Import/Export
-- Folder Organization
-- DRM Detection Improvements
-- Performance Optimizations
+- Bookmark System + Import/Export
+- Directories Organization
 - Accessibility Enhancements
+- Performance Optimizations
+- Tab Groups
 
 </td>
 <td width="33%" valign="top">
 
 ### 🔮 Planned
-- Extension/Plugin API
-- Persistent History
-- Multi-Profile Support
-- Tab Groups
+
+- Multi-Profile Support (?)
 - Reader Mode
-- Screenshot Tool
+- Screenshot Tool (?)
 - Custom Themes
-- Sync Service
-- Extension/Plugin API
-- Persistent History
-- Multi-Profile Support
-- Password Manager
-- Tab Groups
-- Reader Mode
-- Screenshot Tool
-- Custom Themes
-- Sync Service
+- Sync Service (?)
+- DRM Detection Improvements
+
 
 </td>
 </tr>
