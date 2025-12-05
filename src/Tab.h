@@ -166,6 +166,9 @@ public:
   JSValue OnGetPasswordSuggestions(const JSObject &obj, const JSArgs &args);
   void OnPasswordSelected(const JSObject &obj, const JSArgs &args);
   void OnPasswordSaveResponse(const JSObject &obj, const JSArgs &args);
+  
+  // Favicon callback
+  void OnFaviconFetched(const JSObject &obj, const JSArgs &args);
 
 protected:
   UI *ui_;

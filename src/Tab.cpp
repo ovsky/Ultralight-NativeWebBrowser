@@ -634,6 +634,93 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
     std::string_view url_view(c ? c : "");
     if (c && (url_view.size() < 7 || url_view.substr(0, 7) != "file://"))
     {
+      // Inject favicon fetcher script
+      {
+        RefPtr<JSContext> ctx = caller->LockJSContext();
+        SetJSContext(ctx->ctx());
+        JSObject global = JSGlobalObject();
+        global["NativeFaviconFetched"] = BindJSCallback(&Tab::OnFaviconFetched);
+        
+        const char *faviconScript = R"JS((function(){
+          if (window.__ul_favicon_fetched) return;
+          window.__ul_favicon_fetched = true;
+          
+          function fetchFavicon() {
+            var pageUrl = window.location.href;
+            var origin = window.location.origin;
+            
+            // Try to find favicon in page head
+            var iconLinks = document.querySelectorAll('link[rel*="icon"]');
+            var faviconUrl = null;
+            
+            // Priority: apple-touch-icon > icon > shortcut icon
+            for (var i = 0; i < iconLinks.length; i++) {
+              var link = iconLinks[i];
+              var rel = (link.rel || '').toLowerCase();
+              var href = link.href;
+              if (href && (rel.indexOf('icon') >= 0)) {
+                // Prefer larger icons (apple-touch-icon usually bigger)
+                if (rel.indexOf('apple-touch') >= 0 || !faviconUrl) {
+                  faviconUrl = href;
+                }
+              }
+            }
+            
+            // Fallback to /favicon.ico
+            if (!faviconUrl) {
+              faviconUrl = origin + '/favicon.ico';
+            }
+            
+            // Fetch and convert to data URL
+            var img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = function() {
+              try {
+                var canvas = document.createElement('canvas');
+                canvas.width = 16;
+                canvas.height = 16;
+                var ctx = canvas.getContext('2d');
+                ctx.imageSmoothingEnabled = true;
+                ctx.drawImage(img, 0, 0, 16, 16);
+                var dataUrl = canvas.toDataURL('image/png');
+                if (window.NativeFaviconFetched) {
+                  window.NativeFaviconFetched(pageUrl, dataUrl);
+                }
+              } catch(e) {
+                // Canvas tainted by cross-origin image
+              }
+            };
+            img.onerror = function() {
+              // Try fallback to /favicon.ico if we tried a different icon
+              if (faviconUrl !== origin + '/favicon.ico') {
+                var fallbackImg = new Image();
+                fallbackImg.crossOrigin = 'anonymous';
+                fallbackImg.onload = function() {
+                  try {
+                    var canvas = document.createElement('canvas');
+                    canvas.width = 16;
+                    canvas.height = 16;
+                    var ctx = canvas.getContext('2d');
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.drawImage(fallbackImg, 0, 0, 16, 16);
+                    var dataUrl = canvas.toDataURL('image/png');
+                    if (window.NativeFaviconFetched) {
+                      window.NativeFaviconFetched(pageUrl, dataUrl);
+                    }
+                  } catch(e) {}
+                };
+                fallbackImg.src = origin + '/favicon.ico';
+              }
+            };
+            img.src = faviconUrl;
+          }
+          
+          // Run after a short delay to let page set up icons
+          setTimeout(fetchFavicon, 100);
+        })();)JS";
+        caller->EvaluateScript(faviconScript, nullptr);
+      }
+
       std::string script_code = extensions::ExtensionManager::Instance().GetContentScriptsForURL(c);
       if (!script_code.empty())
       {
@@ -1766,6 +1853,24 @@ void Tab::OnPasswordSaveResponse(const JSObject &obj, const JSArgs &args)
   if (ui_)
   {
     ui_->HidePasswordSavePrompt();
+  }
+}
+
+void Tab::OnFaviconFetched(const JSObject &obj, const JSArgs &args)
+{
+  // Forward favicon data to UI for caching and tab update
+  if (!ui_ || args.size() < 2)
+    return;
+  
+  // Delegate to UI's OnFaviconReady which handles caching
+  ui_->OnFaviconReady(obj, args);
+  
+  // Update this tab's favicon display
+  if (args[1].IsString())
+  {
+    ultralight::String data_url = args[1].ToString();
+    ultralight::String url = view()->url();
+    ui_->UpdateTabFavicon(id_, data_url);
   }
 }
 
