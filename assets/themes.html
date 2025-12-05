@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Themes</title>
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23c2bce8'%3E%3Cpath d='M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="themes/theme-variables.css">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            height: 100%;
+            overflow-x: hidden;
+            overflow-y: auto !important;
+        }
+
+        body {
+            font-family: var(--font-family-sans);
+            background: linear-gradient(135deg, var(--color-bg-primary) 0%, var(--color-bg-secondary) 100%);
+            color: var(--color-text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+            padding: var(--spacing-xl);
+            opacity: 0;
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--spacing-xl);
+            padding-bottom: var(--spacing-lg);
+            border-bottom: 1px solid var(--color-border-primary);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .header-left svg {
+            width: 36px;
+            height: 36px;
+            fill: var(--color-accent-primary);
+        }
+
+        h1 {
+            font-size: var(--font-size-xxl);
+            font-weight: var(--font-weight-semibold);
+        }
+
+        .subtitle {
+            color: var(--color-text-tertiary);
+            font-size: var(--font-size-sm);
+            margin-top: 2px;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-sm) var(--spacing-lg);
+            border-radius: var(--radius-md);
+            border: none;
+            font-size: var(--font-size-md);
+            font-weight: var(--font-weight-medium);
+            cursor: pointer;
+            transition: all var(--transition-normal);
+        }
+
+        .btn-primary {
+            background: var(--color-accent-primary);
+            color: var(--btn-primary-text);
+        }
+
+        .btn-primary:hover {
+            background: var(--color-accent-hover);
+        }
+
+        .btn-secondary {
+            background: var(--color-bg-hover);
+            color: var(--color-text-primary);
+            border: 1px solid var(--color-border-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--color-bg-active);
+        }
+
+        .btn-danger {
+            background: var(--color-danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            opacity: 0.9;
+        }
+
+        .btn-icon {
+            padding: var(--spacing-sm);
+        }
+
+        .btn svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        /* Sections */
+        .section {
+            margin-bottom: var(--spacing-xxl);
+        }
+
+        .section-title {
+            font-size: var(--font-size-lg);
+            font-weight: var(--font-weight-semibold);
+            margin-bottom: var(--spacing-lg);
+            color: var(--color-text-secondary);
+        }
+
+        /* Theme Grid */
+        .theme-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: var(--spacing-lg);
+        }
+
+        /* Theme Card */
+        .theme-card {
+            background: var(--color-bg-elevated);
+            border: 1px solid var(--color-border-primary);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            transition: all var(--transition-normal);
+            cursor: pointer;
+        }
+
+        .theme-card:hover {
+            border-color: var(--color-accent-primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .theme-card.active {
+            border-color: var(--color-accent-primary);
+            box-shadow: 0 0 0 2px var(--color-accent-light);
+        }
+
+        .theme-preview {
+            height: 120px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .preview-toolbar {
+            height: 28px;
+            display: flex;
+            align-items: center;
+            padding: 0 var(--spacing-sm);
+            gap: var(--spacing-xs);
+        }
+
+        .preview-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .preview-address {
+            flex: 1;
+            height: 16px;
+            border-radius: var(--radius-pill);
+            margin: 0 var(--spacing-sm);
+        }
+
+        .preview-content {
+            flex: 1;
+            display: flex;
+            padding: var(--spacing-sm);
+            gap: var(--spacing-sm);
+        }
+
+        .preview-sidebar {
+            width: 40px;
+            border-radius: var(--radius-sm);
+        }
+
+        .preview-main {
+            flex: 1;
+            border-radius: var(--radius-sm);
+        }
+
+        .theme-info {
+            padding: var(--spacing-md);
+        }
+
+        .theme-name {
+            font-weight: var(--font-weight-semibold);
+            font-size: var(--font-size-md);
+            margin-bottom: var(--spacing-xs);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .theme-badge {
+            font-size: var(--font-size-xs);
+            padding: 2px 6px;
+            border-radius: var(--radius-sm);
+            background: var(--color-accent-light);
+            color: var(--color-accent-primary);
+        }
+
+        .theme-description {
+            font-size: var(--font-size-sm);
+            color: var(--color-text-tertiary);
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .theme-meta {
+            font-size: var(--font-size-xs);
+            color: var(--color-text-muted);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .theme-actions {
+            display: flex;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
+            border-top: 1px solid var(--color-border-secondary);
+        }
+
+        .theme-actions .btn {
+            flex: 1;
+            justify-content: center;
+            padding: var(--spacing-sm);
+            font-size: var(--font-size-sm);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: var(--z-modal);
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--transition-normal);
+        }
+
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--color-bg-elevated);
+            border: 1px solid var(--color-border-primary);
+            border-radius: var(--radius-lg);
+            width: 90%;
+            max-width: 700px;
+            max-height: 85vh;
+            overflow: hidden;
+            transform: scale(0.95) translateY(20px);
+            transition: all var(--transition-normal);
+        }
+
+        .modal-overlay.visible .modal {
+            transform: scale(1) translateY(0);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: var(--spacing-lg);
+            border-bottom: 1px solid var(--color-border-secondary);
+        }
+
+        .modal-title {
+            font-size: var(--font-size-lg);
+            font-weight: var(--font-weight-semibold);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: var(--spacing-sm);
+            color: var(--color-text-tertiary);
+            border-radius: var(--radius-sm);
+        }
+
+        .modal-close:hover {
+            background: var(--color-bg-hover);
+            color: var(--color-text-primary);
+        }
+
+        .modal-close svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        .modal-body {
+            padding: var(--spacing-lg);
+            overflow-y: auto;
+            max-height: calc(85vh - 140px);
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-lg);
+            border-top: 1px solid var(--color-border-secondary);
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .form-label {
+            display: block;
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-medium);
+            color: var(--color-text-secondary);
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border: 1px solid var(--color-border-primary);
+            border-radius: var(--radius-md);
+            background: var(--color-bg-tertiary);
+            color: var(--color-text-primary);
+            font-size: var(--font-size-md);
+            transition: all var(--transition-normal);
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--color-accent-primary);
+            box-shadow: 0 0 0 3px var(--color-accent-light);
+        }
+
+        .form-textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        /* Color Editor */
+        .color-editor {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: var(--spacing-md);
+        }
+
+        .color-group {
+            background: var(--color-bg-tertiary);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+        }
+
+        .color-group-title {
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-semibold);
+            color: var(--color-text-secondary);
+            margin-bottom: var(--spacing-sm);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .color-item {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-xs) 0;
+        }
+
+        .color-picker {
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            -webkit-appearance: none;
+            padding: 0;
+        }
+
+        .color-picker::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        .color-picker::-webkit-color-swatch {
+            border: 1px solid var(--color-border-primary);
+            border-radius: var(--radius-sm);
+        }
+
+        .color-label {
+            flex: 1;
+            font-size: var(--font-size-sm);
+            color: var(--color-text-tertiary);
+        }
+
+        .color-value {
+            font-family: var(--font-family-mono);
+            font-size: var(--font-size-xs);
+            color: var(--color-text-muted);
+            background: var(--color-bg-primary);
+            padding: 2px 6px;
+            border-radius: var(--radius-sm);
+        }
+
+        /* Tabs for Editor */
+        .tabs {
+            display: flex;
+            gap: var(--spacing-xs);
+            margin-bottom: var(--spacing-lg);
+            border-bottom: 1px solid var(--color-border-secondary);
+            padding-bottom: var(--spacing-xs);
+        }
+
+        .tab {
+            padding: var(--spacing-sm) var(--spacing-lg);
+            background: none;
+            border: none;
+            color: var(--color-text-tertiary);
+            font-size: var(--font-size-md);
+            cursor: pointer;
+            border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+            transition: all var(--transition-normal);
+        }
+
+        .tab:hover {
+            color: var(--color-text-primary);
+            background: var(--color-bg-hover);
+        }
+
+        .tab.active {
+            color: var(--color-accent-primary);
+            background: var(--color-bg-hover);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Import/Export */
+        .import-export {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-lg);
+            padding-top: var(--spacing-lg);
+            border-top: 1px solid var(--color-border-secondary);
+        }
+
+        .drop-zone {
+            flex: 1;
+            border: 2px dashed var(--color-border-primary);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-xl);
+            text-align: center;
+            color: var(--color-text-tertiary);
+            transition: all var(--transition-normal);
+        }
+
+        .drop-zone:hover,
+        .drop-zone.drag-over {
+            border-color: var(--color-accent-primary);
+            background: var(--color-accent-light);
+        }
+
+        .drop-zone svg {
+            width: 48px;
+            height: 48px;
+            fill: var(--color-text-muted);
+            margin-bottom: var(--spacing-sm);
+        }
+
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            bottom: var(--spacing-xl);
+            right: var(--spacing-xl);
+            background: var(--color-bg-elevated);
+            border: 1px solid var(--color-border-primary);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md) var(--spacing-lg);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all var(--transition-normal);
+            z-index: var(--z-toast);
+        }
+
+        .toast.visible {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            border-left: 3px solid var(--color-success);
+        }
+
+        .toast.error {
+            border-left: 3px solid var(--color-danger);
+        }
+
+        /* Info Banner */
+        .info-banner {
+            display: flex;
+            gap: var(--spacing-md);
+            padding: var(--spacing-md);
+            background: var(--color-info-bg, rgba(106, 192, 239, 0.1));
+            border: 1px solid var(--color-info);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-lg);
+            color: var(--color-text-secondary);
+        }
+
+        .info-banner svg {
+            flex-shrink: 0;
+            color: var(--color-info);
+        }
+
+        .info-banner strong {
+            display: block;
+            color: var(--color-text-primary);
+            margin-bottom: 4px;
+        }
+
+        .info-banner p {
+            font-size: var(--font-size-sm);
+            line-height: 1.4;
+        }
+
+        /* Form Hints */
+        .form-hint {
+            font-size: var(--font-size-xs);
+            color: var(--color-text-muted);
+            margin-top: 4px;
+        }
+
+        .required {
+            color: var(--color-danger);
+        }
+
+        /* Category Badge */
+        .category-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: var(--radius-sm);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: var(--font-weight-semibold);
+        }
+
+        .category-badge.dark {
+            background: rgba(100, 100, 150, 0.2);
+            color: #a0a0d0;
+        }
+
+        .category-badge.light {
+            background: rgba(255, 200, 100, 0.2);
+            color: #d0a050;
+        }
+
+        /* Color tooltip */
+        .color-tooltip {
+            position: relative;
+        }
+
+        .color-tooltip::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 4px 8px;
+            background: var(--color-bg-primary);
+            border: 1px solid var(--color-border-primary);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-xs);
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--transition-fast);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .color-tooltip:hover::after {
+            opacity: 1;
+            visibility: visible;
+            bottom: calc(100% + 4px);
+        }
+
+        /* Storage Info Section */
+        .storage-info {
+            background: var(--color-bg-tertiary);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            margin-top: var(--spacing-lg);
+            font-size: var(--font-size-sm);
+        }
+
+        .storage-info h4 {
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-semibold);
+            margin-bottom: var(--spacing-sm);
+            color: var(--color-text-secondary);
+        }
+
+        .storage-info ul {
+            list-style: none;
+            color: var(--color-text-tertiary);
+        }
+
+        .storage-info li {
+            padding: 4px 0;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .storage-info li svg {
+            width: 16px;
+            height: 16px;
+            fill: var(--color-accent-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+                </svg>
+                <div>
+                    <h1>Themes</h1>
+                    <div class="subtitle">Customize your browser appearance</div>
+                </div>
+            </div>
+            <button class="btn btn-primary" id="btn-create-theme">
+                <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                Create Theme
+            </button>
+        </header>
+
+        <!-- Built-in Themes -->
+        <section class="section">
+            <h2 class="section-title">Built-in Themes</h2>
+            <div class="theme-grid" id="builtin-themes"></div>
+        </section>
+
+        <!-- Custom Themes -->
+        <section class="section" id="custom-section" style="display: none;">
+            <h2 class="section-title">Custom Themes</h2>
+            <div class="theme-grid" id="custom-themes"></div>
+        </section>
+
+        <!-- Import Section -->
+        <section class="section">
+            <h2 class="section-title">Import Theme</h2>
+            <div class="drop-zone" id="drop-zone">
+                <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+                <p>Drag & drop a theme file here, or click to browse</p>
+                <input type="file" id="file-input" accept=".json" style="display: none;">
+            </div>
+            
+            <!-- Storage Information -->
+            <div class="storage-info">
+                <h4>📁 Theme Storage Information</h4>
+                <ul>
+                    <li>
+                        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+                        Custom themes are saved in browser storage and persist across sessions
+                    </li>
+                    <li>
+                        <svg viewBox="0 0 24 24"><path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2v9.67z"/></svg>
+                        Export themes to JSON files for backup or sharing with others
+                    </li>
+                    <li>
+                        <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                        Import JSON theme files by dragging them onto the drop zone above
+                    </li>
+                    <li>
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                        Tip: Duplicate a built-in theme to create a customized version
+                    </li>
+                </ul>
+            </div>
+        </section>
+    </div>
+
+    <!-- Create/Edit Theme Modal -->
+    <div class="modal-overlay" id="theme-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title">Create Theme</h3>
+                <button class="modal-close" id="modal-close">
+                    <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="tabs">
+                    <button class="tab active" data-tab="info">Info</button>
+                    <button class="tab" data-tab="colors">Colors</button>
+                    <button class="tab" data-tab="preview">Preview</button>
+                </div>
+
+                <!-- Info Tab -->
+                <div class="tab-content active" id="tab-info">
+                    <div class="info-banner">
+                        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                        <div>
+                            <strong>Creating a Custom Theme</strong>
+                            <p>Start with a base theme, then customize colors in the Colors tab. Your theme will be saved to browser storage and can be exported as a JSON file for backup or sharing.</p>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Theme Name <span class="required">*</span></label>
+                        <input type="text" class="form-input" id="theme-name" placeholder="My Custom Theme">
+                        <div class="form-hint">Give your theme a unique, memorable name</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-input form-textarea" id="theme-description" placeholder="A brief description of your theme..."></textarea>
+                        <div class="form-hint">Optional: Describe the theme's style or inspiration</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Author</label>
+                        <input type="text" class="form-input" id="theme-author" placeholder="Your name">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Base Theme</label>
+                        <select class="form-input" id="theme-base">
+                            <optgroup label="Dark Themes">
+                                <option value="dark">Dark (Default)</option>
+                                <option value="midnight">Midnight Blue</option>
+                                <option value="dracula">Dracula</option>
+                                <option value="onedark">One Dark</option>
+                                <option value="gruvbox">Gruvbox Dark</option>
+                                <option value="catppuccin">Catppuccin Mocha</option>
+                                <option value="tokyo-night">Tokyo Night</option>
+                                <option value="ayu-dark">Ayu Dark</option>
+                                <option value="solarized-dark">Solarized Dark</option>
+                                <option value="material-dark">Material Dark</option>
+                                <option value="nord">Nord</option>
+                                <option value="monokai">Monokai Pro</option>
+                                <option value="ocean-deep">Ocean Deep</option>
+                            </optgroup>
+                            <optgroup label="Light Themes">
+                                <option value="light">Light</option>
+                                <option value="light-soft">Light Soft</option>
+                            </optgroup>
+                        </select>
+                        <div class="form-hint">Choose a theme to start from - you can customize all colors</div>
+                    </div>
+                </div>
+
+                <!-- Colors Tab -->
+                <div class="tab-content" id="tab-colors">
+                    <div class="color-editor" id="color-editor"></div>
+                </div>
+
+                <!-- Preview Tab -->
+                <div class="tab-content" id="tab-preview">
+                    <div class="theme-preview" id="live-preview" style="height: 200px; border-radius: var(--radius-lg); overflow: hidden;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="btn-export">Export</button>
+                <button class="btn btn-secondary" id="btn-cancel">Cancel</button>
+                <button class="btn btn-primary" id="btn-save">Save Theme</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script src="themes/theme.js"></script>
+    <script>
+        (function() {
+            'use strict';
+
+            // DOM Elements
+            const builtinGrid = document.getElementById('builtin-themes');
+            const customGrid = document.getElementById('custom-themes');
+            const customSection = document.getElementById('custom-section');
+            const createBtn = document.getElementById('btn-create-theme');
+            const modal = document.getElementById('theme-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalClose = document.getElementById('modal-close');
+            const cancelBtn = document.getElementById('btn-cancel');
+            const saveBtn = document.getElementById('btn-save');
+            const exportBtn = document.getElementById('btn-export');
+            const dropZone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('file-input');
+            const tabs = document.querySelectorAll('.tab');
+            const toast = document.getElementById('toast');
+
+            let editingThemeId = null;
+            let currentColors = {};
+
+            // Extended color groups for the editor - organized by component
+            const colorGroups = {
+                'Background': [
+                    ['color-bg-primary', 'Primary', 'Main background color'],
+                    ['color-bg-secondary', 'Secondary', 'Sidebar, panels'],
+                    ['color-bg-tertiary', 'Tertiary', 'Toolbar, elevated areas'],
+                    ['color-bg-elevated', 'Elevated', 'Cards, popups'],
+                    ['color-bg-hover', 'Hover', 'Hover state'],
+                ],
+                'Text': [
+                    ['color-text-primary', 'Primary', 'Main text color'],
+                    ['color-text-secondary', 'Secondary', 'Less emphasized text'],
+                    ['color-text-tertiary', 'Tertiary', 'Hints, placeholders'],
+                    ['color-text-muted', 'Muted', 'Disabled text'],
+                ],
+                'Border': [
+                    ['color-border-primary', 'Primary', 'Main borders'],
+                    ['color-border-secondary', 'Secondary', 'Subtle borders'],
+                ],
+                'Accent': [
+                    ['color-accent-primary', 'Primary', 'Links, active elements'],
+                    ['color-accent-secondary', 'Secondary', 'Highlights'],
+                    ['color-accent-hover', 'Hover', 'Accent hover state'],
+                ],
+                'Status': [
+                    ['color-success', 'Success', 'Success messages'],
+                    ['color-warning', 'Warning', 'Warning messages'],
+                    ['color-danger', 'Danger', 'Error, delete actions'],
+                    ['color-info', 'Info', 'Information messages'],
+                ],
+                'Toolbar & Navigation': [
+                    ['toolbar-icon-color', 'Icon Color', 'Toolbar icons'],
+                    ['toolbar-icon-hover', 'Icon Hover', 'Icon hover color'],
+                    ['toolbar-icon-active', 'Icon Active', 'Active icon color'],
+                ],
+                'Tabs': [
+                    ['tab-bg', 'Background', 'Inactive tab background'],
+                    ['tab-active-bg', 'Active BG', 'Active tab background'],
+                    ['tab-hover-bg', 'Hover BG', 'Tab hover background'],
+                    ['tab-text', 'Text', 'Inactive tab text'],
+                    ['tab-active-text', 'Active Text', 'Active tab text'],
+                ],
+                'Components': [
+                    ['menu-bg', 'Menu Background', 'Dropdown menus'],
+                    ['card-bg', 'Card Background', 'Cards, panels'],
+                    ['input-bg', 'Input Background', 'Text inputs'],
+                    ['input-border', 'Input Border', 'Input borders'],
+                ],
+                'Scrollbar': [
+                    ['scrollbar-track', 'Track', 'Scrollbar track'],
+                    ['scrollbar-thumb', 'Thumb', 'Scrollbar handle'],
+                ],
+            };
+
+            // Initialize
+            function init() {
+                renderThemes();
+                setupEventListeners();
+            }
+
+            // Render all themes
+            function renderThemes() {
+                const themes = window.ThemeManager.getAllThemes();
+                const currentTheme = window.ThemeManager.getCurrentTheme();
+                
+                builtinGrid.innerHTML = '';
+                customGrid.innerHTML = '';
+                
+                let hasCustom = false;
+
+                for (const [id, theme] of Object.entries(themes)) {
+                    const card = createThemeCard(theme, currentTheme?.id === id);
+                    
+                    if (theme.isBuiltIn) {
+                        builtinGrid.appendChild(card);
+                    } else {
+                        customGrid.appendChild(card);
+                        hasCustom = true;
+                    }
+                }
+
+                customSection.style.display = hasCustom ? 'block' : 'none';
+            }
+
+            // Create theme card element
+            function createThemeCard(theme, isActive) {
+                const card = document.createElement('div');
+                card.className = 'theme-card' + (isActive ? ' active' : '');
+                card.dataset.themeId = theme.id;
+
+                const colors = theme.colors;
+                const category = theme.category || (colors['color-bg-primary']?.includes('ff') && colors['color-bg-primary']?.startsWith('#f') ? 'light' : 'dark');
+                
+                card.innerHTML = `
+                    <div class="theme-preview" style="background: ${colors['color-bg-primary']}">
+                        <div class="preview-toolbar" style="background: ${colors['color-bg-tertiary']}">
+                            <div class="preview-dot" style="background: ${colors['color-danger']}"></div>
+                            <div class="preview-dot" style="background: ${colors['color-warning']}"></div>
+                            <div class="preview-dot" style="background: ${colors['color-success']}"></div>
+                            <div class="preview-address" style="background: ${colors['color-bg-primary']}"></div>
+                        </div>
+                        <div class="preview-content">
+                            <div class="preview-sidebar" style="background: ${colors['color-bg-secondary']}"></div>
+                            <div class="preview-main" style="background: ${colors['card-bg'] || colors['color-bg-elevated']}"></div>
+                        </div>
+                    </div>
+                    <div class="theme-info">
+                        <div class="theme-name">
+                            ${theme.name}
+                            ${isActive ? '<span class="theme-badge">Active</span>' : ''}
+                            <span class="category-badge ${category}">${category}</span>
+                        </div>
+                        <div class="theme-description">${theme.description || 'No description'}</div>
+                        <div class="theme-meta">
+                            <span>by ${theme.author}</span>
+                            <span>v${theme.version}</span>
+                        </div>
+                    </div>
+                    <div class="theme-actions">
+                        <button class="btn btn-secondary btn-apply" ${isActive ? 'disabled' : ''}>
+                            ${isActive ? 'Active' : 'Apply'}
+                        </button>
+                        ${!theme.isBuiltIn ? `
+                            <button class="btn btn-secondary btn-edit">Edit</button>
+                            <button class="btn btn-danger btn-delete">Delete</button>
+                        ` : `
+                            <button class="btn btn-secondary btn-duplicate">Duplicate</button>
+                        `}
+                    </div>
+                `;
+
+                return card;
+            }
+
+            // Setup event listeners
+            function setupEventListeners() {
+                // Theme card actions
+                document.addEventListener('click', (e) => {
+                    const card = e.target.closest('.theme-card');
+                    if (!card) return;
+
+                    const themeId = card.dataset.themeId;
+
+                    if (e.target.classList.contains('btn-apply')) {
+                        applyTheme(themeId);
+                    } else if (e.target.classList.contains('btn-edit')) {
+                        openEditModal(themeId);
+                    } else if (e.target.classList.contains('btn-delete')) {
+                        deleteTheme(themeId);
+                    } else if (e.target.classList.contains('btn-duplicate')) {
+                        duplicateTheme(themeId);
+                    }
+                });
+
+                // Create button
+                createBtn.addEventListener('click', openCreateModal);
+
+                // Modal controls
+                modalClose.addEventListener('click', closeModal);
+                cancelBtn.addEventListener('click', closeModal);
+                saveBtn.addEventListener('click', saveTheme);
+                exportBtn.addEventListener('click', exportTheme);
+
+                // Modal tabs
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        tabs.forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        
+                        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                        document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+                    });
+                });
+
+                // Base theme change
+                document.getElementById('theme-base').addEventListener('change', (e) => {
+                    const baseTheme = window.ThemeManager.getTheme(e.target.value);
+                    if (baseTheme) {
+                        currentColors = { ...baseTheme.colors };
+                        buildColorEditor();
+                        updatePreview();
+                    }
+                });
+
+                // Import - drag & drop
+                dropZone.addEventListener('click', () => fileInput.click());
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('drag-over');
+                });
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.classList.remove('drag-over');
+                });
+                dropZone.addEventListener('drop', handleFileDrop);
+                fileInput.addEventListener('change', handleFileSelect);
+
+                // Close modal on overlay click
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) closeModal();
+                });
+
+                // Listen for theme changes
+                window.addEventListener('themeChanged', renderThemes);
+            }
+
+            // Apply theme
+            function applyTheme(themeId) {
+                window.ThemeManager.applyTheme(themeId);
+                showToast('Theme applied!', 'success');
+                renderThemes();
+            }
+
+            // Open create modal
+            function openCreateModal() {
+                editingThemeId = null;
+                modalTitle.textContent = 'Create Theme';
+                
+                document.getElementById('theme-name').value = '';
+                document.getElementById('theme-description').value = '';
+                document.getElementById('theme-author').value = '';
+                document.getElementById('theme-base').value = 'dark';
+                
+                const baseTheme = window.ThemeManager.getTheme('dark');
+                currentColors = { ...baseTheme.colors };
+                
+                buildColorEditor();
+                updatePreview();
+                
+                modal.classList.add('visible');
+            }
+
+            // Open edit modal
+            function openEditModal(themeId) {
+                const theme = window.ThemeManager.getTheme(themeId);
+                if (!theme || theme.isBuiltIn) return;
+                
+                editingThemeId = themeId;
+                modalTitle.textContent = 'Edit Theme';
+                
+                document.getElementById('theme-name').value = theme.name;
+                document.getElementById('theme-description').value = theme.description || '';
+                document.getElementById('theme-author').value = theme.author || '';
+                
+                currentColors = { ...theme.colors };
+                
+                buildColorEditor();
+                updatePreview();
+                
+                modal.classList.add('visible');
+            }
+
+            // Close modal
+            function closeModal() {
+                modal.classList.remove('visible');
+                editingThemeId = null;
+            }
+
+            // Build color editor
+            function buildColorEditor() {
+                const editor = document.getElementById('color-editor');
+                editor.innerHTML = '';
+
+                for (const [groupName, colors] of Object.entries(colorGroups)) {
+                    const group = document.createElement('div');
+                    group.className = 'color-group';
+                    
+                    group.innerHTML = `<div class="color-group-title">${groupName}</div>`;
+                    
+                    for (const colorDef of colors) {
+                        const colorKey = colorDef[0];
+                        const label = colorDef[1];
+                        const tooltip = colorDef[2] || '';
+                        
+                        const value = currentColors[colorKey] || '#000000';
+                        // Extract hex color for the picker
+                        const hexMatch = value.match(/#[0-9A-Fa-f]{6}/);
+                        const hexColor = hexMatch ? hexMatch[0] : '#000000';
+                        
+                        const item = document.createElement('div');
+                        item.className = 'color-item' + (tooltip ? ' color-tooltip' : '');
+                        if (tooltip) item.dataset.tooltip = tooltip;
+                        
+                        item.innerHTML = `
+                            <input type="color" class="color-picker" data-key="${colorKey}" value="${hexColor}">
+                            <span class="color-label">${label}</span>
+                            <span class="color-value">${hexColor}</span>
+                        `;
+                        
+                        const picker = item.querySelector('.color-picker');
+                        const valueSpan = item.querySelector('.color-value');
+                        
+                        picker.addEventListener('input', (e) => {
+                            currentColors[colorKey] = e.target.value;
+                            valueSpan.textContent = e.target.value;
+                            updatePreview();
+                        });
+                        
+                        group.appendChild(item);
+                    }
+                    
+                    editor.appendChild(group);
+                }
+            }
+
+            // Update preview
+            function updatePreview() {
+                const preview = document.getElementById('live-preview');
+                const c = currentColors;
+                
+                preview.innerHTML = `
+                    <div style="height: 100%; background: ${c['color-bg-primary']}; display: flex; flex-direction: column;">
+                        <div style="height: 36px; background: ${c['color-bg-tertiary']}; display: flex; align-items: center; padding: 0 12px; gap: 8px;">
+                            <div style="width: 10px; height: 10px; border-radius: 50%; background: ${c['color-danger']}"></div>
+                            <div style="width: 10px; height: 10px; border-radius: 50%; background: ${c['color-warning']}"></div>
+                            <div style="width: 10px; height: 10px; border-radius: 50%; background: ${c['color-success']}"></div>
+                            <div style="flex: 1; height: 24px; background: ${c['color-bg-primary']}; border-radius: 999px; margin: 0 12px;"></div>
+                        </div>
+                        <div style="flex: 1; display: flex; padding: 12px; gap: 12px;">
+                            <div style="width: 60px; background: ${c['color-bg-secondary']}; border-radius: 8px;"></div>
+                            <div style="flex: 1; background: ${c['card-bg'] || c['color-bg-elevated']}; border-radius: 8px; padding: 12px;">
+                                <div style="height: 12px; width: 60%; background: ${c['color-text-primary']}; border-radius: 4px; margin-bottom: 8px; opacity: 0.8;"></div>
+                                <div style="height: 10px; width: 80%; background: ${c['color-text-secondary']}; border-radius: 4px; margin-bottom: 6px; opacity: 0.6;"></div>
+                                <div style="height: 10px; width: 50%; background: ${c['color-text-tertiary']}; border-radius: 4px; opacity: 0.4;"></div>
+                                <div style="margin-top: 16px; display: flex; gap: 8px;">
+                                    <div style="padding: 6px 12px; background: ${c['color-accent-primary']}; border-radius: 6px;"></div>
+                                    <div style="padding: 6px 12px; background: ${c['color-bg-hover']}; border-radius: 6px; border: 1px solid ${c['color-border-primary']};"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Save theme
+            function saveTheme() {
+                const name = document.getElementById('theme-name').value.trim();
+                if (!name) {
+                    showToast('Please enter a theme name', 'error');
+                    return;
+                }
+
+                const themeData = {
+                    name: name,
+                    description: document.getElementById('theme-description').value.trim(),
+                    author: document.getElementById('theme-author').value.trim() || 'User',
+                    colors: { ...currentColors }
+                };
+
+                if (editingThemeId) {
+                    window.ThemeManager.updateTheme(editingThemeId, themeData);
+                    showToast('Theme updated!', 'success');
+                } else {
+                    window.ThemeManager.createTheme(themeData);
+                    showToast('Theme created!', 'success');
+                }
+
+                closeModal();
+                renderThemes();
+            }
+
+            // Export theme
+            function exportTheme() {
+                const name = document.getElementById('theme-name').value.trim() || 'custom-theme';
+                const themeData = {
+                    id: editingThemeId || 'custom_' + Date.now(),
+                    name: name,
+                    description: document.getElementById('theme-description').value.trim(),
+                    author: document.getElementById('theme-author').value.trim() || 'User',
+                    version: '1.0.0',
+                    isBuiltIn: false,
+                    colors: { ...currentColors }
+                };
+
+                const json = JSON.stringify(themeData, null, 2);
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = name.toLowerCase().replace(/\s+/g, '-') + '.json';
+                a.click();
+                
+                URL.revokeObjectURL(url);
+                showToast('Theme exported!', 'success');
+            }
+
+            // Delete theme
+            function deleteTheme(themeId) {
+                if (confirm('Are you sure you want to delete this theme?')) {
+                    window.ThemeManager.deleteTheme(themeId);
+                    showToast('Theme deleted', 'success');
+                    renderThemes();
+                }
+            }
+
+            // Duplicate theme
+            function duplicateTheme(themeId) {
+                const theme = window.ThemeManager.duplicateTheme(themeId);
+                if (theme) {
+                    showToast('Theme duplicated!', 'success');
+                    renderThemes();
+                    openEditModal(theme.id);
+                }
+            }
+
+            // Handle file drop
+            function handleFileDrop(e) {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+                
+                const file = e.dataTransfer.files[0];
+                if (file) importThemeFile(file);
+            }
+
+            // Handle file select
+            function handleFileSelect(e) {
+                const file = e.target.files[0];
+                if (file) importThemeFile(file);
+            }
+
+            // Import theme file
+            function importThemeFile(file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const theme = window.ThemeManager.importTheme(e.target.result);
+                    if (theme) {
+                        showToast('Theme imported!', 'success');
+                        renderThemes();
+                    } else {
+                        showToast('Invalid theme file', 'error');
+                    }
+                };
+                reader.readAsText(file);
+            }
+
+            // Show toast notification
+            function showToast(message, type = 'success') {
+                toast.textContent = message;
+                toast.className = 'toast ' + type + ' visible';
+                
+                setTimeout(() => {
+                    toast.classList.remove('visible');
+                }, 3000);
+            }
+
+            // Initialize on load
+            init();
+        })();
+    </script>
+</body>
+</html>

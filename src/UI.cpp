@@ -1494,6 +1494,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnOpenDownloadsNewTab"] = BindJSCallback(&UI::OnOpenDownloadsNewTab);
   global["OnOpenPasswordsNewTab"] = BindJSCallback(&UI::OnOpenPasswordsNewTab);
   global["OnOpenExtensionsNewTab"] = BindJSCallback(&UI::OnOpenExtensionsNewTab);
+  global["OnOpenThemesNewTab"] = BindJSCallback(&UI::OnOpenThemesNewTab);
   global["GetDownloadsSnapshot"] = BindJSCallbackWithRetval(&UI::OnDownloadsOverlayGet);
   global["ClearDownloadsSnapshot"] = BindJSCallback(&UI::OnDownloadsOverlayClear);
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
@@ -1952,6 +1953,11 @@ void UI::OnOpenPasswordsNewTab(const JSObject &obj, const JSArgs &args)
 void UI::OnOpenExtensionsNewTab(const JSObject &obj, const JSArgs &args)
 {
   CreateNewTabForChildView(String("file:///extensions.html"));
+}
+
+void UI::OnOpenThemesNewTab(const JSObject &obj, const JSArgs &args)
+{
+  CreateNewTabForChildView(String("file:///themes.html"));
 }
 
 // ============================================================================

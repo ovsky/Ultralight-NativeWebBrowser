@@ -71,6 +71,8 @@ set(SOURCES
 	"src/AdBlocker.cpp"
 	"src/BookmarkStore.h"
 	"src/BookmarkStore.cpp"
+	"src/ThemeManager.h"
+	"src/ThemeManager.cpp"
 	"src/DownloadManager.h"
 	"src/DownloadManager.cpp"
 	"src/ExtensionManager.h"

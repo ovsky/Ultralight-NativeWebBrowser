@@ -122,6 +122,9 @@
                 <span class="menu-label">Extensions</span>
                 <span class="shortcut-badge">Ctrl+E</span>
             </div>
+            <div class="menu-item" data-action="themes">
+                <span class="menu-label">Themes</span>
+            </div>
             <div class="menu-item" data-action="settings">
                 <span class="menu-label">Settings</span>
                 <span class="shortcut-badge">Ctrl+,</span>
@@ -209,6 +212,9 @@
                         break;
                     case 'extensions':
                         if (window.OnOpenExtensionsNewTab) OnOpenExtensionsNewTab();
+                        break;
+                    case 'themes':
+                        if (window.OnOpenThemesNewTab) OnOpenThemesNewTab();
                         break;
                     case 'settings':
                         if (window.OnOpenSettingsPanel) OnOpenSettingsPanel();
