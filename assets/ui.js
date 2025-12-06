@@ -1,5 +1,24 @@
 window.__ul_settings = window.__ul_settings || {};
 
+// Listen for theme changes to update toolbar icon colors
+window.addEventListener('themeChanged', function(e) {
+    // Force repaint of SVG icons by updating their fill from CSS variables
+    const icons = document.querySelectorAll('.icon:not(.disabled)');
+    icons.forEach(function(icon) {
+        // Trigger a repaint by briefly toggling a class
+        icon.style.fill = '';
+        // Force browser to recalculate styles
+        void icon.offsetWidth;
+    });
+    
+    // Update disabled icons too
+    const disabledIcons = document.querySelectorAll('.icon.disabled');
+    disabledIcons.forEach(function(icon) {
+        icon.style.fill = '';
+        void icon.offsetWidth;
+    });
+});
+
 function updateBack(enable) {
 	if (enable)
 		document.getElementById("back").classList.remove("disabled");

@@ -78,6 +78,8 @@ body {
      padding: 5px;
      height: 18px;
      width: 18px;
+     transition: fill 0.2s ease, background-color 0.2s ease;
+     border-radius: 100%;
 }
 
 /* Slightly smaller settings/toolbar tools icon (90% of 18px ~= 16px) */
@@ -388,12 +390,12 @@ body.compact-tabs #toggle-downloads .downloads-badge {
 
 #session-restore-bar .restore-btn {
      padding: 6px 14px;
-     border-radius: var(--radius-sm, 4px);
+     border-radius: 10px;
      border: none;
      font-size: var(--font-size-sm, 12px);
      font-weight: var(--font-weight-medium, 500);
      cursor: pointer;
-     transition: background-color 0.2s, transform 0.1s;
+     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 #session-restore-bar .restore-btn:hover {
