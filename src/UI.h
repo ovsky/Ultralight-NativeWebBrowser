@@ -149,6 +149,7 @@ public:
   void OnOpenDownloadsNewTab(const JSObject &obj, const JSArgs &args);
   void OnOpenPasswordsNewTab(const JSObject &obj, const JSArgs &args);
   void OnOpenThemesNewTab(const JSObject &obj, const JSArgs &args);
+  void OnOpenThemesDirectory(const JSObject &obj, const JSArgs &args);
   void OnAddressBarBlur(const JSObject &obj, const JSArgs &args);
   void OnAddressBarFocus(const JSObject &obj, const JSArgs &args);
   void OnMenuOpen(const JSObject &obj, const JSArgs &args);

@@ -7,10 +7,10 @@
 body {
      margin: 0;
      padding: 0;
-     font-family: "Segoe UI", -apple-system, Ubuntu, Arial, sans-serif;
-     font-size: 14px;
-     background: #16151d;
-     color: #c4c2d0;
+     font-family: var(--font-family-sans, "Segoe UI", -apple-system, Ubuntu, Arial, sans-serif);
+     font-size: var(--font-size-md, 14px);
+     background: var(--color-bg-primary, #16151d);
+     color: var(--color-text-secondary, #c4c2d0);
      animation: ul_fade_in 1s ease forwards;
      -webkit-animation: ul_fade_in 1s ease forwards;
 }
@@ -36,24 +36,23 @@ body {
 }
 
 #bar {
-     background: #232330;
-     background: linear-gradient(0deg, #232330, #282836);
+     background: var(--toolbar-bg, linear-gradient(0deg, #232330, #282836));
      height: 32px;
      padding: 4px 9px;
-     border-bottom: 0.8px solid #252532;
+     border-bottom: 0.8px solid var(--toolbar-border, #252532);
      cursor: default;
      display: flex;
 }
 
 #address {
 
-     border-radius: 9999px;
+     border-radius: var(--radius-pill, 9999px);
      border: none;
      height: 32px;
      flex: 1;
-     font-size: 14px;
-     color: #c4c2d0;
-     background-color: #16151d;
+     font-size: var(--font-size-md, 14px);
+     color: var(--address-text, #c4c2d0);
+     background-color: var(--address-bg, #16151d);
      display: inline-block;
      padding: 2px 16px 2px 16px;
      margin-top: 0px;
@@ -65,14 +64,14 @@ body {
 }
 
 #address:focus {
-     background-color: #16151d;
-     color: #FFF;
+     background-color: var(--address-bg, #16151d);
+     color: var(--address-focus-text, #FFF);
      /* Rounded focus ring */
-     box-shadow: 0 0 0 2px #343446 inset;
+     box-shadow: 0 0 0 2px var(--address-focus-ring, #343446) inset;
 }
 
 .icon {
-     fill: rgba(200, 200, 200, 1.0);
+     fill: var(--toolbar-icon-color, rgba(200, 200, 200, 1.0));
      vertical-align: middle;
      /* margin-top: -1px; */
      padding: 5px;
@@ -97,7 +96,7 @@ body {
 
 .icon.disabled {
      cursor: default;
-     fill: rgb(99 96 116);
+     fill: var(--toolbar-icon-disabled, rgb(99 96 116));
 }
 
 svg#icon_defs path {
@@ -105,7 +104,7 @@ svg#icon_defs path {
 }
 
 .icon:not(.disabled):hover {
-     background-color: #343446;
+     background-color: var(--toolbar-icon-hover-bg, #343446);
      border-radius: 100%;
 }
 
@@ -122,8 +121,8 @@ svg#icon_defs path {
      line-height: 12px;
      font-size: 9px;
      font-weight: 600;
-     border-radius: 999px;
-     background: #ff6b6b;
+     border-radius: var(--radius-pill, 999px);
+     background: var(--color-download-badge, #ff6b6b);
      color: #fff;
      text-align: center;
      padding: 0 3px;
@@ -138,46 +137,46 @@ svg#icon_defs path {
 
 /* AdBlock toggle coloring: highlight when protection is active */
 #toggle-adblock {
-     color: #b6b3c9;
-     fill: #b6b3c9;
-     transition: color 0.075s ease, fill 0.075s ease;
+     color: var(--color-text-tertiary, #b6b3c9);
+     fill: var(--color-text-tertiary, #b6b3c9);
+     transition: color var(--transition-fast, 0.075s ease), fill var(--transition-fast, 0.075s ease);
 }
 
 #toggle-adblock:hover {
-     color: #cbc9d8;
-     fill: #cbc9d8;
+     color: var(--color-text-secondary, #cbc9d8);
+     fill: var(--color-text-secondary, #cbc9d8);
 }
 
 #toggle-adblock.active {
-     color: #6C63FF;
-     fill: #6C63FF;
+     color: var(--color-accent-primary, #6C63FF);
+     fill: var(--color-accent-primary, #6C63FF);
 }
 
 #toggle-adblock.active:hover {
-     color: #8a83ff;
-     fill: #8a83ff;
+     color: var(--color-accent-hover, #8a83ff);
+     fill: var(--color-accent-hover, #8a83ff);
 }
 
 /* Bookmark toggle coloring: highlight when page is bookmarked */
 #toggle-bookmark {
-     color: #b6b3c9;
-     fill: #b6b3c9;
-     transition: color 0.075s ease, fill 0.075s ease;
+     color: var(--color-text-tertiary, #b6b3c9);
+     fill: var(--color-text-tertiary, #b6b3c9);
+     transition: color var(--transition-fast, 0.075s ease), fill var(--transition-fast, 0.075s ease);
 }
 
 #toggle-bookmark:hover {
-     color: #cbc9d8;
-     fill: #cbc9d8;
+     color: var(--color-text-secondary, #cbc9d8);
+     fill: var(--color-text-secondary, #cbc9d8);
 }
 
 #toggle-bookmark.bookmarked {
-     color: #FFD700;
-     fill: #FFD700;
+     color: var(--color-bookmark-active, #FFD700);
+     fill: var(--color-bookmark-active, #FFD700);
 }
 
 #toggle-bookmark.bookmarked:hover {
-     color: #ffe44d;
-     fill: #ffe44d;
+     color: var(--color-bookmark-hover, #ffe44d);
+     fill: var(--color-bookmark-hover, #ffe44d);
 }
 
 /* Dropdown menu styles */
@@ -187,12 +186,12 @@ svg#icon_defs path {
      /* below top bar */
      right: 10px;
      width: 240px;
-     background: #2b2b38;
-     border: 1px solid #313146;
-     border-radius: 8px;
-     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+     background: var(--menu-bg, #2b2b38);
+     border: 1px solid var(--menu-border, #313146);
+     border-radius: var(--radius-md, 8px);
+     box-shadow: var(--menu-shadow, 0 8px 16px rgba(0, 0, 0, 0.4));
      padding: 6px 0;
-     z-index: 1000;
+     z-index: var(--z-dropdown, 1000);
 }
 
 .menu-dropdown.hidden {
@@ -200,43 +199,43 @@ svg#icon_defs path {
 }
 
 .menu-item {
-     padding: 8px 12px;
+     padding: var(--spacing-sm, 8px) var(--spacing-md, 12px);
      line-height: 1.6;
      display: flex;
      align-items: center;
      justify-content: space-between;
-     color: #e2e1ea;
+     color: var(--menu-text, #e2e1ea);
      cursor: default;
 }
 
 .menu-item:hover {
-     background: #343446;
+     background: var(--menu-item-hover, #343446);
      cursor: pointer;
 }
 
 .menu-separator {
      height: 1px;
-     background: #3a3a4e;
+     background: var(--menu-separator, #3a3a4e);
      margin: 6px 0;
 }
 
 /* Address suggestions panel */
 .suggestions-panel {
      position: fixed;
-     background: #2b2b38;
-     border: 1px solid #313146;
-     border-radius: 8px;
-     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+     background: var(--menu-bg, #2b2b38);
+     border: 1px solid var(--menu-border, #313146);
+     border-radius: var(--radius-md, 8px);
+     box-shadow: var(--menu-shadow, 0 8px 16px rgba(0, 0, 0, 0.4));
      padding: 4px 0;
      z-index: 2000;
-     color: #e2e1ea;
+     color: var(--menu-text, #e2e1ea);
      max-height: 320px;
      overflow-y: auto;
      display: none;
 }
 
 .suggestions-item {
-     padding: 8px 12px;
+     padding: var(--spacing-sm, 8px) var(--spacing-md, 12px);
      cursor: pointer;
      white-space: nowrap;
      overflow: hidden;
@@ -245,26 +244,26 @@ svg#icon_defs path {
 
 .suggestions-item:hover,
 .suggestions-item.active {
-     background: #343446;
+     background: var(--menu-item-hover, #343446);
 }
 
 /* Floating tooltip for toolbar icons */
 .toolbar-tooltip {
      position: fixed;
      padding: 4px 10px;
-     background: rgba(43, 43, 56, 0.95);
-     color: #f0f0ff;
-     border-radius: 4px;
-     font-size: 12px;
+     background: var(--tooltip-bg, rgba(43, 43, 56, 0.95));
+     color: var(--tooltip-text, #f0f0ff);
+     border-radius: var(--radius-sm, 4px);
+     font-size: var(--font-size-sm, 12px);
      line-height: 1.4;
      pointer-events: none;
      opacity: 0;
      transform: translate(-50%, -6px);
      transition: opacity 0.12s ease, transform 0.12s ease;
-     z-index: 12000;
+     z-index: var(--z-toast, 12000);
      white-space: nowrap;
      overflow: visible !important;
-     box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+     box-shadow: var(--tooltip-shadow, 0 6px 14px rgba(0, 0, 0, 0.45));
 }
 
 .toolbar-tooltip.visible {
@@ -282,7 +281,7 @@ svg#icon_defs path {
      height: 0;
      border-width: 5px 5px 0 5px;
      border-style: solid;
-     border-color: rgba(43, 43, 56, 0.95) transparent transparent transparent;
+     border-color: var(--tooltip-bg, rgba(43, 43, 56, 0.95)) transparent transparent transparent;
 }
 
 .toolbar-tooltip.below {
@@ -297,7 +296,7 @@ svg#icon_defs path {
      top: -5px;
      bottom: auto;
      border-width: 0 5px 5px 5px;
-     border-color: transparent transparent rgba(43, 43, 56, 0.95) transparent;
+     border-color: transparent transparent var(--tooltip-bg, rgba(43, 43, 56, 0.95)) transparent;
 }
 
 body.transparent-toolbar #bar {
@@ -307,7 +306,7 @@ body.transparent-toolbar #bar {
 }
 
 body.transparent-toolbar {
-     background: radial-gradient(circle at top, rgba(26, 26, 38, 0.85), #16151d 68%);
+     background: radial-gradient(circle at top, rgba(26, 26, 38, 0.85), var(--color-bg-primary, #16151d) 68%);
 }
 
 body.transparent-toolbar .chrome-tabs {
@@ -341,13 +340,13 @@ body.compact-tabs #toggle-downloads .downloads-badge {
      top: 0;
      left: 0;
      right: 0;
-     background: linear-gradient(180deg, #2d4a6f 0%, #1e3a5f 100%);
-     border-bottom: 1px solid #3d6a9f;
-     padding: 8px 16px;
+     background: var(--session-restore-bg, linear-gradient(180deg, #2d4a6f 0%, #1e3a5f 100%));
+     border-bottom: 1px solid var(--session-restore-border, #3d6a9f);
+     padding: var(--spacing-sm, 8px) var(--spacing-lg, 16px);
      z-index: 9999;
      align-items: center;
      justify-content: space-between;
-     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+     box-shadow: var(--card-shadow, 0 2px 8px rgba(0, 0, 0, 0.3));
      animation: slideDown 0.3s ease-out;
 }
 
@@ -371,27 +370,27 @@ body.compact-tabs #toggle-downloads .downloads-badge {
      display: flex;
      align-items: center;
      gap: 10px;
-     color: #e0e8f0;
+     color: var(--session-restore-text, #e0e8f0);
      font-size: 13px;
 }
 
 #session-restore-bar .restore-icon {
      width: 20px;
      height: 20px;
-     fill: #7cb3e0;
+     fill: var(--session-restore-icon, #7cb3e0);
 }
 
 #session-restore-bar .restore-actions {
      display: flex;
-     gap: 8px;
+     gap: var(--spacing-sm, 8px);
 }
 
 #session-restore-bar .restore-btn {
      padding: 6px 14px;
-     border-radius: 4px;
+     border-radius: var(--radius-sm, 4px);
      border: none;
-     font-size: 12px;
-     font-weight: 500;
+     font-size: var(--font-size-sm, 12px);
+     font-weight: var(--font-weight-medium, 500);
      cursor: pointer;
      transition: background-color 0.2s, transform 0.1s;
 }
@@ -405,31 +404,31 @@ body.compact-tabs #toggle-downloads .downloads-badge {
 }
 
 #session-restore-bar .restore-btn.primary {
-     background: #4a9eff;
-     color: white;
+     background: var(--btn-primary-bg, #4a9eff);
+     color: var(--btn-primary-text, white);
 }
 
 #session-restore-bar .restore-btn.primary:hover {
-     background: #5aadff;
+     background: var(--btn-primary-hover, #5aadff);
 }
 
 #session-restore-bar .restore-btn.secondary {
-     background: rgba(255, 255, 255, 0.1);
-     color: #c0d0e0;
-     border: 1px solid rgba(255, 255, 255, 0.2);
+     background: var(--btn-secondary-bg, rgba(255, 255, 255, 0.1));
+     color: var(--btn-secondary-text, #c0d0e0);
+     border: 1px solid var(--btn-secondary-border, rgba(255, 255, 255, 0.2));
 }
 
 #session-restore-bar .restore-btn.secondary:hover {
-     background: rgba(255, 255, 255, 0.15);
+     background: var(--btn-secondary-hover, rgba(255, 255, 255, 0.15));
 }
 
 #session-restore-bar .dismiss-btn {
      background: none;
      border: none;
-     color: #8090a0;
+     color: var(--color-text-muted, #8090a0);
      cursor: pointer;
      padding: 4px;
-     margin-left: 8px;
+     margin-left: var(--spacing-sm, 8px);
      border-radius: 50%;
      display: flex;
      align-items: center;
@@ -437,6 +436,6 @@ body.compact-tabs #toggle-downloads .downloads-badge {
 }
 
 #session-restore-bar .dismiss-btn:hover {
-     background: rgba(255, 255, 255, 0.1);
-     color: #c0d0e0;
+     background: var(--btn-secondary-bg, rgba(255, 255, 255, 0.1));
+     color: var(--btn-secondary-text, #c0d0e0);
 }

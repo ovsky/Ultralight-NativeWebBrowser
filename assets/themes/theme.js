@@ -56,21 +56,34 @@
                 'color-danger': '#ef6a6a',
                 'color-info': '#6ac0ef',
                 
-                // Navbar/Toolbar
+                // Navbar/Toolbar - COMPLETE SET
                 'toolbar-bg': 'linear-gradient(0deg, #232330, #282836)',
+                'toolbar-border': '#252532',
                 'toolbar-icon-color': '#c8c8c8',
                 'toolbar-icon-hover': '#ffffff',
                 'toolbar-icon-active': '#6C63FF',
+                'toolbar-icon-disabled': '#636074',
+                'toolbar-icon-hover-bg': '#343446',
+                
+                // Address Bar
+                'address-bg': '#16151d',
+                'address-text': '#c4c2d0',
+                'address-focus-text': '#ffffff',
+                'address-focus-ring': '#343446',
                 
                 // Tabs
-                'tab-bg': '#1e1e28',
-                'tab-active-bg': '#282836',
-                'tab-hover-bg': '#252532',
+                'tab-bg': 'linear-gradient(180deg, #212130, #1c1c24)',
+                'tab-active-bg': 'linear-gradient(180deg, #313141, #282836)',
+                'tab-hover-bg': 'linear-gradient(180deg, #2d2d3d, #323242)',
                 'tab-text': '#b0afc0',
                 'tab-active-text': '#e0dff0',
                 
                 // Menu & Cards
                 'menu-bg': '#2b2b38',
+                'menu-border': '#313146',
+                'menu-item-hover': '#343446',
+                'menu-text': '#e2e1ea',
+                'menu-separator': '#3a3a4e',
                 'card-bg': '#282839',
                 
                 // Inputs
@@ -80,6 +93,16 @@
                 // Scrollbar
                 'scrollbar-track': '#1e1e2e',
                 'scrollbar-thumb': '#3d3d5c',
+                
+                // Tooltip
+                'tooltip-bg': 'rgba(43, 43, 56, 0.95)',
+                'tooltip-text': '#f0f0ff',
+                
+                // Buttons
+                'btn-primary-bg': '#6C63FF',
+                'btn-primary-hover': '#7a72ff',
+                'btn-secondary-bg': 'rgba(255, 255, 255, 0.1)',
+                'btn-secondary-hover': 'rgba(255, 255, 255, 0.15)',
                 
                 // Radius (in pixels)
                 'radius-sm': '4',
@@ -122,17 +145,29 @@
                 'color-info': '#58a6ff',
                 
                 'toolbar-bg': 'linear-gradient(0deg, #161b22, #21262d)',
+                'toolbar-border': '#21262d',
                 'toolbar-icon-color': '#8b949e',
                 'toolbar-icon-hover': '#e6edf3',
                 'toolbar-icon-active': '#58a6ff',
+                'toolbar-icon-disabled': '#484f58',
+                'toolbar-icon-hover-bg': '#30363d',
                 
-                'tab-bg': '#0d1117',
-                'tab-active-bg': '#21262d',
-                'tab-hover-bg': '#161b22',
+                'address-bg': '#0d1117',
+                'address-text': '#c9d1d9',
+                'address-focus-text': '#e6edf3',
+                'address-focus-ring': '#30363d',
+                
+                'tab-bg': 'linear-gradient(180deg, #161b22, #0d1117)',
+                'tab-active-bg': 'linear-gradient(180deg, #21262d, #161b22)',
+                'tab-hover-bg': 'linear-gradient(180deg, #1c232c, #161b22)',
                 'tab-text': '#8b949e',
                 'tab-active-text': '#e6edf3',
                 
                 'menu-bg': '#21262d',
+                'menu-border': '#30363d',
+                'menu-item-hover': '#30363d',
+                'menu-text': '#c9d1d9',
+                'menu-separator': '#30363d',
                 'card-bg': '#21262d',
                 
                 'input-bg': '#0d1117',
@@ -140,6 +175,14 @@
                 
                 'scrollbar-track': '#0d1117',
                 'scrollbar-thumb': '#30363d',
+                
+                'tooltip-bg': 'rgba(33, 38, 45, 0.95)',
+                'tooltip-text': '#e6edf3',
+                
+                'btn-primary-bg': '#238636',
+                'btn-primary-hover': '#2ea043',
+                'btn-secondary-bg': 'rgba(110, 118, 129, 0.2)',
+                'btn-secondary-hover': 'rgba(110, 118, 129, 0.3)',
                 
                 'radius-sm': '6',
                 'radius-md': '8',
@@ -1043,9 +1086,74 @@
 
             this.currentTheme = theme;
             
-            // Generate CSS from theme colors
+            // Complete set of CSS variables with fallback generation
+            const colors = theme.colors;
+            const completeColors = { ...colors };
+            
+            // Generate missing toolbar variables from existing colors
+            if (!completeColors['toolbar-border']) {
+                completeColors['toolbar-border'] = colors['color-border-secondary'] || '#252532';
+            }
+            if (!completeColors['toolbar-icon-disabled']) {
+                completeColors['toolbar-icon-disabled'] = colors['color-text-muted'] || '#636074';
+            }
+            if (!completeColors['toolbar-icon-hover-bg']) {
+                completeColors['toolbar-icon-hover-bg'] = colors['color-bg-hover'] || '#343446';
+            }
+            
+            // Generate missing address bar variables
+            if (!completeColors['address-bg']) {
+                completeColors['address-bg'] = colors['color-bg-primary'] || '#16151d';
+            }
+            if (!completeColors['address-text']) {
+                completeColors['address-text'] = colors['color-text-secondary'] || '#c4c2d0';
+            }
+            if (!completeColors['address-focus-text']) {
+                completeColors['address-focus-text'] = colors['color-text-primary'] || '#ffffff';
+            }
+            if (!completeColors['address-focus-ring']) {
+                completeColors['address-focus-ring'] = colors['color-bg-hover'] || '#343446';
+            }
+            
+            // Generate missing menu variables
+            if (!completeColors['menu-border']) {
+                completeColors['menu-border'] = colors['color-border-primary'] || '#313146';
+            }
+            if (!completeColors['menu-item-hover']) {
+                completeColors['menu-item-hover'] = colors['color-bg-hover'] || '#343446';
+            }
+            if (!completeColors['menu-text']) {
+                completeColors['menu-text'] = colors['color-text-primary'] || '#e2e1ea';
+            }
+            if (!completeColors['menu-separator']) {
+                completeColors['menu-separator'] = colors['color-border-primary'] || '#3a3a4e';
+            }
+            
+            // Generate missing tooltip variables
+            if (!completeColors['tooltip-bg']) {
+                completeColors['tooltip-bg'] = colors['color-bg-overlay'] || 'rgba(43, 43, 56, 0.95)';
+            }
+            if (!completeColors['tooltip-text']) {
+                completeColors['tooltip-text'] = colors['color-text-primary'] || '#f0f0ff';
+            }
+            
+            // Generate missing button variables
+            if (!completeColors['btn-primary-bg']) {
+                completeColors['btn-primary-bg'] = colors['color-accent-primary'] || '#6C63FF';
+            }
+            if (!completeColors['btn-primary-hover']) {
+                completeColors['btn-primary-hover'] = colors['color-accent-hover'] || '#7a72ff';
+            }
+            if (!completeColors['btn-secondary-bg']) {
+                completeColors['btn-secondary-bg'] = 'rgba(255, 255, 255, 0.1)';
+            }
+            if (!completeColors['btn-secondary-hover']) {
+                completeColors['btn-secondary-hover'] = 'rgba(255, 255, 255, 0.15)';
+            }
+            
+            // Generate CSS from complete colors
             let css = ':root {\n';
-            for (const [key, value] of Object.entries(theme.colors)) {
+            for (const [key, value] of Object.entries(completeColors)) {
                 css += `    --${key}: ${value};\n`;
             }
             css += '}\n';

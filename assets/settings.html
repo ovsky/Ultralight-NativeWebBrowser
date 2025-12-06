@@ -113,6 +113,13 @@
             color: var(--text-secondary);
             cursor: pointer;
             font-size: 13px;
+            transition: all 0.2s ease;
+        }
+
+        .settings-search .clear-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-color);
+            color: var(--text-primary);
         }
 
         #settings-container {
@@ -148,6 +155,13 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            transition: all 0.2s ease;
+        }
+
+        .setting-item:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--accent-color);
+            transform: translateX(4px);
         }
 
         .setting-info {
@@ -218,7 +232,7 @@
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: all 0.2s ease;
             font-family: inherit;
         }
 
@@ -230,6 +244,8 @@
 
         .btn-primary:hover:not(:disabled) {
             background: var(--accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(124, 106, 239, 0.3);
         }
 
         .btn-primary:disabled {
@@ -246,6 +262,7 @@
 
         .btn-secondary:hover {
             background: var(--bg-hover);
+            transform: translateY(-1px);
         }
 
         .storage-path {

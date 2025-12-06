@@ -21,10 +21,11 @@ The Ultralight WebBrowser features a comprehensive theme system that allows user
 
 The theme system provides:
 
-- **5 built-in themes**: Dark (default), Light, Midnight Blue, Nord, and Monokai Pro
+- **15 built-in themes**: 13 dark themes and 2 light themes
+- **Full browser theming**: Themes affect toolbar, tabs, address bar, menus, and all pages
 - **Custom theme creation**: Users can create and save their own themes
 - **Import/Export**: Share themes as JSON files
-- **Live preview**: See changes in real-time while editing
+- **Click-to-apply**: Themes apply immediately on selection
 - **Persistent storage**: Themes are saved and remembered across sessions
 
 ---
@@ -35,12 +36,15 @@ The theme system provides:
 assets/
 ├── themes/
 │   ├── theme-variables.css   # Central CSS variables
-│   ├── theme.js              # JavaScript theme manager
+│   ├── theme.js              # JavaScript theme manager (15 built-in themes)
 │   ├── dark.json             # Dark theme definition
 │   ├── light.json            # Light theme definition
 │   ├── midnight.json         # Midnight Blue theme
-│   └── nord.json             # Nord theme
+│   └── ...                   # Additional theme files
 ├── themes.html               # Theme management page
+├── ui.html                   # Browser UI (imports theme system)
+├── ui.css                    # Browser chrome styling (uses CSS variables)
+├── chrome-tabs.css           # Tab bar styling (uses CSS variables)
 └── ...
 
 src/
@@ -53,30 +57,30 @@ src/
 
 ## Built-in Themes
 
-### Dark (Default)
-The default dark purple theme with a modern, comfortable appearance.
-- Primary accent: `#6C63FF` (purple)
-- Background: Deep purples (`#16151d`, `#1e1e2e`)
+### Dark Themes (13)
 
-### Light
-A clean, bright theme for daytime use.
-- Primary accent: `#0969da` (blue)
-- Background: Whites and light grays
+| Theme | Description | Accent Color |
+|-------|-------------|--------------|
+| **Dark (Default)** | Default dark purple theme | `#6C63FF` |
+| **Midnight** | Deep midnight black | `#818CF8` |
+| **Dracula** | Classic Dracula dark theme | `#BD93F9` |
+| **One Dark** | Atom One Dark inspired | `#E5C07B` |
+| **Gruvbox Dark** | Retro groove color scheme | `#D79921` |
+| **Catppuccin Mocha** | Soothing pastel theme | `#CBA6F7` |
+| **Tokyo Night** | Tokyo nighttime palette | `#7AA2F7` |
+| **Ayu Dark** | Ayu dark mirage | `#FFB454` |
+| **Solarized Dark** | Classic Solarized dark | `#268BD2` |
+| **Material Dark** | Material Design dark | `#82AAFF` |
+| **Nord** | Arctic, north-bluish palette | `#88C0D0` |
+| **Monokai** | Classic Monokai colors | `#A6E22E` |
+| **Ocean Deep** | Deep ocean blues | `#64D2FF` |
 
-### Midnight Blue
-Deep blue night theme inspired by GitHub's dark mode.
-- Primary accent: `#58a6ff` (bright blue)
-- Background: Dark blues (`#0d1117`, `#161b22`)
+### Light Themes (2)
 
-### Nord
-Arctic, north-bluish color palette inspired by the aurora borealis.
-- Primary accent: `#88c0d0` (frost blue)
-- Background: Polar night colors (`#2e3440`, `#3b4252`)
-
-### Monokai Pro
-Classic Monokai color scheme popular with developers.
-- Primary accent: `#ffd866` (yellow)
-- Background: Warm grays (`#2d2a2e`, `#353236`)
+| Theme | Description | Accent Color |
+|-------|-------------|--------------|
+| **Light** | Clean bright theme | `#0969DA` |
+| **Light Soft** | Softer cream-tinted light | `#059669` |
 
 ---
 
@@ -91,15 +95,19 @@ Classic Monokai color scheme popular with developers.
 ### Applying a Theme
 
 1. Browse available themes in the grid
-2. Click **"Apply"** on the theme you want to use
-3. The theme is applied immediately and saved
+2. **Click on any theme** to apply it immediately
+3. The theme is applied to the entire browser including:
+   - Navigation bar and toolbar
+   - Tab bar
+   - Address bar
+   - All browser pages (history, bookmarks, settings, etc.)
+   - Session restore bar
+   - Menus and dropdowns
 
 ### Importing a Theme
 
-1. Scroll to the **"Import Theme"** section
-2. Either:
-   - Drag and drop a `.json` theme file
-   - Click the drop zone to browse for a file
+1. Click the **"Import"** button
+2. Select a `.json` theme file from your computer
 3. The theme is imported and appears in Custom Themes
 
 ### Exporting a Theme

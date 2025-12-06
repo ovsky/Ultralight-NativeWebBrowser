@@ -1188,6 +1188,12 @@ bool UI::RunShortcutAction(const std::string &action)
     CreateNewTabForChildView(String("file:///settings.html"));
     return true;
   }
+  if (action == "open-themes")
+  {
+    // Open Themes in a new tab
+    CreateNewTabForChildView(String("file:///themes.html"));
+    return true;
+  }
   return false;
 }
 
@@ -1495,6 +1501,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnOpenPasswordsNewTab"] = BindJSCallback(&UI::OnOpenPasswordsNewTab);
   global["OnOpenExtensionsNewTab"] = BindJSCallback(&UI::OnOpenExtensionsNewTab);
   global["OnOpenThemesNewTab"] = BindJSCallback(&UI::OnOpenThemesNewTab);
+  global["OnOpenThemesDirectory"] = BindJSCallback(&UI::OnOpenThemesDirectory);
   global["GetDownloadsSnapshot"] = BindJSCallbackWithRetval(&UI::OnDownloadsOverlayGet);
   global["ClearDownloadsSnapshot"] = BindJSCallback(&UI::OnDownloadsOverlayClear);
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
@@ -1958,6 +1965,29 @@ void UI::OnOpenExtensionsNewTab(const JSObject &obj, const JSArgs &args)
 void UI::OnOpenThemesNewTab(const JSObject &obj, const JSArgs &args)
 {
   CreateNewTabForChildView(String("file:///themes.html"));
+}
+
+void UI::OnOpenThemesDirectory(const JSObject &obj, const JSArgs &args)
+{
+  // Open themes directory in system file explorer
+  std::filesystem::path themes_dir = std::filesystem::current_path() / "data" / "themes";
+  
+  // Create directory if it doesn't exist
+  if (!std::filesystem::exists(themes_dir)) {
+    std::filesystem::create_directories(themes_dir);
+  }
+  
+  std::string path_str = themes_dir.string();
+#ifdef _WIN32
+  std::wstring wide_path(path_str.begin(), path_str.end());
+  ShellExecuteW(NULL, L"explore", wide_path.c_str(), NULL, NULL, SW_SHOWNORMAL);
+#elif defined(__APPLE__)
+  std::string cmd = "open " + util::EscapeShellArg(path_str);
+  system(cmd.c_str());
+#else
+  std::string cmd = "xdg-open " + util::EscapeShellArg(path_str);
+  system(cmd.c_str());
+#endif
 }
 
 // ============================================================================
