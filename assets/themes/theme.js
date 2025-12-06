@@ -104,6 +104,20 @@
                 'btn-secondary-bg': 'rgba(255, 255, 255, 0.1)',
                 'btn-secondary-hover': 'rgba(255, 255, 255, 0.15)',
                 
+                // Session Restore Bar
+                'session-restore-bg': 'linear-gradient(180deg, #3d3d5c 0%, #2d2d44 100%)',
+                'session-restore-border': '#4a4a6a',
+                'session-restore-text': '#e4e4ef',
+                'session-restore-icon': '#9090b0',
+                
+                // DRM Prompt Bar
+                'drm-bar-bg': 'linear-gradient(135deg, #5a4fcf, #7c6aef)',
+                'drm-bar-text': '#ffffff',
+                'drm-btn-bg': 'rgba(255, 255, 255, 0.15)',
+                'drm-btn-hover': 'rgba(255, 255, 255, 0.25)',
+                'drm-btn-primary-bg': '#ffffff',
+                'drm-btn-primary-text': '#5a4fcf',
+                
                 // Radius (in pixels)
                 'radius-sm': '4',
                 'radius-md': '8',
@@ -1167,6 +1181,44 @@
             }
             if (!completeColors['btn-secondary-hover']) {
                 completeColors['btn-secondary-hover'] = 'rgba(255, 255, 255, 0.15)';
+            }
+            
+            // Generate missing session restore bar variables
+            if (!completeColors['session-restore-bg']) {
+                const bgActive = colors['color-bg-active'] || '#3d3d5c';
+                const bgTertiary = colors['color-bg-tertiary'] || '#2d2d44';
+                completeColors['session-restore-bg'] = `linear-gradient(180deg, ${bgActive} 0%, ${bgTertiary} 100%)`;
+            }
+            if (!completeColors['session-restore-border']) {
+                completeColors['session-restore-border'] = colors['color-border-primary'] || '#4a4a6a';
+            }
+            if (!completeColors['session-restore-text']) {
+                completeColors['session-restore-text'] = colors['color-text-primary'] || '#e4e4ef';
+            }
+            if (!completeColors['session-restore-icon']) {
+                completeColors['session-restore-icon'] = colors['color-text-tertiary'] || '#9090b0';
+            }
+            
+            // Generate missing DRM bar variables
+            if (!completeColors['drm-bar-bg']) {
+                const accentPrimary = colors['color-accent-primary'] || '#6C63FF';
+                const accentSecondary = colors['color-accent-secondary'] || '#7c6aef';
+                completeColors['drm-bar-bg'] = `linear-gradient(135deg, ${accentPrimary}, ${accentSecondary})`;
+            }
+            if (!completeColors['drm-bar-text']) {
+                completeColors['drm-bar-text'] = '#ffffff';
+            }
+            if (!completeColors['drm-btn-bg']) {
+                completeColors['drm-btn-bg'] = 'rgba(255, 255, 255, 0.15)';
+            }
+            if (!completeColors['drm-btn-hover']) {
+                completeColors['drm-btn-hover'] = 'rgba(255, 255, 255, 0.25)';
+            }
+            if (!completeColors['drm-btn-primary-bg']) {
+                completeColors['drm-btn-primary-bg'] = '#ffffff';
+            }
+            if (!completeColors['drm-btn-primary-text']) {
+                completeColors['drm-btn-primary-text'] = colors['color-accent-primary'] || '#6C63FF';
             }
             
             // Generate CSS from complete colors
