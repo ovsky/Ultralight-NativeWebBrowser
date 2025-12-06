@@ -79,17 +79,20 @@
         }
 
         .btn {
-            padding: 6px 10px;
-            border-radius: 7px;
+            padding: 6px 12px;
+            border-radius: 10px;
             border: 1px solid rgba(255, 255, 255, 0.15);
             background: transparent;
             color: inherit;
             cursor: pointer;
             font-size: 12px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .btn:hover {
             background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-1px);
+            border-color: rgba(108, 99, 255, 0.5);
         }
 
         .list {
@@ -187,11 +190,14 @@
             color: #7da3ff;
             cursor: pointer;
             font-size: 12px;
-            padding: 0;
+            padding: 4px 8px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
         }
 
         .link-btn:hover {
             text-decoration: underline;
+            background: rgba(125, 163, 255, 0.1);
         }
 
         footer {

@@ -986,6 +986,24 @@
             } else {
                 this.applyTheme('dark');
             }
+            
+            // Listen for theme changes from other pages/tabs via localStorage
+            const self = this;
+            window.addEventListener('storage', function(e) {
+                if (e.key === 'ultralight_active_theme' && e.newValue) {
+                    self.applyTheme(e.newValue);
+                }
+            });
+            
+            // Also poll for changes periodically (backup for same-origin frames)
+            this._lastThemeId = savedThemeId || 'dark';
+            setInterval(function() {
+                const currentThemeId = self.getSavedThemeId();
+                if (currentThemeId !== self._lastThemeId) {
+                    self._lastThemeId = currentThemeId;
+                    self.applyTheme(currentThemeId);
+                }
+            }, 500);
         }
 
         /**
