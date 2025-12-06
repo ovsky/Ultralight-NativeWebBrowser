@@ -7,8 +7,15 @@
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23FFD700'%3E%3Cpath d='M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z'/%3E%3C/svg%3E" />
     <link rel="stylesheet" type="text/css" href="ui.css">
+    <link rel="stylesheet" href="themes/theme-variables.css">
     <style>
         :root {
+            /* Map page variables to theme variables */
+            --bg: var(--color-bg-primary, #f6f7f9);
+            --fg: var(--color-text-primary, #111);
+            --muted: var(--color-text-secondary, #666);
+            --accent: var(--color-accent-primary, #6C63FF);
+            --accent-light: var(--color-accent-light, rgba(108, 99, 255, 0.15));
             color-scheme: light dark;
         }
 
@@ -76,7 +83,7 @@
         }
 
         .btn:hover {
-            background: #f2f2f2;
+            background: var(--btn-bg, #f2f2f2);
         }
 
         .btn.danger {
@@ -89,7 +96,7 @@
         }
 
         .muted {
-            color: #666;
+            color: var(--muted, #666);
             font-size: 14px;
         }
 
@@ -149,7 +156,7 @@
             font-size: 11px;
             font-weight: 600;
             color: white;
-            background: linear-gradient(135deg, #4285f4, #5e35b1);
+            background: linear-gradient(135deg, var(--accent, #4285f4), var(--accent, #5e35b1));
         }
 
         .favicon img {
@@ -224,8 +231,8 @@
             font-size: 10px;
             padding: 2px 6px;
             border-radius: 4px;
-            background: rgba(108, 99, 255, 0.15);
-            color: #6C63FF;
+            background: var(--accent-light, rgba(108, 99, 255, 0.15));
+            color: var(--accent, #6C63FF);
             font-weight: 500;
         }
 
@@ -260,6 +267,7 @@
             }
         }
     </style>
+    <script defer src="themes/theme.js"></script>
 </head>
 
 <body>
