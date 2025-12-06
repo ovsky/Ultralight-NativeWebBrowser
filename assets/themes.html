@@ -306,12 +306,12 @@
 
         .category-badge.dark {
             background: rgba(100, 100, 150, 0.25);
-            color: #a0a0d0;
+            color: var(--color-text-secondary, #a0a0d0);
         }
 
         .category-badge.light {
             background: rgba(255, 200, 100, 0.25);
-            color: #d0a050;
+            color: var(--color-warning, #d0a050);
         }
 
         .theme-description {
@@ -570,7 +570,7 @@
         }
 
         .json-content {
-            background: #0d1117;
+            background: var(--color-bg-primary, #0d1117);
             border: 1px solid var(--color-border-primary);
             border-radius: 12px;
             padding: 16px;
@@ -585,13 +585,13 @@
         }
 
         /* JSON Syntax Highlighting */
-        .json-key { color: #79c0ff; }
-        .json-string { color: #a5d6ff; }
-        .json-number { color: #56d364; }
-        .json-boolean { color: #ff7b72; }
-        .json-null { color: #ff7b72; }
-        .json-bracket { color: #8b949e; }
-        .json-colon { color: #8b949e; }
+        .json-key { color: var(--color-accent-primary, #79c0ff); }
+        .json-string { color: var(--color-accent-hover, #a5d6ff); }
+        .json-number { color: var(--color-success, #56d364); }
+        .json-boolean { color: var(--color-danger, #ff7b72); }
+        .json-null { color: var(--color-danger, #ff7b72); }
+        .json-bracket { color: var(--color-text-muted, #8b949e); }
+        .json-colon { color: var(--color-text-muted, #8b949e); }
         .json-comma { color: #8b949e; }
         .json-color-preview {
             display: inline-block;

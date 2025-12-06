@@ -666,7 +666,7 @@
             top: 0;
             left: 0;
             right: 0;
-            background: linear-gradient(135deg, #1a73e8, #4285f4);
+            background: linear-gradient(135deg, var(--color-accent-primary, #1a73e8), var(--color-accent-primary, #4285f4));
             color: white;
             padding: 8px 16px;
             display: flex;
@@ -734,12 +734,12 @@
 
         .password-btn.primary {
             background: white;
-            color: #1a73e8;
+            color: var(--color-accent-primary, #1a73e8);
             font-weight: 500;
         }
 
         .password-btn.primary:hover {
-            background: #f0f0f0;
+            background: var(--bg-tertiary, #f0f0f0);
         }
 
         #password-close-btn {
@@ -747,12 +747,12 @@
         }
 
         body.dark-mode .password-save-bar {
-            background: linear-gradient(135deg, #3c4043, #5f6368);
+            background: var(--bg-hover, linear-gradient(135deg, #3c4043, #5f6368));
         }
 
         body.dark-mode .password-btn.primary {
-            background: #8ab4f8;
-            color: #202124;
+            background: var(--color-accent-hover, #8ab4f8);
+            color: var(--color-text-primary, #202124);
         }
     </style>
 
@@ -893,7 +893,7 @@
             top: 0;
             left: 0;
             right: 0;
-            background: var(--drm-bar-bg, linear-gradient(135deg, #7c3aed, #a855f7));
+            background: var(--drm-bar-bg, linear-gradient(135deg, var(--color-accent-secondary, #7c3aed), var(--color-accent-secondary, #a855f7)));
             color: var(--drm-bar-text, white);
             padding: 8px 16px;
             display: flex;
@@ -954,7 +954,7 @@
 
         .drm-btn.primary {
             background: var(--drm-btn-primary-bg, white);
-            color: var(--drm-btn-primary-text, #7c3aed);
+            color: var(--drm-btn-primary-text, var(--color-accent-secondary, #7c3aed));
             font-weight: 500;
         }
 
