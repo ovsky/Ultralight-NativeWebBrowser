@@ -446,3 +446,11 @@ body.compact-tabs #toggle-downloads .downloads-badge {
      background: var(--btn-secondary-bg, rgba(255, 255, 255, 0.1));
      color: var(--btn-secondary-text, #c0d0e0);
 }
+
+.shortcut-badge {
+    color: var(--color-text-primary, #e4e4ef) !important;
+}
+
+#toggle-inspector svg {
+    transform: scale(0.81);
+}
