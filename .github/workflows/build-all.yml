@@ -140,7 +140,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Job status table
           echo "## 📋 Build Status" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -155,11 +155,11 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # List all artifacts
           echo "## 📦 Generated Artifacts" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ -d "artifacts" ]; then
             find artifacts -type f \( -name "*.zip" -o -name "*.exe" -o -name "*.tar.gz" -o -name "*.deb" -o -name "*.rpm" -o -name "*.dmg" \) | while read file; do
               size=$(du -h "$file" | cut -f1)
@@ -169,15 +169,15 @@ jobs:
           else
             echo "⚠️ No artifacts directory found" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Include individual platform summaries if available
           echo "## 📝 Platform Details" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           for summary in artifacts/*/BUILD-SUMMARY.md; do
             if [ -f "$summary" ]; then
               platform=$(dirname "$summary" | xargs basename)
@@ -192,7 +192,7 @@ jobs:
               echo "" >> $GITHUB_STEP_SUMMARY
             fi
           done
-          
+
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**🎉 Build completed!**" >> $GITHUB_STEP_SUMMARY
@@ -217,6 +217,6 @@ jobs:
           echo "Linux x64: ${{ needs.linux-x64.result }}"
           echo "Linux ARM64: ${{ needs.linux-arm64.result }}"
           exit 1
-        else
-          echo "✅ All builds succeeded!"
-        fi
+          else
+            echo "✅ All builds succeeded!"
+          fi
