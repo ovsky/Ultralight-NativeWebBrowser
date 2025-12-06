@@ -2,7 +2,6 @@
      overflow: hidden;
      user-select: none;
      -webkit-user-select: none;
-     transition-duration: 0.5s;
 }
 
 body {
@@ -173,13 +172,17 @@ svg#icon_defs path {
 }
 
 #toggle-bookmark.bookmarked {
-     color: var(--color-bookmark-active, #FFD700);
-     fill: var(--color-bookmark-active, #FFD700);
+     color: var(--color-accent-primary, #6C63FF);
+     fill: var(--color-accent-primary, #6C63FF);
 }
 
 #toggle-bookmark.bookmarked:hover {
-     color: var(--color-bookmark-hover, #ffe44d);
-     fill: var(--color-bookmark-hover, #ffe44d);
+     color: var(--color-accent-hover, #8a83ff);
+     fill: var(--color-accent-hover, #8a83ff);
+}
+
+#toggle-bookmark.bookmarked svg {
+    transform: scale(1.21);
 }
 
 /* Dropdown menu styles */

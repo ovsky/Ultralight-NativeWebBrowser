@@ -25,16 +25,17 @@
   top: 2px;
   left: 0;
   padding: 0 18px;
-  border: 0.8px solid var(--toolbar-border, #252532);
+  border: 0.8px solid var(--add-tab-border, #252532);
   border-bottom: none;
-  border-radius: var(--radius-md, 8px) var(--radius-md, 8px) 0 0;
+  border-radius: 8px 8px 0 0;
   font-size: 13px;
   height: 37px;
-  color: var(--tab-text, #c4c2d0) !important;
+  color: var(--add-tab-text, #c4c2d0);
   cursor: pointer;
   z-index: 100;
   min-width: 40px;
   font-weight: var(--font-weight-medium, 500);
+  transition: background 0.1s ease-out, transform 0.1s ease-out;
 }
 
 #chrome-tabs-add-tab:hover {
@@ -42,7 +43,7 @@
 }
 
 #chrome-tabs-add-tab:active {
-  background: var(--tab-bg, linear-gradient(180deg, #262633, #1e1e29));
+  background: var(--tab-active-bg, linear-gradient(180deg, #313141, #282836));
   box-shadow: none;
   transform: translateY(2px);
 }
@@ -94,7 +95,7 @@
   width: calc(100% - 8px);
   height: 100%;
   background: var(--tab-bg, linear-gradient(180deg, #212130, #1c1c24));
-  border-radius: var(--radius-md, 8px) var(--radius-md, 8px) 0 0;
+  border-radius: 8px 8px 0 0;
   margin: 2px 4px 4px 4px;
 }
 

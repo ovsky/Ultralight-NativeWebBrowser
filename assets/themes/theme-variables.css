@@ -80,12 +80,22 @@
     /* ============================================================
      * COMPONENT COLORS - Tabs
      * ============================================================ */
-    --tab-bg: #1e1e28;
-    --tab-active-bg: #282836;
-    --tab-hover-bg: #252532;
+    --tab-bg: linear-gradient(180deg, #212130, #1c1c24);
+    --tab-active-bg: linear-gradient(180deg, #313141, #282836);
+    --tab-hover-bg: linear-gradient(180deg, #2d2d3d, #252532);
     --tab-text: #b0afc0;
     --tab-active-text: #e0dff0;
     --tab-close-hover: rgba(255, 255, 255, 0.1);
+    
+    /* Add Tab Button (matches tab styling) */
+    --add-tab-bg-start: #212130;
+    --add-tab-bg-end: #1c1c24;
+    --add-tab-border: #252532;
+    --add-tab-hover-start: #2d2d3d;
+    --add-tab-hover-end: #323242;
+    --add-tab-active-start: #262633;
+    --add-tab-active-end: #1e1e29;
+    --add-tab-text: #c4c2d0;
     
     /* ============================================================
      * COMPONENT COLORS - Menu/Dropdown

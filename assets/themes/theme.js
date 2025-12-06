@@ -1221,6 +1221,28 @@
                 completeColors['drm-btn-primary-text'] = colors['color-accent-primary'] || '#6C63FF';
             }
             
+            // Generate tab gradient backgrounds (matching tabs and add-tab button)
+            const bgSecondary = colors['color-bg-secondary'] || '#1c1c24';
+            const bgTertiary = colors['color-bg-tertiary'] || '#232330';
+            const bgElevated = colors['color-bg-elevated'] || '#282839';
+            const bgHover = colors['color-bg-hover'] || '#343446';
+            
+            if (!completeColors['tab-bg']) {
+                completeColors['tab-bg'] = `linear-gradient(180deg, ${bgTertiary}, ${bgSecondary})`;
+            }
+            if (!completeColors['tab-active-bg']) {
+                completeColors['tab-active-bg'] = `linear-gradient(180deg, ${bgElevated}, ${bgTertiary})`;
+            }
+            if (!completeColors['tab-hover-bg']) {
+                completeColors['tab-hover-bg'] = `linear-gradient(180deg, ${bgHover}, ${bgElevated})`;
+            }
+            if (!completeColors['add-tab-border']) {
+                completeColors['add-tab-border'] = colors['toolbar-border'] || colors['color-border-secondary'] || '#252532';
+            }
+            if (!completeColors['add-tab-text']) {
+                completeColors['add-tab-text'] = colors['color-text-secondary'] || '#c4c2d0';
+            }
+            
             // Generate CSS from complete colors
             let css = ':root {\n';
             for (const [key, value] of Object.entries(completeColors)) {

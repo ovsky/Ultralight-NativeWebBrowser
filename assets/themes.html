@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Themes</title>
-    <link rel="icon" type="image/svg+xml"
-        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%236C63FF'/%3E%3Cpath d='M12 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c.55 0 1-.45 1-1 0-.26-.1-.47-.25-.65-.15-.17-.25-.38-.25-.65 0-.55.45-1 1-1h1.5c2.21 0 4-1.79 4-4 0-2.76-2.69-5-6-5zm-4 6c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm2-3c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm4 0c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm2 3c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z' fill='white'/%3E%3C/svg%3E">
+    <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA6ElEQVQ4T6WTsQ3CMBCFP0dKRUNFyQJQsoAzAitAyQJsQEVBR8kClLCAuwALUKaIFCHFii0SB4mcK+zTe//d+WzY+JiN+fwDIOkAvAG9FhG8AQfgCAxTvQVWwBnoScqB0sxeSW6wBxpxBsaS5pImwFnSQ9IcqORJcoI+sJRUkdQBLgnYIo0QBFQDlAMm8yDz1PeSpAHUEIBfyVPhZ4Bv8B+AL/g1gOeL3oLi/8sKPGcW0Ae6sY9d+hbVJcVrVNKbWVOS08w2kmaSbGZrSTkzW8V/SXKYpJaZlYdwEMDRzN5mdksDvgFQBCgRv7fNlgAAAABJRU5ErkJggg==">
     <link rel="stylesheet" href="themes/theme-variables.css">
     <style>
         * {
@@ -214,14 +213,13 @@
             border: 2px solid var(--color-border-primary);
             border-radius: 16px;
             overflow: hidden;
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
+            transition: transform 0.1s ease-out, border-color 0.1s ease-out;
         }
 
         .theme-card:hover {
             border-color: var(--color-accent-primary);
-            transform: translateY(-6px) scale(1.02);
-            box-shadow: 0 12px 40px rgba(108, 99, 255, 0.25);
+            transform: translateY(-2px);
         }
 
         .theme-card.active {
