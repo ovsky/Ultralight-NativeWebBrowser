@@ -1,0 +1,245 @@
+name: Build - Windows ARM64EC
+
+permissions:
+  contents: read
+  actions: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      sdk_url:
+        description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
+        required: false
+        type: string
+      version:
+        description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
+        required: false
+        type: string
+      webbrowser_version:
+        description: "Override build version name (default 'dev')"
+        required: false
+        type: string
+      create_installer:
+        description: "Create Windows installer via CPack (NSIS)"
+        required: false
+        type: boolean
+      development_build:
+        description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
+      clean_build:
+        description: "Clean build (skip all caches for fresh build)"
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      sdk_url:
+        description: "Override ULTRALIGHT_SDK_URL (raw .7z in base-sdk branch)"
+        required: false
+        type: string
+      version:
+        description: "Override ULTRALIGHT_VERSION (eg. 1.4.0)"
+        required: false
+        type: string
+      webbrowser_version:
+        description: "Override build version name (default 'dev')"
+        required: false
+        type: string
+      create_installer:
+        description: "Create Windows installer via CPack (NSIS)"
+        required: false
+        type: boolean
+        default: false
+      development_build:
+        description: "Development build (keeps intermediate packages, verbose logs)"
+        required: false
+        type: boolean
+        default: false
+      clean_build:
+        description: "Clean build (skip all caches for fresh build)"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build-arm64ec:
+    runs-on: windows-latest
+    env:
+      ULTRALIGHT_SDK_URL: ${{ inputs.sdk_url || github.event.inputs.sdk_url }}
+      ULTRALIGHT_VERSION: ${{ inputs.version || github.event.inputs.version }}
+      WEBBROWSER_VERSION: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version || 'dev' }}
+      CREATE_INSTALLER: ${{ inputs.create_installer || github.event.inputs.create_installer }}
+      DEVELOPMENT_BUILD: ${{ inputs.development_build || github.event.inputs.development_build || 'false' }}
+      CLEAN_BUILD: ${{ inputs.clean_build || github.event.inputs.clean_build || 'false' }}
+
+    steps:
+      - name: Configure Git (longpaths, autocrlf=false)
+        shell: pwsh
+        run: |
+          git config --global core.longpaths true
+          git config --global core.autocrlf false
+
+      - name: Checkout Code (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Setup CMake Build Cache
+        if: inputs.clean_build != true
+        uses: actions/cache@v4
+        with:
+          path: |
+            build
+            !build/CMakeFiles
+            !build/Testing
+            !build/_CPack_Packages
+            !build/**/*.exe
+            !build/**/*.dll
+            !build/**/*.zip
+            !build/**/*.7z
+          key: ${{ runner.os }}-cmake-${{ hashFiles('CMakeLists.txt', 'cmake/**') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-cmake-${{ hashFiles('CMakeLists.txt', 'cmake/**') }}-
+            ${{ runner.os }}-cmake-
+
+      - name: Setup SDK Cache
+        if: inputs.clean_build != true
+        uses: actions/cache@v4
+        with:
+          path: |
+            libs/Ultralight
+            ultralight-sdk-*.7z
+          key: ${{ runner.os }}-sdk-${{ env.ULTRALIGHT_VERSION || 'latest' }}
+          restore-keys: |
+            ${{ runner.os }}-sdk-
+
+      - name: Setup Compiler Cache (sccache)
+        if: inputs.clean_build != true
+        uses: mozilla-actions/sccache-action@v0.0.5
+
+      - name: Configure Compiler Cache Environment
+        if: inputs.clean_build != true
+        shell: pwsh
+        run: |
+          echo "SCCACHE_DIR=$env:GITHUB_WORKSPACE\.sccache" >> $env:GITHUB_ENV
+          echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache" >> $env:GITHUB_ENV
+          echo "CMAKE_C_COMPILER_LAUNCHER=sccache" >> $env:GITHUB_ENV
+
+      - name: Detect ULTRALIGHT_SDK_URL from repo base-sdk branch (Windows)
+        id: detect_url
+        shell: pwsh
+        run: |
+          if ($env:ULTRALIGHT_SDK_URL) { exit 0 }
+          $api = "https://api.github.com/repos/${{ github.repository }}/contents/sdks?ref=base-sdk"
+          $headers = @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = "application/vnd.github+json" }
+          try { $resp = Invoke-RestMethod -Uri $api -Headers $headers -Method Get -UseBasicParsing } catch { $resp = $null }
+          if ($resp) {
+            $names = @($resp | Where-Object { $_.type -eq 'file' } | ForEach-Object { $_.name })
+            if ($names.Count -gt 0) {
+              $candidates = @()
+              foreach ($n in $names) {
+                if ($n -match '^ultralight(-free)?-sdk-([0-9]+\.[0-9]+\.[0-9]+)-(win|windows)-x64\.7z$') { $candidates += $n }
+              }
+              if ($candidates.Count -gt 0) {
+                $best = $null
+                foreach ($f in $candidates) {
+                  $m = [regex]::Match($f, '([0-9]+\.[0-9]+\.[0-9]+)')
+                  if ($m.Success) {
+                    $ver = [version]$m.Groups[1].Value
+                    if (-not $best -or $ver -gt $best.Version) { $best = [pscustomobject]@{ Version=$ver; File=$f } }
+                  }
+                }
+                if ($best) {
+                  $baseRaw = "https://raw.githubusercontent.com/${{ github.repository }}/base-sdk/sdks"
+                  $url = "$baseRaw/$($best.File)"
+                  "ULTRALIGHT_SDK_URL=$url" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+                  "ULTRALIGHT_VERSION=$($best.Version.ToString())" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+                  "url=$url" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+                  "version=$($best.Version.ToString())" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+                  exit 0
+                }
+              }
+            }
+          }
+          $header = "data/include/Ultralight/Defines.h"
+          $version = $null
+          if (Test-Path $header) {
+            $matchLine = Select-String -Path $header -Pattern '^#define\s+ULTRALIGHT_VERSION\s+"([^"]+)"' | Select-Object -First 1
+            if ($matchLine) { $version = $matchLine.Matches[0].Groups[1].Value }
+          }
+          if (-not $version) {
+            if ($env:ULTRALIGHT_VERSION) { $version = $env:ULTRALIGHT_VERSION }
+            else { $version = '1.4.0' }
+          }
+          $baseRaw = "https://raw.githubusercontent.com/${{ github.repository }}/base-sdk/sdks"
+          $candidates = @(
+            "$baseRaw/ultralight-free-sdk-$version-win-x64.7z",
+            "$baseRaw/ultralight-free-sdk-$version-windows-x64.7z"
+          )
+          function Test-Url($u) {
+            try { $r = Invoke-WebRequest -Uri $u -Method Head -UseBasicParsing; return $true } catch {}
+            try { $tmp = Join-Path $env:RUNNER_TEMP "probe.tmp"; Invoke-WebRequest -Uri $u -Method Get -UseBasicParsing -OutFile $tmp | Out-Null; Remove-Item $tmp -ErrorAction SilentlyContinue; return $true } catch { return $false }
+          }
+          $found = $null
+          foreach ($url in $candidates) { if (Test-Url $url) { $found = $url; break } }
+          if ($found) { "ULTRALIGHT_SDK_URL=$found" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append }
+          else { Write-Error "Could not auto-detect a valid Windows SDK URL in base-sdk branch for version $version."; exit 1 }
+
+      - name: Install 7zip
+        shell: pwsh
+        run: |
+          choco install 7zip -y --no-progress
+          $sevenZipExe = Join-Path $env:ProgramFiles '7-Zip/7z.exe'
+          if (Test-Path $sevenZipExe) { (Split-Path $sevenZipExe) | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append }
+
+      - name: Prepare Ultralight SDK (Windows)
+        id: prep_sdk
+        shell: pwsh
+        run: |
+          $rootDefault = Join-Path $env:GITHUB_WORKSPACE 'data'
+          $root = $env:ULTRALIGHT_SDK_ROOT
+          if (-not $root) { $root = $rootDefault }
+          $present = 'false'
+          if ((Test-Path (Join-Path $root 'include')) -and ((Test-Path (Join-Path $root 'lib')) -or (Test-Path (Join-Path $root 'bin')))) { $present = 'true' }
+          elseif ($env:ULTRALIGHT_SDK_URL) {
+            $dlUrl = $env:ULTRALIGHT_SDK_URL
+            if ($dlUrl -match '^https://github.com/([^/]+)/([^/]+)/blob/(.+)$') {
+              $dlUrl = "https://raw.githubusercontent.com/$($Matches[1])/$($Matches[2])/$($Matches[3])"
+            }
+            $pkg = Join-Path $env:RUNNER_TEMP 'ultralight-sdk'
+            Invoke-WebRequest -Uri $dlUrl -UseBasicParsing -OutFile $pkg
+            $extract = Join-Path $env:RUNNER_TEMP 'sdk-extract'
+            New-Item -ItemType Directory -Force -Path $extract | Out-Null
+            & 7z x -y -o"$extract" "$pkg" | Out-Null
+            $rootFound = Get-ChildItem -Path $extract -Recurse -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'include') -and Test-Path (Join-Path $_.FullName 'lib') } | Select-Object -First 1
+            if ($rootFound) { $root = $rootFound.FullName; $present = 'true' }
+          }
+          "present=$present" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          if ($present -eq 'true') {
+            "ULTRALIGHT_SDK_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          } else { Write-Error "Ultralight Windows SDK not found."; exit 1 }
+
+      - name: Install libcurl (vcpkg/choco)
+        shell: pwsh
+        run: |
+          pwsh -File "${{ github.workspace }}\scripts\install_curl.ps1"
+
+      - name: Configure CMake (ARM64EC)
+        if: steps.prep_sdk.outputs.present == 'true'
+        shell: pwsh
+        run: |
+          cmake --version
+          $createInstaller = "$env:CREATE_INSTALLER"
+          if ($createInstaller -eq '' -or $null -eq $createInstaller) { $createInstaller = 'false' }
+          $installerFlag = if ($createInstaller -match '^(true|1|on)$') { 'ON' } else { 'OFF' }
+          $vcpkgToolchain = if ($env:VCPKG_ROOT) { "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" } else { "" }
+          cmake -S . -B build -G "Visual Studio 17 2022" -A ARM64EC -DULTRALIGHT_SDK_ROOT="$env:ULTRALIGHT_SDK_ROOT" -DBUILD_TESTING=OFF -DAUTO_INSTALL_CURL=ON -DCREATE_INSTALLER=$installerFlag -DWEBBROWSER_VERSION="$env:WEBBROWSER_VERSION" -DCMAKE_BUILD_TYPE=Release $vcpkgToolchain
+
+      - name: Build Project
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & cmake --build build --config Release --parallel
