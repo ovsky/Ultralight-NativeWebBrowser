@@ -1186,6 +1186,7 @@
                 description: themeData.description || '',
                 author: themeData.author || 'User',
                 version: themeData.version || '1.0.0',
+                category: themeData.category || 'dark',
                 isBuiltIn: false,
                 colors: themeData.colors || { ...DEFAULT_THEMES.dark.colors }
             };
