@@ -2,6 +2,7 @@
      overflow: hidden;
      user-select: none;
      -webkit-user-select: none;
+     transition-duration: 0.5s;
 }
 
 body {
