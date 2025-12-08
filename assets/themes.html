@@ -802,7 +802,11 @@
                 }
                 renderThemes();
                 setupEventListeners();
+<<<<<<< Updated upstream
                 
+=======
+
+>>>>>>> Stashed changes
                 // Listen for theme changes from other tabs/windows
                 window.addEventListener('storage', (e) => {
                     if (e.key === 'ultralight_custom_themes' || e.key === 'ultralight_active_theme') {
@@ -1129,7 +1133,11 @@
                     .replace(/&/g, '&amp;')
                     .replace(/</g, '&lt;')
                     .replace(/>/g, '&gt;');
+<<<<<<< Updated upstream
                 
+=======
+
+>>>>>>> Stashed changes
                 // Process line by line to add color previews
                 const lines = result.split('\n');
                 const processedLines = lines.map(line => {
@@ -1143,6 +1151,7 @@
                         }
                         return `${indent}<span class="json-key">"${key}"</span><span class="json-colon">:</span> <span class="json-string">"${value}"</span>${comma}`;
                     }
+<<<<<<< Updated upstream
                     
                     // Handle other string values
                     line = line.replace(/^(\s*)"([^"]+)":\s*"([^"]*)"(,?)$/g, '$1<span class="json-key">"$2"</span><span class="json-colon">:</span> <span class="json-string">"$3"</span>$4');
@@ -1165,6 +1174,30 @@
                     return line;
                 });
                 
+=======
+
+                    // Handle other string values
+                    line = line.replace(/^(\s*)"([^"]+)":\s*"([^"]*)"(,?)$/g, '$1<span class="json-key">"$2"</span><span class="json-colon">:</span> <span class="json-string">"$3"</span>$4');
+
+                    // Handle numbers
+                    line = line.replace(/:\s*(\d+\.?\d*)(,?)$/g, ': <span class="json-number">$1</span>$2');
+
+                    // Handle booleans
+                    line = line.replace(/:\s*(true|false)(,?)$/g, ': <span class="json-boolean">$1</span>$2');
+
+                    // Handle null
+                    line = line.replace(/:\s*(null)(,?)$/g, ': <span class="json-null">$1</span>$2');
+
+                    // Handle brackets
+                    line = line.replace(/([\[\]{}])/g, '<span class="json-bracket">$1</span>');
+
+                    // Handle standalone keys (objects)
+                    line = line.replace(/^(\s*)"([^"]+)":\s*(<span class="json-bracket">)/g, '$1<span class="json-key">"$2"</span><span class="json-colon">:</span> $3');
+
+                    return line;
+                });
+
+>>>>>>> Stashed changes
                 return processedLines.join('\n');
             }
 
@@ -1181,29 +1214,52 @@
             // Delete a theme
             function deleteTheme(themeId) {
                 console.log('Delete theme called with ID:', themeId);
+<<<<<<< Updated upstream
                 
+=======
+
+>>>>>>> Stashed changes
                 if (!themeId) {
                     showToast('Error: No theme ID provided', 'error');
                     return;
                 }
+<<<<<<< Updated upstream
                 
                 const theme = window.ThemeManager.getTheme(themeId);
                 console.log('Found theme:', theme);
                 
+=======
+
+                const theme = window.ThemeManager.getTheme(themeId);
+                console.log('Found theme:', theme);
+
+>>>>>>> Stashed changes
                 if (!theme) {
                     showToast('Theme not found', 'error');
                     return;
                 }
+<<<<<<< Updated upstream
                 
+=======
+
+>>>>>>> Stashed changes
                 if (theme.isBuiltIn) {
                     showToast('Cannot delete built-in themes', 'error');
                     return;
                 }
+<<<<<<< Updated upstream
                 
                 // Use a simple approach - just delete without confirm since confirm() may not work in Ultralight
                 const success = window.ThemeManager.deleteTheme(themeId);
                 console.log('Delete result:', success);
                 
+=======
+
+                // Use a simple approach - just delete without confirm since confirm() may not work in Ultralight
+                const success = window.ThemeManager.deleteTheme(themeId);
+                console.log('Delete result:', success);
+
+>>>>>>> Stashed changes
                 if (success) {
                     showToast('Theme "' + theme.name + '" deleted', 'success');
                     renderThemes();
