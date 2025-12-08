@@ -138,7 +138,7 @@ src/
 ### Duplicating an Existing Theme
 
 1. Find a built-in or custom theme you like
-2. Click **"Duplicate"** 
+2. Click **"Duplicate"**
 3. The theme editor opens with all colors copied
 4. Modify as needed and save
 
