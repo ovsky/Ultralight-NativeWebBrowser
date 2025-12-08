@@ -3,7 +3,7 @@
  * ==================
  * Central theme system for Ultralight WebBrowser
  * All color and style definitions are centralized here.
- * 
+ *
  * Usage: Include this file in any HTML page to apply theming.
  * Themes override these variables via JavaScript.
  */
@@ -12,7 +12,7 @@
     /* ============================================================
      * COLOR PALETTE - Primary Colors
      * ============================================================ */
-    
+
     /* Background Colors */
     --color-bg-primary: #16151d;
     --color-bg-secondary: #1e1e2e;
@@ -21,26 +21,26 @@
     --color-bg-hover: #343446;
     --color-bg-active: #3d3d5c;
     --color-bg-overlay: rgba(22, 21, 29, 0.95);
-    
+
     /* Text Colors */
     --color-text-primary: #e4e4ef;
     --color-text-secondary: #c4c2d0;
     --color-text-tertiary: #9999b3;
     --color-text-muted: #71718a;
     --color-text-disabled: #636074;
-    
+
     /* Border Colors */
     --color-border-primary: #313146;
     --color-border-secondary: #252532;
     --color-border-hover: #404060;
     --color-border-focus: #4a4a6a;
-    
+
     /* Accent Colors */
     --color-accent-primary: #6C63FF;
     --color-accent-secondary: #7c6aef;
     --color-accent-hover: #8a83ff;
     --color-accent-light: rgba(108, 99, 255, 0.15);
-    
+
     /* Status Colors */
     --color-success: #6aef8a;
     --color-success-bg: rgba(106, 239, 138, 0.15);
@@ -50,14 +50,14 @@
     --color-danger-bg: rgba(239, 106, 106, 0.15);
     --color-info: #6ac0ef;
     --color-info-bg: rgba(106, 192, 239, 0.15);
-    
+
     /* Special Colors */
     --color-bookmark-active: #FFD700;
     --color-bookmark-hover: #ffe44d;
     --color-download-badge: #ff6b6b;
     --color-link: #8a9eff;
     --color-link-hover: #aab8ff;
-    
+
     /* ============================================================
      * COMPONENT COLORS - Toolbar
      * ============================================================ */
@@ -68,7 +68,7 @@
     --toolbar-icon-active: #6C63FF;
     --toolbar-icon-disabled: rgb(99, 96, 116);
     --toolbar-icon-hover-bg: #343446;
-    
+
     /* ============================================================
      * COMPONENT COLORS - Address Bar
      * ============================================================ */
@@ -76,7 +76,7 @@
     --address-text: #c4c2d0;
     --address-focus-text: #ffffff;
     --address-focus-ring: #343446;
-    
+
     /* ============================================================
      * COMPONENT COLORS - Tabs
      * ============================================================ */
@@ -86,7 +86,11 @@
     --tab-text: #b0afc0;
     --tab-active-text: #e0dff0;
     --tab-close-hover: rgba(255, 255, 255, 0.1);
+<<<<<<< Updated upstream
     
+=======
+
+>>>>>>> Stashed changes
     /* Add Tab Button (matches tab styling) */
     --add-tab-bg-start: #212130;
     --add-tab-bg-end: #1c1c24;
@@ -96,7 +100,11 @@
     --add-tab-active-start: #262633;
     --add-tab-active-end: #1e1e29;
     --add-tab-text: #c4c2d0;
+<<<<<<< Updated upstream
     
+=======
+
+>>>>>>> Stashed changes
     /* ============================================================
      * COMPONENT COLORS - Menu/Dropdown
      * ============================================================ */
@@ -106,7 +114,7 @@
     --menu-text: #e2e1ea;
     --menu-separator: #3a3a4e;
     --menu-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
-    
+
     /* ============================================================
      * COMPONENT COLORS - Cards & Panels
      * ============================================================ */
@@ -114,7 +122,7 @@
     --card-border: #404060;
     --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     --panel-bg: #1e1e2e;
-    
+
     /* ============================================================
      * COMPONENT COLORS - Buttons
      * ============================================================ */
@@ -128,7 +136,7 @@
     --btn-danger-bg: #ef6a6a;
     --btn-danger-hover: #f58080;
     --btn-danger-text: #ffffff;
-    
+
     /* ============================================================
      * COMPONENT COLORS - Inputs
      * ============================================================ */
@@ -138,21 +146,21 @@
     --input-placeholder: #9999b3;
     --input-focus-border: #6C63FF;
     --input-focus-shadow: 0 0 0 3px rgba(108, 99, 255, 0.2);
-    
+
     /* ============================================================
      * COMPONENT COLORS - Scrollbar
      * ============================================================ */
     --scrollbar-track: #1e1e2e;
     --scrollbar-thumb: #3d3d5c;
     --scrollbar-thumb-hover: #4d4d6c;
-    
+
     /* ============================================================
      * COMPONENT COLORS - Tooltip
      * ============================================================ */
     --tooltip-bg: rgba(43, 43, 56, 0.95);
     --tooltip-text: #f0f0ff;
     --tooltip-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
-    
+
     /* ============================================================
      * COMPONENT COLORS - Bookmark Bar
      * ============================================================ */
@@ -161,7 +169,7 @@
     --bookmark-item-bg: rgba(255, 255, 255, 0.08);
     --bookmark-item-hover: rgba(255, 255, 255, 0.14);
     --bookmark-item-text: #e0dff0;
-    
+
     /* ============================================================
      * COMPONENT COLORS - Session Restore
      * ============================================================ */
@@ -169,7 +177,7 @@
     --session-restore-border: #3d6a9f;
     --session-restore-text: #e0e8f0;
     --session-restore-icon: #7cb3e0;
-    
+
     /* ============================================================
      * SPACING & SIZING
      * ============================================================ */
@@ -179,38 +187,38 @@
     --spacing-lg: 16px;
     --spacing-xl: 24px;
     --spacing-xxl: 32px;
-    
+
     --radius-sm: 4px;
     --radius-md: 8px;
     --radius-lg: 12px;
     --radius-xl: 16px;
     --radius-pill: 9999px;
-    
+
     /* ============================================================
      * TYPOGRAPHY
      * ============================================================ */
     --font-family-sans: "Segoe UI", -apple-system, BlinkMacSystemFont, Ubuntu, Roboto, Arial, sans-serif;
     --font-family-mono: "Consolas", "Courier New", monospace;
-    
+
     --font-size-xs: 10px;
     --font-size-sm: 12px;
     --font-size-md: 14px;
     --font-size-lg: 16px;
     --font-size-xl: 20px;
     --font-size-xxl: 24px;
-    
+
     --font-weight-normal: 400;
     --font-weight-medium: 500;
     --font-weight-semibold: 600;
     --font-weight-bold: 700;
-    
+
     /* ============================================================
      * TRANSITIONS
      * ============================================================ */
     --transition-fast: 0.075s ease;
     --transition-normal: 0.15s ease;
     --transition-slow: 0.3s ease;
-    
+
     /* ============================================================
      * Z-INDEX LAYERS
      * ============================================================ */
