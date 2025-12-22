@@ -1,7 +1,16 @@
 * {
-     overflow: hidden;
-     user-select: none;
+     /* Avoid globally hiding overflow — shadows and focus rings need room to render */
      -webkit-user-select: none;
+     user-select: none;
+}
+
+/* Provide consistent accent aliases for pages still using older vars */
+:root {
+     --accent: var(--accent-color, var(--color-accent-primary, #6C63FF));
+     --accent-color: var(--accent-color, var(--color-accent-primary, #6C63FF));
+     --accent-hover: var(--accent-hover, var(--color-accent-hover, #8a83ff));
+     --accent-light: var(--accent-light, var(--color-accent-light, rgba(108,99,255,0.15)));
+     --accent-shadow: var(--accent-shadow, rgba(108,99,255,0.30));
 }
 
 body {
@@ -42,6 +51,7 @@ body {
      border-bottom: 0.8px solid var(--toolbar-border, #252532);
      cursor: default;
      display: flex;
+     align-items: center; /* vertically center the address bar and icons */
 }
 
 #address {
@@ -54,21 +64,24 @@ body {
      color: var(--address-text, #c4c2d0);
      background-color: var(--address-bg, #16151d);
      display: inline-block;
-     padding: 2px 16px 2px 16px;
+     padding: 2px 16px 2px 16px; /* restored original vertical padding */
      margin-top: 0px;
      margin-left: 9px;
      margin-right: 9px;
      user-select: auto !important;
      -webkit-user-select: text !important;
      outline: none;
-}
+} 
+
+/* Ensure toolbar icons are vertically centered too */
+#bar .icon { align-self: center; }
 
 #address:focus {
      background-color: var(--address-bg, #16151d);
      color: var(--address-focus-text, #FFF);
      /* Rounded focus ring */
      box-shadow: 0 0 0 2px var(--address-focus-ring, #343446) inset;
-}
+} 
 
 .icon {
      fill: var(--toolbar-icon-color, rgba(200, 200, 200, 1.0));
@@ -109,6 +122,23 @@ svg#icon_defs path {
      background-color: var(--toolbar-icon-hover-bg, #343446);
      border-radius: 100%;
 }
+
+/* Keyboard focus ring for toolbar icons (rounded) */
+.icon:focus-visible {
+     outline: none;
+     box-shadow: 0 0 0 4px var(--accent-light, var(--color-accent-light, rgba(108,99,255,0.15)));
+     border-radius: 100%;
+}
+
+/* Rounded focus for inline menu items so selection outlines are not square */
+.menu-item {
+     border-radius: 6px;
+}
+.menu-item:focus-visible {
+     outline: none;
+     box-shadow: 0 0 0 4px var(--accent-light, var(--color-accent-light, rgba(108,99,255,0.15)));
+     border-radius: 6px;
+} 
 
 #toggle-downloads {
      position: relative;
@@ -357,11 +387,195 @@ body.compact-tabs #toggle-downloads .downloads-badge {
      transition: background 0.3s ease, border-color 0.3s ease;
 }
 
-@keyframes slideDown {
-     from {
-          transform: translateY(-100%);
-          opacity: 0;
-     }
+/* Standardize buttons across pages using theme variables */
+.btn {
+     display: inline-flex;
+     align-items: center;
+     gap: var(--spacing-sm, 6px);
+     padding: var(--btn-padding, 10px) var(--btn-padding-x, 20px);
+     border-radius: var(--btn-radius, 12px);
+     border: none;
+     background: var(--btn-bg, var(--color-bg-elevated, #32324a));
+     color: var(--color-text-primary, #e4e4ef);
+     cursor: pointer;
+     transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+     box-shadow: none;
+     -webkit-appearance: none;
+     appearance: none;
+     position: relative; /* allow z-index and stack over siblings when hovered */
+     z-index: 1;
+}
+
+/* Ensure header and control containers don't clip button shadows */
+header, .controls, .header-actions, .container {
+     overflow: visible !important;
+}
+
+/* Constrain header icons to avoid overlapping other controls and align them nicely */
+header h1 .icon, .container header .icon {
+     width: 36px;
+     height: 36px;
+     display: inline-flex;
+     align-items: center;
+     justify-content: center;
+     font-size: 18px;
+     margin-right: 12px;
+     vertical-align: middle;
+}
+
+/* Ensure header layouts align items when icon is present */
+header h1 {
+     display: inline-flex;
+     align-items: center;
+     gap: 12px;
+}
+
+/* Keep header actions vertically centered on larger screens */
+header {
+     align-items: center;
+}
+
+/* Small screens keep stacked layout */
+@media (max-width: 720px) {
+     header { flex-direction: column; align-items: flex-start; }
+}
+
+#bar {
+    position: relative;
+} /* Right-edge overlay removed to avoid covering toolbar icons */
+
+/* Ensure toolbar icons render above the overlay */
+#bar .icon { position: relative; z-index: 1400; }
+
+/* Slight overlap to remove small gap between chrome-tabs and toolbar */
+/* Move the overlap to the tabs so the toolbar stays visually stable */
+.chrome-tabs { margin-bottom: -2px; }
+#bar { margin-top: 0; }
+/* Avoid header icon visually overflowing buttons */
+header h1 { z-index: 1; }
+header .header-actions { z-index: 2; }
+.btn:hover {
+     transform: translateY(-1px);
+     background: var(--bg-hover, var(--color-bg-hover, #343446));
+     border-color: var(--accent-color, var(--color-accent-primary, #6C63FF));
+}
+
+.btn-primary {
+     background: linear-gradient(135deg, var(--accent-color, var(--color-accent-primary, #6C63FF)), var(--color-accent-secondary, #7c6aef));
+     color: #fff;
+     border-color: transparent;
+     box-shadow: 0 4px 15px var(--accent-shadow, rgba(108,99,255,0.30));
+     padding: 10px 20px;
+     border-radius: 12px;
+     font-weight: 600;
+}
+
+.btn-primary:hover {
+     transform: translateY(-2px);
+     box-shadow: 0 6px 20px var(--accent-shadow-strong, rgba(108,99,255,0.40));
+     background: linear-gradient(135deg, var(--accent-hover, var(--color-accent-hover, #8a83ff)), var(--color-accent-secondary, #7c6aef));
+}
+
+/* Small / compact variants that match primary visuals */
+.btn-sm, .btn-small {
+     padding: 6px 12px;
+     border-radius: calc(var(--btn-radius, 12px) - 4px);
+     font-size: var(--font-size-sm, 13px);
+     font-weight: var(--font-weight-medium, 600);
+}
+
+/* Secondary button defaults (muted, lower elevation than primary) */
+.btn-secondary {
+     background: var(--btn-secondary-bg, rgba(255,255,255,0.04));
+     color: var(--btn-secondary-text, var(--color-text-primary, #e4e4ef));
+     border: 1px solid var(--btn-secondary-border, rgba(255,255,255,0.06));
+     /* Subtle accent-tinted shadow so secondaries feel part of the theme */
+     box-shadow: 0 2px 8px var(--accent-shadow-subtle, rgba(0,0,0,0.12));
+     transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+.btn-secondary:hover {
+     transform: translateY(-1px);
+     box-shadow: 0 4px 14px var(--accent-shadow, var(--accent-shadow-subtle, rgba(0,0,0,0.12)));
+     background: var(--btn-secondary-hover, rgba(255,255,255,0.06));
+} 
+
+/* Improve icon sizing & ensure icons follow text color */
+.btn svg, .btn img.icon {
+     width: 16px;
+     height: 16px;
+     fill: currentColor;
+}
+
+/* Disabled state */
+.btn:disabled,
+.btn[disabled] {
+     opacity: 0.6;
+     cursor: not-allowed;
+     transform: none !important;
+     box-shadow: none !important;
+}
+
+/* Keyboard focus ring for accessibility (uses derived accent light) */
+.btn:focus-visible {
+     outline: none;
+     box-shadow: 0 0 0 4px var(--accent-light, var(--color-accent-light, rgba(108,99,255,0.15)));
+}
+
+/* Active (pressed) state */
+.btn:active {
+     transform: translateY(0);
+     box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+}
+
+/* Ensure destructive buttons keep sizing parity and consistent shadow */
+.btn-danger, .btn.danger {
+     background: var(--color-danger, #ef6a6a);
+     color: #fff;
+     border-color: var(--color-danger, #ef6a6a);
+     border-radius: var(--btn-radius, 12px);
+     padding: 10px 20px;
+}
+
+.btn-danger:hover {
+     transform: translateY(-2px);
+     box-shadow: 0 6px 18px rgba(239, 106, 106, 0.32);
+     background: var(--color-danger, #ef6a6a);
+}
+
+/* Performance hint: hint to browsers what will animate */
+.btn {
+    will-change: transform, box-shadow;
+}
+
+/* Responsive tweaks for small screens */
+@media (max-width: 480px) {
+    .btn {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+    .btn-sm, .btn-small {
+        padding: 5px 10px;
+        font-size: 12px;
+    }
+    .btn svg, .btn img.icon { width: 14px; height: 14px; }
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    .btn, .btn-primary, .btn-danger { transition: none !important; transform: none !important; }
+}
+
+/* Slightly stronger focus ring for keyboard users */
+.btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 6px var(--accent-light, var(--color-accent-light, rgba(108,99,255,0.18)));
+}
+
+/* Soften shadows on small screens for better readability */
+@media (max-width: 720px) {
+    .btn-primary { box-shadow: 0 3px 10px var(--accent-shadow, rgba(108,99,255,0.30)); }
+}
 
      to {
           transform: translateY(0);
@@ -413,10 +627,12 @@ body.compact-tabs #toggle-downloads .downloads-badge {
 #session-restore-bar .restore-btn.primary {
      background: var(--btn-primary-bg, #4a9eff);
      color: var(--btn-primary-text, white);
+     box-shadow: 0 3px 10px var(--accent-shadow-subtle, rgba(0,0,0,0.12));
 }
 
 #session-restore-bar .restore-btn.primary:hover {
      background: var(--btn-primary-hover, #5aadff);
+     box-shadow: 0 6px 18px var(--accent-shadow, rgba(108,99,255,0.30));
 }
 
 #session-restore-bar .restore-btn.secondary {

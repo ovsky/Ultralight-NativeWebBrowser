@@ -243,6 +243,30 @@
             }
         }
 
+        // Favicon bridge: receive events from pages or direct calls and update the current tab's favicon
+        (function setupFaviconBridge() {
+            // If a page calls the global function directly, forward it to a custom event
+            if (typeof OnFaviconReady !== 'function') {
+                window.OnFaviconReady = function(url, href) {
+                    try { window.dispatchEvent(new CustomEvent('FaviconReady', { detail: { url: String(url||''), href: String(href||'') } })); } catch (e) {}
+                }
+            }
+
+            // Listen for dispatched events and update the active tab's favicon
+            window.addEventListener('FaviconReady', (e) => {
+                try {
+                    const href = e.detail && e.detail.href ? String(e.detail.href) : '';
+                    if (!href) return;
+                    const cur = document.querySelector('.chrome-tab.chrome-tab-current');
+                    if (cur && window.chromeTabs && typeof chromeTabs.updateTab === 'function') {
+                        chromeTabs.updateTab(cur, { favicon: href });
+                    }
+                } catch (err) {
+                    // no-op
+                }
+            });
+        })();
+
         function hideSessionRestoreBar() {
             const bar = document.getElementById('session-restore-bar');
             if (bar) bar.classList.remove('visible');
