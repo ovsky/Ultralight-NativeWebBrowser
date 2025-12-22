@@ -6,6 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Extensions</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23c2bce8'%3E%3Cpath d='M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z'/%3E%3C/svg%3E">
+    <link rel="stylesheet" type="text/css" href="ui.css">
+    <link rel="stylesheet" href="themes/theme-variables.css">
+    <script defer src="themes/theme.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -14,39 +17,39 @@
         }
 
         :root {
-            /* Dark purple theme matching Passwords & Settings */
-            --bg-primary: #1e1e2e;
-            --bg-secondary: #282839;
-            --bg-tertiary: #32324a;
-            --bg-elevated: #3d3d5c;
-            --bg-hover: #3d3d5c;
+            /* Map local names to global theme variables so the page follows the active theme */
+            --bg-primary: var(--color-bg-primary);
+            --bg-secondary: var(--color-bg-secondary);
+            --bg-tertiary: var(--color-bg-tertiary);
+            --bg-elevated: var(--color-bg-elevated);
+            --bg-hover: var(--color-bg-hover);
 
-            --border-color: #404060;
+            --border-color: var(--color-border-primary);
             --border-subtle: rgba(64, 64, 96, 0.5);
             --border-soft: rgba(64, 64, 96, 0.7);
             --border-medium: var(--border-color);
 
-            --text-primary: #e4e4ef;
-            --text-secondary: #9999b3;
-            --text-tertiary: #71718a;
+            --text-primary: var(--color-text-primary);
+            --text-secondary: var(--color-text-secondary);
+            --text-tertiary: var(--color-text-tertiary);
 
-            --accent-color: #7c6aef;
-            --accent-hover: #9182f3;
-            --accent-primary: #7c6aef;
-            --accent-light: rgba(124, 106, 239, 0.15);
-            --accent-soft: rgba(124, 106, 239, 0.15);
-            --accent-softer: rgba(124, 106, 239, 0.08);
+            --accent-color: var(--color-accent-primary);
+            --accent-hover: var(--color-accent-hover);
+            --accent-primary: var(--color-accent-primary);
+            --accent-light: var(--color-accent-light);
+            --accent-soft: var(--color-accent-light);
+            --accent-softer: var(--color-accent-light);
 
-            --success: #6aef8a;
+            --success: var(--color-success);
             --success-soft: rgba(106, 239, 138, 0.15);
-            --danger: #ef6a6a;
-            --danger-color: #ef6a6a;
+            --danger: var(--color-danger);
+            --danger-color: var(--color-danger);
             --danger-soft: rgba(239, 106, 106, 0.15);
-            --warning: #efcf6a;
-            --warning-color: #efcf6a;
+            --warning: var(--color-warning);
+            --warning-color: var(--color-warning);
             --warning-soft: rgba(239, 207, 106, 0.15);
             
-            --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            --card-shadow: var(--card-shadow);
         }
 
         body {
@@ -167,7 +170,7 @@
             border: 1px solid var(--border-color);
             border-radius: 12px;
             margin-bottom: 16px;
-            overflow: hidden;
+            overflow: visible; /* allow hover shadow to be visible */
             transition: all 0.2s;
             box-shadow: var(--card-shadow);
         }
@@ -175,7 +178,7 @@
         .extension-card:hover {
             border-color: var(--accent-color);
             transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(124, 106, 239, 0.2);
+            box-shadow: 0 4px 16px var(--color-accent-light);
         }
 
         .extension-card.disabled {
@@ -273,12 +276,12 @@
         .toggle-switch.active {
             background: var(--success);
             border-color: var(--success);
-            box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
+            box-shadow: 0 0 12px var(--success-soft, rgba(34,197,94,0.15));
         }
 
         .toggle-switch.active:hover {
             background: #2dd665;
-            box-shadow: 0 0 16px rgba(34, 197, 94, 0.4);
+            box-shadow: 0 0 16px var(--success-soft, rgba(34,197,94,0.15));
         }
 
         .toggle-switch::after {
@@ -378,43 +381,17 @@
             font-family: inherit;
         }
 
-        .btn-primary {
-            background: var(--accent-color);
-            color: white;
-        }
+        /* Primary button visuals are provided by assets/ui.css (.btn .btn-primary) */
 
-        .btn-primary:hover:not(:disabled) {
-            background: var(--accent-hover);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(124, 106, 239, 0.4);
-        }
-
-        .btn-secondary {
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-        }
-
-        .btn-secondary:hover {
-            background: var(--bg-hover);
-            border-color: var(--accent-color);
-        }
+        /* .btn-secondary uses global styles from assets/ui.css */
+        /* local override removed to ensure consistency with Themes page */
 
         .btn-small {
             padding: 6px 12px;
             font-size: 11px;
         }
 
-        .btn-danger {
-            background: var(--danger-soft);
-            color: var(--danger);
-            border-color: var(--danger);
-        }
-
-        .btn-danger:hover {
-            background: var(--danger);
-            color: #ffffff;
-        }
+        /* Danger buttons use global .btn-danger from assets/ui.css */
 
         .btn-icon {
             padding: 8px;
@@ -556,7 +533,7 @@
         .form-group textarea:focus {
             outline: none;
             border-color: var(--accent-color);
-            box-shadow: 0 0 0 3px rgba(124, 106, 239, 0.2);
+            box-shadow: 0 0 0 3px var(--color-accent-light);
         }
 
         .form-group .hint {
@@ -669,13 +646,13 @@
             </h1>
             <p class="subtitle">Manage browser extensions and add custom functionality</p>
             <div class="header-actions">
-                <button id="btn-load-extension" class="btn-primary">
+                <button id="btn-load-extension" class="btn btn-primary">
                     <span>+</span> Load Extension
                 </button>
-                <button id="btn-create-extension" class="btn-secondary">
+                <button id="btn-create-extension" class="btn btn-secondary">
                     <span>✨</span> Create New
                 </button>
-                <button id="btn-reload-all" class="btn-secondary">
+                <button id="btn-reload-all" class="btn btn-secondary">
                     <span>↻</span> Reload All
                 </button>
                 <div id="ext-count" class="ext-count" style="display: none;">
@@ -694,7 +671,7 @@
 
         <div class="footer-info">
             <span>Extensions directory: <code id="extensions-path">Loading...</code></span>
-            <button id="btn-open-folder" class="btn-secondary btn-small">Open Folder</button>
+            <button id="btn-open-folder" class="btn btn-secondary btn-small">Open Folder</button>
         </div>
 
         <div id="debug-info" class="debug-info"></div>
@@ -715,8 +692,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeModal('modal-load')">Cancel</button>
-                <button class="btn-primary" id="btn-load-confirm">Load Extension</button>
+                <button class="btn btn-secondary" onclick="closeModal('modal-load')">Cancel</button>
+                <button class="btn btn-primary" id="btn-load-confirm">Load Extension</button>
             </div>
         </div>
     </div>
@@ -755,8 +732,8 @@ console.log('Extension loaded!');"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeModal('modal-create')">Cancel</button>
-                <button class="btn-primary" id="btn-create-confirm">Create Extension</button>
+                <button class="btn btn-secondary" onclick="closeModal('modal-create')">Cancel</button>
+                <button class="btn btn-primary" id="btn-create-confirm">Create Extension</button>
             </div>
         </div>
     </div>
@@ -829,7 +806,7 @@ console.log('Extension loaded!');"></textarea>
                         <div class="icon">🧩</div>
                         <h2>No Extensions Installed</h2>
                         <p>Get started by loading an existing extension or creating a new one.</p>
-                        <button class="btn-primary" onclick="openModal('modal-create')">
+                        <button class="btn btn-primary" onclick="openModal('modal-create')">
                             <span>✨</span> Create Your First Extension
                         </button>
                     </div>
@@ -898,10 +875,10 @@ console.log('Extension loaded!');"></textarea>
                         </div>
                         ` : ''}
                         <div class="extension-actions">
-                            <button class="btn-secondary btn-small" onclick="reloadExtension('${ext.id}')">
+                            <button class="btn btn-secondary btn-small" onclick="reloadExtension('${ext.id}')">
                                 ↻ Reload
                             </button>
-                            <button class="btn-danger btn-small" onclick="deleteExtension('${ext.id}')">
+                            <button class="btn btn-danger btn-small" onclick="deleteExtension('${ext.id}')">
                                 🗑 Remove
                             </button>
                         </div>
@@ -1133,7 +1110,7 @@ console.log('Extension loaded!');"></textarea>
                     <div class="icon">⚠️</div>
                     <h2>Error Loading Extensions</h2>
                     <p>${escapeHtml(message)}</p>
-                    <button class="btn-primary" onclick="loadExtensions()">
+                    <button class="btn btn-primary" onclick="loadExtensions()">
                         ↻ Retry
                     </button>
                 </div>

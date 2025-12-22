@@ -6,6 +6,8 @@
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23c2bce8'%3E%3Cpath d='M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z'/%3E%3C/svg%3E" />
     <link rel="stylesheet" type="text/css" href="ui.css">
+    <link rel="stylesheet" href="themes/theme-variables.css">
+    <script defer src="themes/theme.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -14,22 +16,22 @@
         }
 
         :root {
-            /* Dark purple theme matching Passwords & Settings */
-            --bg-primary: #1e1e2e;
-            --bg-secondary: #282839;
-            --bg-tertiary: #32324a;
-            --bg-hover: #3d3d5c;
-            --text-primary: #e4e4ef;
-            --text-secondary: #9999b3;
-            --text-tertiary: #71718a;
-            --border-color: #404060;
-            --accent-color: #7c6aef;
-            --accent-hover: #9182f3;
-            --accent-light: rgba(124, 106, 239, 0.15);
-            --danger-color: #ef6a6a;
-            --success-color: #6aef8a;
-            --warning-color: #efcf6a;
-            --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            /* Map local names to global theme variables so the page follows the active theme */
+            --bg-primary: var(--color-bg-primary);
+            --bg-secondary: var(--color-bg-secondary);
+            --bg-tertiary: var(--color-bg-tertiary);
+            --bg-hover: var(--color-bg-hover);
+            --text-primary: var(--color-text-primary);
+            --text-secondary: var(--color-text-secondary);
+            --text-tertiary: var(--color-text-tertiary);
+            --border-color: var(--color-border-primary);
+            --accent-color: var(--color-accent-primary);
+            --accent-hover: var(--color-accent-hover);
+            --accent-light: var(--color-accent-light);
+            --danger-color: var(--color-danger);
+            --success-color: var(--color-success);
+            --warning-color: var(--color-warning);
+            --card-shadow: var(--card-shadow);
         }
 
         html,
@@ -85,49 +87,10 @@
             gap: 12px;
         }
 
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 16px;
-            border: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-        }
+        /* Buttons standardized via assets/ui.css */
+        /* Use .btn and .btn-primary to get consistent visuals */
 
-        .btn:hover {
-            background: var(--bg-hover);
-            border-color: var(--accent-color);
-            transform: translateY(-1px);
-        }
-
-        .btn-primary {
-            background: var(--accent-color);
-            color: white;
-            border-color: var(--accent-color);
-        }
-
-        .btn-primary:hover {
-            background: var(--accent-hover);
-            box-shadow: 0 4px 12px rgba(124, 106, 239, 0.4);
-        }
-
-        .btn-danger {
-            background: var(--danger-color);
-            color: white;
-            border-color: var(--danger-color);
-        }
-
-        .btn-danger:hover {
-            background: #f37878;
-            box-shadow: 0 4px 12px rgba(239, 106, 106, 0.4);
-        }
+        /* Danger buttons use global .btn-danger from assets/ui.css */
 
         .list {
             display: flex;
@@ -147,7 +110,7 @@
         .item:hover {
             border-color: var(--accent-color);
             transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(124, 106, 239, 0.2);
+            box-shadow: 0 4px 16px var(--color-accent-light);
         }
 
         .item h2 {
@@ -227,8 +190,8 @@
         }
 
         .actions .btn {
-            font-size: 13px;
-            padding: 6px 14px;
+            font-size: var(--font-size-md, 14px);
+            padding: 10px 20px;
         }
 
         .empty {
@@ -268,12 +231,12 @@
         }
 
         ::-webkit-scrollbar-thumb {
-            background: rgba(124, 106, 239, 0.3);
+            background: var(--color-accent-light);
             border-radius: 4px;
         }
 
         ::-webkit-scrollbar-thumb:hover {
-            background: rgba(124, 106, 239, 0.5);
+            background: var(--color-accent-light);
         }
 
     @keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
@@ -286,7 +249,7 @@
         <header>
             <h1>Downloads</h1>
             <div class="controls">
-                <button id="clear-btn" class="btn">Clear finished</button>
+                <button id="clear-btn" class="btn btn-primary">Clear finished</button>
             </div>
         </header>
         <section id="content">

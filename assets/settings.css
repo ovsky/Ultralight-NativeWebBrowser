@@ -63,11 +63,9 @@ h1 svg { width:32px; height:32px; fill:var(--accent-color); }
 .toggle-switch.active::after { transform: translateX(24px); }
 .actions { margin-top:24px; padding-top:16px; border-top:1px solid var(--border-color); display:flex; gap:12px; justify-content:flex-end; }
 button { display:inline-flex; align-items:center; gap:6px; padding:10px 20px; border:1px solid var(--border-color); border-radius:8px; font-size:14px; font-weight:500; cursor:pointer; transition:all 0.2s ease; font-family:inherit; }
-.btn-primary{ background:var(--accent-color); color:white; border-color:var(--accent-color); }
-.btn-primary:hover:not(:disabled) { background:var(--accent-hover); transform:translateY(-2px); box-shadow: 0 4px 12px rgba(124,106,239,0.3); }
+/* Primary button visuals are provided by assets/ui.css (.btn .btn-primary) */
 .btn-primary:disabled { background:var(--bg-tertiary); color:var(--text-tertiary); border-color:var(--border-color); cursor:not-allowed; }
-.btn-secondary { background:var(--bg-tertiary); color:var(--text-primary); }
-.btn-secondary:hover { background:var(--bg-hover); transform:translateY(-1px); }
+/* .btn-secondary uses global styles from assets/ui.css to keep button visuals consistent across pages */
 .storage-path { margin-top:20px; padding:14px 16px; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:10px; font-size:12px; color:var(--text-secondary); font-family:'Consolas', 'Courier New', monospace; word-break:break-all; }
 .loading { text-align:center; padding:60px 20px; color:var(--text-secondary); font-size:14px; }
 .debug-info { margin-top:16px; padding:14px 16px; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:10px; font-family:'Consolas','Courier New', monospace; font-size:11px; color:var(--text-tertiary); max-height:150px; overflow-y:auto; line-height:1.5; }

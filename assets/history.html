@@ -17,7 +17,8 @@
             --bg: var(--color-bg-primary, #f6f7f9);
             --fg: var(--color-text-primary, #111);
             --muted: var(--color-text-secondary, #666);
-            --accent: var(--color-accent-primary, #6C63FF);
+            --accent-color: var(--color-accent-primary, #6C63FF);
+            --accent: var(--accent-color);
             --accent-light: var(--color-accent-light, rgba(108, 99, 255, 0.15));
             --btn-bg: var(--color-bg-elevated, #ffffff);
             color-scheme: light dark;
@@ -69,18 +70,11 @@
             gap: 12px;
         }
 
-        .btn {
-            padding: 8px 12px;
-            border-radius: 8px;
-            border: 1px solid rgba(0, 0, 0, 0.1);
-            background: white;
-            color: inherit;
-            cursor: pointer;
-        }
+        /* Buttons standardized via assets/ui.css */
+        /* Use .btn and .btn-primary to get consistent visuals */
 
-        .btn:hover {
-            background: var(--btn-bg, #f2f2f2);
-        }
+        /* Header controls rely on global `.btn` styles in assets/ui.css */
+        header .controls .btn { /* no local visual overrides */ }
 
         .muted {
             color: var(--muted, #666);
@@ -143,7 +137,7 @@
         <header>
             <h1>History</h1>
             <div class="controls">
-                <button id="clear-btn" class="btn">Clear history</button>
+                <button id="clear-btn" class="btn btn-primary">Clear history</button>
             </div>
         </header>
 

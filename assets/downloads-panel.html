@@ -78,16 +78,7 @@
             color: #f5f4ff;
         }
 
-        .btn {
-            padding: 6px 12px;
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            background: transparent;
-            color: inherit;
-            cursor: pointer;
-            font-size: 12px;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        }
+        /* Buttons in panels use global .btn rules from assets/ui.css */
 
         .btn:hover {
             background: rgba(255, 255, 255, 0.1);
@@ -180,8 +171,8 @@
         }
 
         .actions .btn {
-            font-size: 11px;
-            padding: 5px 9px;
+            font-size: var(--font-size-md, 14px);
+            padding: 10px 20px;
         }
 
         .link-btn {
@@ -265,7 +256,7 @@
             <div id="downloads-list" class="list"></div>
             <div id="downloads-empty" class="empty">No downloads yet.</div>
             <footer>
-                <button id="downloads-clear" class="btn" type="button">Clear finished</button>
+                <button id="downloads-clear" class="btn btn-primary" type="button">Clear finished</button>
                 <button id="open-downloads-page" class="link-btn" type="button">Open downloads page</button>
             </footer>
         </div>

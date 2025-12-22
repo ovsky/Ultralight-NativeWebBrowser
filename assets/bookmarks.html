@@ -14,7 +14,8 @@
             --bg: var(--color-bg-primary, #f6f7f9);
             --fg: var(--color-text-primary, #111);
             --muted: var(--color-text-secondary, #666);
-            --accent: var(--color-accent-primary, #6C63FF);
+            --accent-color: var(--color-accent-primary, #6C63FF);
+            --accent: var(--accent-color);
             --accent-light: var(--color-accent-light, rgba(108, 99, 255, 0.15));
             color-scheme: light dark;
         }
@@ -63,6 +64,7 @@
         h1 svg {
             width: 24px;
             height: 24px;
+            fill: var(--accent-color);
         }
 
         .controls {
@@ -71,20 +73,8 @@
             gap: 12px;
         }
 
-        .btn {
-            padding: 8px 16px;
-            border-radius: 8px;
-            border: 1px solid rgba(0, 0, 0, 0.1);
-            background: white;
-            color: inherit;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.15s ease;
-        }
-
-        .btn:hover {
-            background: var(--btn-bg, #f2f2f2);
-        }
+        /* Buttons standardized via assets/ui.css */
+        /* Use .btn and .btn-primary to get consistent visuals */
 
         .btn.danger {
             color: #dc3545;
@@ -156,7 +146,7 @@
             font-size: 11px;
             font-weight: 600;
             color: white;
-            background: linear-gradient(135deg, var(--accent, #4285f4), var(--accent, #5e35b1));
+            background: linear-gradient(135deg, var(--accent-color, #4285f4), var(--accent-color, #5e35b1));
         }
 
         .favicon img {
@@ -243,14 +233,8 @@
                 --fg: #e8e8e8;
             }
 
-            .btn {
-                background: #2a2a32;
-                border-color: rgba(255, 255, 255, 0.1);
-            }
-
-            .btn:hover {
-                background: #3a3a42;
-            }
+            /* Dark-mode button colors should use theme variables; no local .btn overrides */
+            /* Use global .btn/.btn-primary/.btn-danger for consistent visuals */
 
             li.item:hover {
                 background: rgba(255, 255, 255, 0.05);
@@ -273,8 +257,8 @@
 <body>
     <div class="container">
         <header>
-            <h1>
-                <svg viewBox="0 0 24 24" fill="#FFD700">
+            <h1 style="color: var(--accent-color);">
+                <svg viewBox="0 0 24 24" fill="currentColor">
                     <path
                         d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
                 </svg>
@@ -282,7 +266,7 @@
             </h1>
             <div class="controls">
                 <span class="muted" id="count"></span>
-                <button class="btn danger" id="clearAll" style="display: none;">Clear All</button>
+                <button class="btn btn-primary" id="clearAll" style="display: none;">Clear All</button>
             </div>
         </header>
 
@@ -316,6 +300,26 @@
             });
         }
 
+        // Ensure an SVG data URI uses base64 encoding. If already base64 or not SVG, return as-is.
+        function ensureBase64DataUri(uri) {
+            if (!uri || !uri.startsWith('data:image/svg+xml')) return uri;
+            if (uri.indexOf('base64,') !== -1) return uri;
+            const idx = uri.indexOf(',');
+            const payload = idx === -1 ? uri : uri.substring(idx + 1);
+            let svgStr = payload;
+            try {
+                svgStr = decodeURIComponent(payload);
+            } catch (e) {
+                // payload may already be plain
+            }
+            try {
+                return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgStr)));
+            } catch (e) {
+                // Fallback to percent-encoded form if base64 conversion fails
+                return 'data:image/svg+xml,' + encodeURIComponent(svgStr);
+            }
+        }
+
         function createBookmarkItem(bookmark) {
             const li = document.createElement('li');
             li.className = 'item';
@@ -325,7 +329,7 @@
             favicon.className = 'favicon';
             if (bookmark.favicon && bookmark.favicon.startsWith('data:')) {
                 const img = document.createElement('img');
-                img.src = bookmark.favicon;
+                img.src = ensureBase64DataUri(bookmark.favicon);
                 img.onerror = function () {
                     favicon.textContent = getFirstLetter(bookmark.url);
                     this.remove();
@@ -462,6 +466,80 @@
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
             setTimeout(loadBookmarks, 100);
         }
+    // Inform host about our favicon (so the tab icon is updated)
+    (function announceFavicon(retries = 5, delay = 200) {
+        const link = document.querySelector('link[rel="icon"]');
+        if (!link) return;
+
+        // Prefer a per-item img favicon if present in the rendered list
+        let href = link.href;
+        const img = document.querySelector('.list .favicon img');
+        if (img && img.src) {
+            href = img.src;
+        } else {
+            // Otherwise, try to build a standard favicon URL from the first bookmark's hostname
+            const firstEntry = document.querySelector('.list li.item a.entry-link');
+            if (firstEntry && firstEntry.href) {
+                try {
+                    const urlObj = new URL(firstEntry.href);
+                    href = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(urlObj.hostname)}&sz=64`;
+                } catch (e) {
+                    // ignore
+                }
+            }
+        }
+
+        (function notifyFavicon(href) {
+            function dispatch(h) {
+                try { if (typeof OnFaviconReady === 'function') OnFaviconReady(window.location.href, h); } catch(e){}
+                try { if (window.OnFaviconReady) window.OnFaviconReady(window.location.href, h); } catch(e){}
+                try { window.dispatchEvent(new CustomEvent('FaviconReady', { detail: { url: window.location.href, href: h } })); } catch(e){}
+            }
+            if (typeof href === 'string' && href.startsWith('data:image/svg+xml')) {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width || 64;
+                    canvas.height = img.height || 64;
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0,0,canvas.width,canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    try {
+                        const png = canvas.toDataURL('image/png');
+                        console.log('[bookmarks] dispatching favicon PNG, length=', png.length);
+                        let dbg = document.getElementById('favicon-debug-bookmarks');
+                        if (!dbg) {
+                            dbg = document.createElement('pre');
+                            dbg.id = 'favicon-debug-bookmarks';
+                            dbg.style.position = 'fixed';
+                            dbg.style.right = '8px';
+                            dbg.style.bottom = '80px';
+                            dbg.style.background = 'rgba(0,0,0,0.6)';
+                            dbg.style.color = '#fff';
+                            dbg.style.zIndex = 9999;
+                            dbg.style.padding = '6px';
+                            dbg.style.maxWidth = '320px';
+                            dbg.style.maxHeight = '200px';
+                            dbg.style.overflow = 'auto';
+                            document.body.appendChild(dbg);
+                        }
+                        dbg.textContent = 'Favicon len: ' + png.length + '\n' + png.slice(0,120);
+                        dispatch(png);
+                    } catch(e) { console.error('[bookmarks] favicon conversion failed', e); dispatch(href); }
+                };
+                img.onerror = () => { dispatch(href); };
+                img.src = href;
+            } else {
+                dispatch(href);
+            }
+        })(href);
+
+        // If we didn't find a per-item favicon yet and retries remain, try again shortly (native may not have populated bookmarks yet)
+        if (href === link.href && retries > 0) {
+            setTimeout(() => announceFavicon(retries - 1, delay), delay);
+        }
+    })();
+
     </script>
 </body>
 
