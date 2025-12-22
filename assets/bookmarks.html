@@ -5,7 +5,7 @@
     <title>Bookmarks</title>
 
     <link rel="icon" type="image/svg+xml"
-        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23FFD700'%3E%3Cpath d='M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z'/%3E%3C/svg%3E" />
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='4' width='20' height='16' fill='%236C63FF'/%3E%3Crect x='2' y='2' width='12' height='4' fill='%236C63FF'/%3E%3C/svg%3E" />
     <link rel="stylesheet" type="text/css" href="ui.css">
     <link rel="stylesheet" href="themes/theme-variables.css">
     <style>
@@ -466,79 +466,27 @@
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
             setTimeout(loadBookmarks, 100);
         }
-    // Inform host about our favicon (so the tab icon is updated)
-    (function announceFavicon(retries = 5, delay = 200) {
-        const link = document.querySelector('link[rel="icon"]');
-        if (!link) return;
 
-        // Prefer a per-item img favicon if present in the rendered list
-        let href = link.href;
-        const img = document.querySelector('.list .favicon img');
-        if (img && img.src) {
-            href = img.src;
-        } else {
-            // Otherwise, try to build a standard favicon URL from the first bookmark's hostname
-            const firstEntry = document.querySelector('.list li.item a.entry-link');
-            if (firstEntry && firstEntry.href) {
-                try {
-                    const urlObj = new URL(firstEntry.href);
-                    href = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(urlObj.hostname)}&sz=64`;
-                } catch (e) {
-                    // ignore
-                }
-            }
-        }
-
-        (function notifyFavicon(href) {
-            function dispatch(h) {
-                try { if (typeof OnFaviconReady === 'function') OnFaviconReady(window.location.href, h); } catch(e){}
-                try { if (window.OnFaviconReady) window.OnFaviconReady(window.location.href, h); } catch(e){}
-                try { window.dispatchEvent(new CustomEvent('FaviconReady', { detail: { url: window.location.href, href: h } })); } catch(e){}
-            }
-            if (typeof href === 'string' && href.startsWith('data:image/svg+xml')) {
+        // Dispatch favicon to host (convert SVG to PNG as host expects PNGs)
+        (function() {
+            const link = document.querySelector('link[rel="icon"]');
+            if (link && link.href) {
                 const img = new Image();
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    canvas.width = img.width || 64;
-                    canvas.height = img.height || 64;
+                    canvas.width = 64;
+                    canvas.height = 64;
                     const ctx = canvas.getContext('2d');
-                    ctx.clearRect(0,0,canvas.width,canvas.height);
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    try {
-                        const png = canvas.toDataURL('image/png');
-                        console.log('[bookmarks] dispatching favicon PNG, length=', png.length);
-                        let dbg = document.getElementById('favicon-debug-bookmarks');
-                        if (!dbg) {
-                            dbg = document.createElement('pre');
-                            dbg.id = 'favicon-debug-bookmarks';
-                            dbg.style.position = 'fixed';
-                            dbg.style.right = '8px';
-                            dbg.style.bottom = '80px';
-                            dbg.style.background = 'rgba(0,0,0,0.6)';
-                            dbg.style.color = '#fff';
-                            dbg.style.zIndex = 9999;
-                            dbg.style.padding = '6px';
-                            dbg.style.maxWidth = '320px';
-                            dbg.style.maxHeight = '200px';
-                            dbg.style.overflow = 'auto';
-                            document.body.appendChild(dbg);
-                        }
-                        dbg.textContent = 'Favicon len: ' + png.length + '\n' + png.slice(0,120);
-                        dispatch(png);
-                    } catch(e) { console.error('[bookmarks] favicon conversion failed', e); dispatch(href); }
+                    ctx.drawImage(img, 0, 0, 64, 64);
+                    const png = canvas.toDataURL('image/png');
+                    try { if (typeof OnFaviconReady === 'function') OnFaviconReady(window.location.href, png); } catch(e){}
+                    try { if (window.OnFaviconReady) window.OnFaviconReady(window.location.href, png); } catch(e){}
+                    try { window.dispatchEvent(new CustomEvent('FaviconReady', { detail: { url: window.location.href, href: png } })); } catch(e){}
                 };
-                img.onerror = () => { dispatch(href); };
-                img.src = href;
-            } else {
-                dispatch(href);
+                img.src = link.href;
             }
-        })(href);
+        })();
 
-        // If we didn't find a per-item favicon yet and retries remain, try again shortly (native may not have populated bookmarks yet)
-        if (href === link.href && retries > 0) {
-            setTimeout(() => announceFavicon(retries - 1, delay), delay);
-        }
-    })();
 
     </script>
 </body>
