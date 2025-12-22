@@ -56,12 +56,20 @@
                 'color-danger': '#ef6a6a',
                 'color-info': '#6ac0ef',
 
-                // Navbar/Toolbar
+                // Navbar/Toolbar - COMPLETE SET
                 'toolbar-bg': 'linear-gradient(0deg, #232330, #282836)',
                 'toolbar-border': '#252532',
                 'toolbar-icon-color': '#c8c8c8',
                 'toolbar-icon-hover': '#ffffff',
                 'toolbar-icon-active': '#6C63FF',
+                'toolbar-icon-disabled': '#636074',
+                'toolbar-icon-hover-bg': '#343446',
+
+                // Address Bar
+                'address-bg': '#16151d',
+                'address-text': '#c4c2d0',
+                'address-focus-text': '#ffffff',
+                'address-focus-ring': '#343446',
 
                 // Tabs
                 'tab-bg': 'linear-gradient(180deg, #212130, #1c1c24)',
@@ -85,6 +93,30 @@
                 // Scrollbar
                 'scrollbar-track': '#1e1e2e',
                 'scrollbar-thumb': '#3d3d5c',
+
+                // Tooltip
+                'tooltip-bg': 'rgba(43, 43, 56, 0.95)',
+                'tooltip-text': '#f0f0ff',
+
+                // Buttons
+                'btn-primary-bg': '#6C63FF',
+                'btn-primary-hover': '#7a72ff',
+                'btn-secondary-bg': 'rgba(255, 255, 255, 0.1)',
+                'btn-secondary-hover': 'rgba(255, 255, 255, 0.15)',
+
+                // Session Restore Bar
+                'session-restore-bg': 'linear-gradient(180deg, #3d3d5c 0%, #2d2d44 100%)',
+                'session-restore-border': '#4a4a6a',
+                'session-restore-text': '#e4e4ef',
+                'session-restore-icon': '#9090b0',
+
+                // DRM Prompt Bar
+                'drm-bar-bg': 'linear-gradient(135deg, #5a4fcf, #7c6aef)',
+                'drm-bar-text': '#ffffff',
+                'drm-btn-bg': 'rgba(255, 255, 255, 0.15)',
+                'drm-btn-hover': 'rgba(255, 255, 255, 0.25)',
+                'drm-btn-primary-bg': '#ffffff',
+                'drm-btn-primary-text': '#5a4fcf',
 
                 // Radius (in pixels)
                 'radius-sm': '4',
@@ -131,10 +163,17 @@
                 'toolbar-icon-color': '#8b949e',
                 'toolbar-icon-hover': '#e6edf3',
                 'toolbar-icon-active': '#58a6ff',
+                'toolbar-icon-disabled': '#484f58',
+                'toolbar-icon-hover-bg': '#30363d',
 
-                'tab-bg': '#0d1117',
-                'tab-active-bg': '#21262d',
-                'tab-hover-bg': '#161b22',
+                'address-bg': '#0d1117',
+                'address-text': '#c9d1d9',
+                'address-focus-text': '#e6edf3',
+                'address-focus-ring': '#30363d',
+
+                'tab-bg': 'linear-gradient(180deg, #161b22, #0d1117)',
+                'tab-active-bg': 'linear-gradient(180deg, #21262d, #161b22)',
+                'tab-hover-bg': 'linear-gradient(180deg, #1c232c, #161b22)',
                 'tab-text': '#8b949e',
                 'tab-active-text': '#e6edf3',
 
@@ -150,6 +189,14 @@
 
                 'scrollbar-track': '#0d1117',
                 'scrollbar-thumb': '#30363d',
+
+                'tooltip-bg': 'rgba(33, 38, 45, 0.95)',
+                'tooltip-text': '#e6edf3',
+
+                'btn-primary-bg': '#238636',
+                'btn-primary-hover': '#2ea043',
+                'btn-secondary-bg': 'rgba(110, 118, 129, 0.2)',
+                'btn-secondary-hover': 'rgba(110, 118, 129, 0.3)',
 
                 'radius-sm': '6',
                 'radius-md': '8',
@@ -953,6 +1000,24 @@
             } else {
                 this.applyTheme('dark');
             }
+
+            // Listen for theme changes from other pages/tabs via localStorage
+            const self = this;
+            window.addEventListener('storage', function(e) {
+                if (e.key === 'ultralight_active_theme' && e.newValue) {
+                    self.applyTheme(e.newValue);
+                }
+            });
+
+            // Also poll for changes periodically (backup for same-origin frames)
+            this._lastThemeId = savedThemeId || 'dark';
+            setInterval(function() {
+                const currentThemeId = self.getSavedThemeId();
+                if (currentThemeId !== self._lastThemeId) {
+                    self._lastThemeId = currentThemeId;
+                    self.applyTheme(currentThemeId);
+                }
+            }, 500);
         }
 
         /**
@@ -1041,61 +1106,6 @@
             }
         }
 
-        // Update link[rel~='icon'] entries to use the provided accent color
-        updateFavicons(accentColor) {
-            try {
-                const links = document.querySelectorAll("link[rel~='icon']");
-                const hexNoHash = (accentColor || '').replace('#','');
-                links.forEach(link => {
-                    try {
-                        let href = link.getAttribute('href');
-                        if (!href) return;
-                        if (href.startsWith('data:image/svg+xml;base64,')) {
-                            const base = href.split(',')[1];
-                            const decoded = atob(base);
-                            const updated = decoded.replace(/fill=['\"]#[0-9A-Fa-f]{3,6}['\"]/g, `fill='#${hexNoHash}'`);
-                            const reencoded = btoa(updated);
-                            link.setAttribute('href', 'data:image/svg+xml;base64,' + reencoded);
-                        } else if (href.startsWith('data:image/svg+xml,')) {
-                            const decoded = decodeURIComponent(href.split(',')[1]);
-                            const updated = decoded.replace(/fill=['\"]#[0-9A-Fa-f]{3,6}['\"]/g, `fill='#${hexNoHash}'`);
-                            link.setAttribute('href', 'data:image/svg+xml,' + encodeURIComponent(updated));
-                        } else {
-                            // Plain file href; do not change
-                        }
-                    } catch (e) {
-                        // Avoid flooding console if a single link fails
-                    }
-                });
-            } catch (e) {
-                console.warn('Failed to update favicons:', e);
-            }
-        }
-
-        // Replace %23HEX occurrences inside inline <style> blocks with the accent color
-        updateStyleDataUriIcons(accentColor) {
-            try {
-                const accentHex = (accentColor || '').replace('#','');
-                const encodedHex = `%23${accentHex}`;
-                const styles = document.querySelectorAll('style');
-                styles.forEach(styleEl => {
-                    try {
-                        let t = styleEl.textContent;
-                        if (!t || t.indexOf('data:image/svg+xml') === -1) return;
-                        // Replace encoded hex patterns (%23XXXXXX)
-                        t = t.replace(/%23[0-9A-Fa-f]{3,6}/g, encodedHex);
-                        // Replace plain fill attributes (fill='#XXXXXX') if present
-                        t = t.replace(/fill=['\"]#[0-9A-Fa-f]{3,6}['\"]/g, `fill='#${accentHex}'`);
-                        styleEl.textContent = t;
-                    } catch (e) {
-                        // continue
-                    }
-                });
-            } catch (e) {
-                console.warn('Failed to update style data-uri icons:', e);
-            }
-        }
-
         /**
          * Apply a theme by ID
          */
@@ -1108,7 +1118,132 @@
 
             this.currentTheme = theme;
 
-            // Generate CSS from theme colors
+            // Complete set of CSS variables with fallback generation
+            const colors = theme.colors;
+            const completeColors = { ...colors };
+
+            // Generate missing toolbar variables from existing colors
+            if (!completeColors['toolbar-border']) {
+                completeColors['toolbar-border'] = colors['color-border-secondary'] || '#252532';
+            }
+            if (!completeColors['toolbar-icon-disabled']) {
+                completeColors['toolbar-icon-disabled'] = colors['color-text-muted'] || '#636074';
+            }
+            if (!completeColors['toolbar-icon-hover-bg']) {
+                completeColors['toolbar-icon-hover-bg'] = colors['color-bg-hover'] || '#343446';
+            }
+
+            // Generate missing address bar variables
+            if (!completeColors['address-bg']) {
+                completeColors['address-bg'] = colors['color-bg-primary'] || '#16151d';
+            }
+            if (!completeColors['address-text']) {
+                completeColors['address-text'] = colors['color-text-secondary'] || '#c4c2d0';
+            }
+            if (!completeColors['address-focus-text']) {
+                completeColors['address-focus-text'] = colors['color-text-primary'] || '#ffffff';
+            }
+            if (!completeColors['address-focus-ring']) {
+                completeColors['address-focus-ring'] = colors['color-bg-hover'] || '#343446';
+            }
+
+            // Generate missing menu variables
+            if (!completeColors['menu-border']) {
+                completeColors['menu-border'] = colors['color-border-primary'] || '#313146';
+            }
+            if (!completeColors['menu-item-hover']) {
+                completeColors['menu-item-hover'] = colors['color-bg-hover'] || '#343446';
+            }
+            if (!completeColors['menu-text']) {
+                completeColors['menu-text'] = colors['color-text-primary'] || '#e2e1ea';
+            }
+            if (!completeColors['menu-separator']) {
+                completeColors['menu-separator'] = colors['color-border-primary'] || '#3a3a4e';
+            }
+
+            // Generate missing tooltip variables
+            if (!completeColors['tooltip-bg']) {
+                completeColors['tooltip-bg'] = colors['color-bg-overlay'] || 'rgba(43, 43, 56, 0.95)';
+            }
+            if (!completeColors['tooltip-text']) {
+                completeColors['tooltip-text'] = colors['color-text-primary'] || '#f0f0ff';
+            }
+
+            // Generate missing button variables
+            if (!completeColors['btn-primary-bg']) {
+                completeColors['btn-primary-bg'] = colors['color-accent-primary'] || '#6C63FF';
+            }
+            if (!completeColors['btn-primary-hover']) {
+                completeColors['btn-primary-hover'] = colors['color-accent-hover'] || '#7a72ff';
+            }
+            if (!completeColors['btn-secondary-bg']) {
+                completeColors['btn-secondary-bg'] = 'rgba(255, 255, 255, 0.1)';
+            }
+            if (!completeColors['btn-secondary-hover']) {
+                completeColors['btn-secondary-hover'] = 'rgba(255, 255, 255, 0.15)';
+            }
+
+            // Generate missing session restore bar variables
+            if (!completeColors['session-restore-bg']) {
+                const bgActive = colors['color-bg-active'] || '#3d3d5c';
+                const bgTertiary = colors['color-bg-tertiary'] || '#2d2d44';
+                completeColors['session-restore-bg'] = `linear-gradient(180deg, ${bgActive} 0%, ${bgTertiary} 100%)`;
+            }
+            if (!completeColors['session-restore-border']) {
+                completeColors['session-restore-border'] = colors['color-border-primary'] || '#4a4a6a';
+            }
+            if (!completeColors['session-restore-text']) {
+                completeColors['session-restore-text'] = colors['color-text-primary'] || '#e4e4ef';
+            }
+            if (!completeColors['session-restore-icon']) {
+                completeColors['session-restore-icon'] = colors['color-text-tertiary'] || '#9090b0';
+            }
+
+            // Generate missing DRM bar variables
+            if (!completeColors['drm-bar-bg']) {
+                const accentPrimary = colors['color-accent-primary'] || '#6C63FF';
+                const accentSecondary = colors['color-accent-secondary'] || '#7c6aef';
+                completeColors['drm-bar-bg'] = `linear-gradient(135deg, ${accentPrimary}, ${accentSecondary})`;
+            }
+            if (!completeColors['drm-bar-text']) {
+                completeColors['drm-bar-text'] = '#ffffff';
+            }
+            if (!completeColors['drm-btn-bg']) {
+                completeColors['drm-btn-bg'] = 'rgba(255, 255, 255, 0.15)';
+            }
+            if (!completeColors['drm-btn-hover']) {
+                completeColors['drm-btn-hover'] = 'rgba(255, 255, 255, 0.25)';
+            }
+            if (!completeColors['drm-btn-primary-bg']) {
+                completeColors['drm-btn-primary-bg'] = '#ffffff';
+            }
+            if (!completeColors['drm-btn-primary-text']) {
+                completeColors['drm-btn-primary-text'] = colors['color-accent-primary'] || '#6C63FF';
+            }
+
+            // Generate tab gradient backgrounds (matching tabs and add-tab button)
+            const bgSecondary = colors['color-bg-secondary'] || '#1c1c24';
+            const bgTertiary = colors['color-bg-tertiary'] || '#232330';
+            const bgElevated = colors['color-bg-elevated'] || '#282839';
+            const bgHover = colors['color-bg-hover'] || '#343446';
+
+            if (!completeColors['tab-bg']) {
+                completeColors['tab-bg'] = `linear-gradient(180deg, ${bgTertiary}, ${bgSecondary})`;
+            }
+            if (!completeColors['tab-active-bg']) {
+                completeColors['tab-active-bg'] = `linear-gradient(180deg, ${bgElevated}, ${bgTertiary})`;
+            }
+            if (!completeColors['tab-hover-bg']) {
+                completeColors['tab-hover-bg'] = `linear-gradient(180deg, ${bgHover}, ${bgElevated})`;
+            }
+            if (!completeColors['add-tab-border']) {
+                completeColors['add-tab-border'] = colors['toolbar-border'] || colors['color-border-secondary'] || '#252532';
+            }
+            if (!completeColors['add-tab-text']) {
+                completeColors['add-tab-text'] = colors['color-text-secondary'] || '#c4c2d0';
+            }
+
+            // Generate CSS from complete colors
             let css = ':root {\n';
             for (const [key, value] of Object.entries(completeColors)) {
                 css += `    --${key}: ${value};\n`;
@@ -1118,17 +1253,6 @@
             // Apply to style element
             if (this.styleElement) {
                 this.styleElement.textContent = css;
-            }
-
-            // Update favicons and inline data-uri icons to match updated accent color
-            try {
-                const accentColor = completeColors['color-accent-primary'] || colors['color-accent-primary'];
-                if (accentColor) {
-                    this.updateFavicons(accentColor);
-                    this.updateStyleDataUriIcons(accentColor);
-                }
-            } catch (e) {
-                console.warn('Failed to update runtime favicons/icons', e);
             }
 
             // Save preference

@@ -1,47 +1,5 @@
 window.__ul_settings = window.__ul_settings || {};
 
-// Listen for theme changes to update toolbar icon colors
-window.addEventListener('themeChanged', function(e) {
-    // Get the computed style to force CSS variable recalculation
-    const computedStyle = getComputedStyle(document.documentElement);
-    const newIconColor = computedStyle.getPropertyValue('--toolbar-icon-color').trim();
-    const newDisabledColor = computedStyle.getPropertyValue('--toolbar-icon-disabled').trim();
-    
-    // Force repaint of SVG icons by explicitly setting fill from CSS variables
-    const icons = document.querySelectorAll('.icon:not(.disabled)');
-    icons.forEach(function(icon) {
-        // Clear inline style and force recalculation
-        icon.style.fill = '';
-        // Force reflow
-        void icon.offsetHeight;
-        // Apply from CSS variable
-        if (newIconColor) {
-            icon.style.fill = 'var(--toolbar-icon-color)';
-        }
-    });
-    
-    // Update disabled icons too
-    const disabledIcons = document.querySelectorAll('.icon.disabled');
-    disabledIcons.forEach(function(icon) {
-        icon.style.fill = '';
-        void icon.offsetHeight;
-        if (newDisabledColor) {
-            icon.style.fill = 'var(--toolbar-icon-disabled)';
-        }
-    });
-    
-    // Force update of session restore bar and other themed elements
-    const sessionBar = document.getElementById('session-restore-bar');
-    if (sessionBar) {
-        sessionBar.style.display = sessionBar.style.display;
-    }
-    
-    // Trigger a full document repaint for any remaining elements
-    document.body.style.display = 'none';
-    void document.body.offsetHeight;
-    document.body.style.display = '';
-});
-
 function updateBack(enable) {
 	if (enable)
 		document.getElementById("back").classList.remove("disabled");
