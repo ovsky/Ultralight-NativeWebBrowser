@@ -22,14 +22,14 @@
   align-items: center;
   justify-content: center;
   position: absolute;
-  top: 2px;
+  top: 4px; /* nudge down slightly to match tabs */
   left: 0;
   padding: 0 18px;
   border: 0.8px solid var(--add-tab-border, #252532);
   border-bottom: none;
   border-radius: 8px 8px 0 0;
   font-size: 13px;
-  height: 37px;
+  height: 33px; /* slightly shorter so it doesn't protrude */
   color: var(--add-tab-text, #c4c2d0);
   cursor: pointer;
   z-index: 100;
@@ -228,8 +228,8 @@ body.compact-tabs .chrome-tabs {
 }
 
 body.compact-tabs #chrome-tabs-add-tab {
-  height: 26px;
-  top: 1px;
+  height: 24px; /* slightly shorter in compact mode */
+  top: 2px;    /* nudge to align with compact tabs */
   padding: 0 10px;
   font-size: 11px;
   min-width: 32px;
