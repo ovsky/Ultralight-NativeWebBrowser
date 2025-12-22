@@ -1971,10 +1971,12 @@ void UI::OnOpenThemesDirectory(const JSObject &obj, const JSArgs &args)
 {
   // Open themes directory in system file explorer
   std::filesystem::path themes_dir = std::filesystem::current_path() / "data" / "themes";
+
   // Create directory if it doesn't exist
   if (!std::filesystem::exists(themes_dir)) {
     std::filesystem::create_directories(themes_dir);
   }
+
   std::string path_str = themes_dir.string();
 #ifdef _WIN32
   std::wstring wide_path(path_str.begin(), path_str.end());

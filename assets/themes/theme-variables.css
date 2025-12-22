@@ -86,11 +86,7 @@
     --tab-text: #b0afc0;
     --tab-active-text: #e0dff0;
     --tab-close-hover: rgba(255, 255, 255, 0.1);
-<<<<<<< Updated upstream
-    
-=======
 
->>>>>>> Stashed changes
     /* Add Tab Button (matches tab styling) */
     --add-tab-bg-start: #212130;
     --add-tab-bg-end: #1c1c24;
@@ -100,11 +96,7 @@
     --add-tab-active-start: #262633;
     --add-tab-active-end: #1e1e29;
     --add-tab-text: #c4c2d0;
-<<<<<<< Updated upstream
-    
-=======
 
->>>>>>> Stashed changes
     /* ============================================================
      * COMPONENT COLORS - Menu/Dropdown
      * ============================================================ */
@@ -261,8 +253,13 @@
 }
 
 @keyframes theme_fade_in {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 /* Selection styling */

@@ -1,10 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Themes</title>
-    <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA6ElEQVQ4T6WTsQ3CMBCFP0dKRUNFyQJQsoAzAitAyQJsQEVBR8kClLCAuwALUKaIFCHFii0SB4mcK+zTe//d+WzY+JiN+fwDIOkAvAG9FhG8AQfgCAxTvQVWwBnoScqB0sxeSW6wBxpxBsaS5pImwFnSQ9IcqORJcoI+sJRUkdQBLgnYIo0QBFQDlAMm8yDz1PeSpAHUEIBfyVPhZ4Bv8B+AL/g1gOeL3oLi/8sKPGcW0Ae6sY9d+hbVJcVrVNKbWVOS08w2kmaSbGZrSTkzW8V/SXKYpJaZlYdwEMDRzN5mdksDvgFQBCgRv7fNlgAAAABJRU5ErkJggg==">
+    <link rel="icon" type="image/png"
+        href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA6ElEQVQ4T6WTsQ3CMBCFP0dKRUNFyQJQsoAzAitAyQJsQEVBR8kClLCAuwALUKaIFCHFii0SB4mcK+zTe//d+WzY+JiN+fwDIOkAvAG9FhG8AQfgCAxTvQVWwBnoScqB0sxeSW6wBxpxBsaS5pImwFnSQ9IcqORJcoI+sJRUkdQBLgnYIo0QBFQDlAMm8yDz1PeSpAHUEIBfyVPhZ4Bv8B+AL/g1gOeL3oLi/8sKPGcW0Ae6sY9d+hbVJcVrVNKbWVOS08w2kmaSbGZrSTkzW8V/SXKYpJaZlYdwEMDRzN5mdksDvgFQBCgRv7fNlgAAAABJRU5ErkJggg==">
+    <link rel="icon" type="image/png"
+        href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA6ElEQVQ4T6WTsQ3CMBCFP0dKRUNFyQJQsoAzAitAyQJsQEVBR8kClLCAuwALUKaIFCHFii0SB4mcK+zTe//d+WzY+JiN+fwDIOkAvAG9FhG8AQfgCAxTvQVWwBnoScqB0sxeSW6wBxpxBsaS5pImwFnSQ9IcqORJcoI+sJRUkdQBLgnYIo0QBFQDlAMm8yDz1PeSpAHUEIBfyVPhZ4Bv8B+AL/g1gOeL3oLi/8sKPGcW0Ae6sY9d+hbVJcVrVNKbWVOS08w2kmaSbGZrSTkzW8V/SXKYpJaZlYdwEMDRzN5mdksDvgFQBCgRv7fNlgAAAABJRU5ErkJggg==">
     <link rel="stylesheet" href="themes/theme-variables.css">
     <style>
         * {
@@ -13,7 +17,8 @@
             padding: 0;
         }
 
-        html, body {
+        html,
+        body {
             height: 100%;
             overflow-x: hidden;
             overflow-y: auto !important;
@@ -31,8 +36,15 @@
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .container {
@@ -93,22 +105,80 @@
             background-repeat: no-repeat;
             background-position: center;
         }
-        .icon-folder { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z'/%3E%3C/svg%3E"); color: var(--color-text-secondary); }
-        .icon-copy { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z'/%3E%3C/svg%3E"); color: var(--color-text-secondary); }
-        .icon-save { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z'/%3E%3C/svg%3E"); color: var(--color-text-secondary); }
-        .icon-close { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z'/%3E%3C/svg%3E"); color: var(--color-text-secondary); }
-        .icon-add { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z'/%3E%3C/svg%3E"); }
-        .icon-duplicate { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z'/%3E%3C/svg%3E"); color: var(--color-text-secondary); }
-        .icon-import { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M19 10c-1.3-4-5-7-9-7-3 0-5.4 1.6-6.6 4C1.3 7.3 0 9.9 0 13c0 3.3 2.7 6 6 6h13c2.8 0 5-2.2 5-5 0-2.6-2-4.8-4.6-5zM14 13v4h-4v-4H7l5-5 5 5h-3z'/%3E%3C/svg%3E"); color: var(--color-text-secondary); }
-        .icon-check { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'/%3E%3C/svg%3E"); color: var(--color-accent-primary); }
-        .icon-edit { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E"); color: var(--color-accent-primary); }
-        .icon-code { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z'/%3E%3C/svg%3E"); color: var(--color-text-secondary); }
-        .icon-delete { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z'/%3E%3C/svg%3E"); color: var(--color-danger); }
-        .btn:hover .icon-folder { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z'/%3E%3C/svg%3E"); }
-        .btn:hover .icon-copy { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z'/%3E%3C/svg%3E"); }
-        .btn:hover .icon-save { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z'/%3E%3C/svg%3E"); }
-        .btn:hover .icon-duplicate { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z'/%3E%3C/svg%3E"); }
-        .btn:hover .icon-import { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M19 10c-1.3-4-5-7-9-7-3 0-5.4 1.6-6.6 4C1.3 7.3 0 9.9 0 13c0 3.3 2.7 6 6 6h13c2.8 0 5-2.2 5-5 0-2.6-2-4.8-4.6-5zM14 13v4h-4v-4H7l5-5 5 5h-3z'/%3E%3C/svg%3E"); }
+
+        .icon-folder {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z'/%3E%3C/svg%3E");
+            color: var(--color-text-secondary);
+        }
+
+        .icon-copy {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z'/%3E%3C/svg%3E");
+            color: var(--color-text-secondary);
+        }
+
+        .icon-save {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z'/%3E%3C/svg%3E");
+            color: var(--color-text-secondary);
+        }
+
+        .icon-close {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z'/%3E%3C/svg%3E");
+            color: var(--color-text-secondary);
+        }
+
+        .icon-add {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z'/%3E%3C/svg%3E");
+        }
+
+        .icon-duplicate {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z'/%3E%3C/svg%3E");
+            color: var(--color-text-secondary);
+        }
+
+        .icon-import {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M19 10c-1.3-4-5-7-9-7-3 0-5.4 1.6-6.6 4C1.3 7.3 0 9.9 0 13c0 3.3 2.7 6 6 6h13c2.8 0 5-2.2 5-5 0-2.6-2-4.8-4.6-5zM14 13v4h-4v-4H7l5-5 5 5h-3z'/%3E%3C/svg%3E");
+            color: var(--color-text-secondary);
+        }
+
+        .icon-check {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'/%3E%3C/svg%3E");
+            color: var(--color-accent-primary);
+        }
+
+        .icon-edit {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E");
+            color: var(--color-accent-primary);
+        }
+
+        .icon-code {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z'/%3E%3C/svg%3E");
+            color: var(--color-text-secondary);
+        }
+
+        .icon-delete {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z'/%3E%3C/svg%3E");
+            color: var(--color-danger);
+        }
+
+        .btn:hover .icon-folder {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z'/%3E%3C/svg%3E");
+        }
+
+        .btn:hover .icon-copy {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z'/%3E%3C/svg%3E");
+        }
+
+        .btn:hover .icon-save {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z'/%3E%3C/svg%3E");
+        }
+
+        .btn:hover .icon-duplicate {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z'/%3E%3C/svg%3E");
+        }
+
+        .btn:hover .icon-import {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='currentColor' viewBox='0 0 24 24'%3E%3Cpath d='M19 10c-1.3-4-5-7-9-7-3 0-5.4 1.6-6.6 4C1.3 7.3 0 9.9 0 13c0 3.3 2.7 6 6 6h13c2.8 0 5-2.2 5-5 0-2.6-2-4.8-4.6-5zM14 13v4h-4v-4H7l5-5 5 5h-3z'/%3E%3C/svg%3E");
+        }
 
         /* Buttons */
         .btn {
@@ -124,7 +194,9 @@
             transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .btn:hover { color: var(--btn-hover-icon-color, #fff); }
+        .btn:hover {
+            color: var(--btn-hover-icon-color, #fff);
+        }
 
         .btn-primary {
             background: linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-secondary));
@@ -587,14 +659,38 @@
         }
 
         /* JSON Syntax Highlighting */
-        .json-key { color: var(--color-accent-primary, #79c0ff); }
-        .json-string { color: var(--color-accent-hover, #a5d6ff); }
-        .json-number { color: var(--color-success, #56d364); }
-        .json-boolean { color: var(--color-danger, #ff7b72); }
-        .json-null { color: var(--color-danger, #ff7b72); }
-        .json-bracket { color: var(--color-text-muted, #8b949e); }
-        .json-colon { color: var(--color-text-muted, #8b949e); }
-        .json-comma { color: var(--color-text-muted, #8b949e); }
+        .json-key {
+            color: var(--color-accent-primary, #79c0ff);
+        }
+
+        .json-string {
+            color: var(--color-accent-hover, #a5d6ff);
+        }
+
+        .json-number {
+            color: var(--color-success, #56d364);
+        }
+
+        .json-boolean {
+            color: var(--color-danger, #ff7b72);
+        }
+
+        .json-null {
+            color: var(--color-danger, #ff7b72);
+        }
+
+        .json-bracket {
+            color: var(--color-text-muted, #8b949e);
+        }
+
+        .json-colon {
+            color: var(--color-text-muted, #8b949e);
+        }
+
+        .json-comma {
+            color: var(--color-text-muted, #8b949e);
+        }
+
         .json-color-preview {
             display: inline-block;
             width: 12px;
@@ -602,7 +698,7 @@
             border-radius: 3px;
             margin-right: 4px;
             vertical-align: middle;
-            border: 1px solid rgba(255,255,255,0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .json-help {
@@ -623,13 +719,15 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <header>
             <div class="header-left">
                 <div class="header-icon">
                     <svg viewBox="0 0 24 24">
-                        <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+                        <path
+                            d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
                     </svg>
                 </div>
                 <div>
@@ -648,7 +746,9 @@
             <div class="section-header">
                 <h2 class="section-title">🌙 Dark Themes</h2>
                 <button class="show-more-btn" id="toggle-dark">
-                    Show all <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+                    Show all <svg viewBox="0 0 24 24" width="16" height="16">
+                        <path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
+                    </svg>
                 </button>
             </div>
             <div class="theme-grid collapsed" id="dark-themes"></div>
@@ -729,7 +829,8 @@
                 </select>
             </div>
             <p style="font-size: 12px; color: var(--color-text-tertiary); margin-bottom: 16px;">
-                The theme will be created based on the selected theme. After creation, click "View JSON" on your theme to see and copy the color values.
+                The theme will be created based on the selected theme. After creation, click "View JSON" on your theme
+                to see and copy the color values.
             </p>
             <div class="modal-actions">
                 <button class="btn btn-secondary" id="btn-modal-cancel">Cancel</button>
@@ -777,7 +878,7 @@
 
     <script src="themes/theme.js"></script>
     <script>
-        (function() {
+        (function () {
             'use strict';
 
             // DOM Elements
@@ -802,8 +903,18 @@
                 }
                 renderThemes();
                 setupEventListeners();
+
+                // Listen for theme changes from other tabs/windows
+                window.addEventListener('storage', (e) => {
+                    if (e.key === 'ultralight_custom_themes' || e.key === 'ultralight_active_theme') {
+                        if (window.ThemeManager) {
+                            window.ThemeManager.loadCustomThemes();
+                        }
+                        renderThemes();
+                    }
+                });
 <<<<<<< Updated upstream
-                
+
 =======
 
 >>>>>>> Stashed changes
@@ -1122,9 +1233,9 @@
                 if (!str || typeof str !== 'string') return false;
                 // Check for hex colors, rgb, rgba, hsl, hsla, or named colors
                 return /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/.test(str) ||
-                       /^rgba?\s*\(/.test(str) ||
-                       /^hsla?\s*\(/.test(str) ||
-                       /^linear-gradient/.test(str);
+                    /^rgba?\s*\(/.test(str) ||
+                    /^hsla?\s*\(/.test(str) ||
+                    /^linear-gradient/.test(str);
             }
 
             // Syntax highlight JSON with color previews
@@ -1134,7 +1245,7 @@
                     .replace(/</g, '&lt;')
                     .replace(/>/g, '&gt;');
 <<<<<<< Updated upstream
-                
+
 =======
 
 >>>>>>> Stashed changes
@@ -1152,28 +1263,28 @@
                         return `${indent}<span class="json-key">"${key}"</span><span class="json-colon">:</span> <span class="json-string">"${value}"</span>${comma}`;
                     }
 <<<<<<< Updated upstream
-                    
+
                     // Handle other string values
                     line = line.replace(/^(\s*)"([^"]+)":\s*"([^"]*)"(,?)$/g, '$1<span class="json-key">"$2"</span><span class="json-colon">:</span> <span class="json-string">"$3"</span>$4');
-                    
+
                     // Handle numbers
                     line = line.replace(/:\s*(\d+\.?\d*)(,?)$/g, ': <span class="json-number">$1</span>$2');
-                    
+
                     // Handle booleans
                     line = line.replace(/:\s*(true|false)(,?)$/g, ': <span class="json-boolean">$1</span>$2');
-                    
+
                     // Handle null
                     line = line.replace(/:\s*(null)(,?)$/g, ': <span class="json-null">$1</span>$2');
-                    
+
                     // Handle brackets
                     line = line.replace(/([\[\]{}])/g, '<span class="json-bracket">$1</span>');
-                    
+
                     // Handle standalone keys (objects)
                     line = line.replace(/^(\s*)"([^"]+)":\s*(<span class="json-bracket">)/g, '$1<span class="json-key">"$2"</span><span class="json-colon">:</span> $3');
-                    
+
                     return line;
                 });
-                
+
 =======
 
                     // Handle other string values
@@ -1215,7 +1326,7 @@
             function deleteTheme(themeId) {
                 console.log('Delete theme called with ID:', themeId);
 <<<<<<< Updated upstream
-                
+
 =======
 
 >>>>>>> Stashed changes
@@ -1224,10 +1335,10 @@
                     return;
                 }
 <<<<<<< Updated upstream
-                
+
                 const theme = window.ThemeManager.getTheme(themeId);
                 console.log('Found theme:', theme);
-                
+
 =======
 
                 const theme = window.ThemeManager.getTheme(themeId);
@@ -1239,7 +1350,7 @@
                     return;
                 }
 <<<<<<< Updated upstream
-                
+
 =======
 
 >>>>>>> Stashed changes
@@ -1248,11 +1359,11 @@
                     return;
                 }
 <<<<<<< Updated upstream
-                
+
                 // Use a simple approach - just delete without confirm since confirm() may not work in Ultralight
                 const success = window.ThemeManager.deleteTheme(themeId);
                 console.log('Delete result:', success);
-                
+
 =======
 
                 // Use a simple approach - just delete without confirm since confirm() may not work in Ultralight
@@ -1312,4 +1423,5 @@
         })();
     </script>
 </body>
+
 </html>

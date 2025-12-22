@@ -9,10 +9,14 @@
     <link rel="stylesheet" type="text/css" href="ui.css">
     <link rel="stylesheet" href="themes/theme-variables.css">
     <style>
-        * {
-        }
-
         :root {
+            /* Map local variables to global theme vars so the page follows the active theme */
+            --bg: var(--color-bg-primary, #f6f7f9);
+            --fg: var(--color-text-primary, #111);
+            --muted: var(--color-text-secondary, #666);
+            --accent: var(--color-accent-primary, #6C63FF);
+            --accent-light: var(--color-accent-light, rgba(108, 99, 255, 0.15));
+            --btn-bg: var(--color-bg-elevated, #ffffff);
             /* Map local variables to global theme vars so the page follows the active theme */
             --bg: var(--color-bg-primary, #f6f7f9);
             --fg: var(--color-text-primary, #111);
@@ -79,11 +83,11 @@
         }
 
         .btn:hover {
-            background: var(--btn-bg, #f2f2f2);
+            background: var(--btn-bg, var(--btn-bg, #f2f2f2));
         }
 
         .muted {
-            color: var(--muted, #666);
+            color: var(--muted, var(--muted, #666));
         }
 
         ul.list {
@@ -107,7 +111,7 @@
 
         .meta {
             font-size: 12px;
-            color: var(--muted, #666);
+            color: var(--muted, var(--muted, #666));
             display: flex;
             gap: 8px;
             align-items: center;
@@ -132,8 +136,25 @@
         }
 
         /* No toggle anymore */
-    @keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
-    @-webkit-keyframes ul_fade_in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes ul_fade_in {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @-webkit-keyframes ul_fade_in {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
     </style>
     <script defer src="themes/theme.js"></script>
 </head>
@@ -153,11 +174,6 @@
         </section>
     </div>
 
-<<<<<<< Updated upstream
-    
-=======
-
->>>>>>> Stashed changes
     <script>
         function render(data) {
             const list = document.getElementById('history-list');
