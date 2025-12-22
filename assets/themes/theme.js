@@ -1183,6 +1183,92 @@
                 completeColors['btn-secondary-hover'] = 'rgba(255, 255, 255, 0.15)';
             }
 
+            // Ensure a color-accent-light exists for glows and shadows (derived from accent color)
+            if (!completeColors['color-accent-light']) {
+                const accentHex = colors['color-accent-primary'] || colors['color-accent'] || completeColors['btn-primary-bg'];
+                function hexToRgb(hex) {
+                    if (!hex) return null;
+                    const clean = hex.replace('#','');
+                    if (clean.length === 3) {
+                        const r = parseInt(clean[0] + clean[0], 16);
+                        const g = parseInt(clean[1] + clean[1], 16);
+                        const b = parseInt(clean[2] + clean[2], 16);
+                        return {r,g,b};
+                    }
+                    if (clean.length === 6) {
+                        const r = parseInt(clean.substring(0,2), 16);
+                        const g = parseInt(clean.substring(2,4), 16);
+                        const b = parseInt(clean.substring(4,6), 16);
+                        return {r,g,b};
+                    }
+                    return null;
+                }
+                let rgbaVal = 'rgba(108, 99, 255, 0.15)';
+                if (/^#/.test(accentHex)) {
+                    const rgb = hexToRgb(accentHex);
+                    if (rgb) rgbaVal = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`;
+                }
+                completeColors['color-accent-light'] = rgbaVal;
+            }
+            // Alias for older pages that use --accent-light
+            if (!completeColors['accent-light']) {
+                completeColors['accent-light'] = completeColors['color-accent-light'];
+            }
+
+            // Provide short, consistent aliases so pages can use simple variables
+            // (avoids having to search & replace many files; pages can use --accent-color)
+            if (!completeColors['accent-color']) {
+                completeColors['accent-color'] = completeColors['color-accent-primary'] || completeColors['btn-primary-bg'] || '#6C63FF';
+            }
+            if (!completeColors['accent-hover']) {
+                completeColors['accent-hover'] = completeColors['color-accent-hover'] || completeColors['btn-primary-hover'] || completeColors['color-accent-secondary'] || '#8a83ff';
+            }
+            // Legacy alias
+            if (!completeColors['accent']) {
+                completeColors['accent'] = completeColors['accent-color'];
+            }
+            // Short aliases for buttons
+            if (!completeColors['btn-bg']) {
+                completeColors['btn-bg'] = completeColors['btn-primary-bg'] || completeColors['accent-color'];
+            }
+            if (!completeColors['btn-hover-bg']) {
+                completeColors['btn-hover-bg'] = completeColors['btn-primary-hover'] || completeColors['accent-hover'];
+            }
+
+            // Shadow aliases derived from accent color for stronger visual parity with Themes page
+            if (!completeColors['accent-shadow']) {
+                const accentHex2 = colors['color-accent-primary'] || colors['color-accent'] || completeColors['accent-color'];
+                function hexToRgbLocal(hex) {
+                    if (!hex) return null;
+                    const clean = hex.replace('#','');
+                    if (clean.length === 3) {
+                        return {
+                            r: parseInt(clean[0] + clean[0], 16),
+                            g: parseInt(clean[1] + clean[1], 16),
+                            b: parseInt(clean[2] + clean[2], 16)
+                        };
+                    }
+                    if (clean.length === 6) {
+                        return {
+                            r: parseInt(clean.substring(0,2), 16),
+                            g: parseInt(clean.substring(2,4), 16),
+                            b: parseInt(clean.substring(4,6), 16)
+                        };
+                    }
+                    return null;
+                }
+                const rgb2 = hexToRgbLocal(accentHex2);
+                if (rgb2) {
+                    completeColors['accent-shadow'] = `rgba(${rgb2.r}, ${rgb2.g}, ${rgb2.b}, 0.30)`;
+                    completeColors['accent-shadow-strong'] = `rgba(${rgb2.r}, ${rgb2.g}, ${rgb2.b}, 0.40)`;
+                    completeColors['accent-shadow-subtle'] = `rgba(${rgb2.r}, ${rgb2.g}, ${rgb2.b}, 0.12)`;
+                } else {
+                    completeColors['accent-shadow'] = 'rgba(108, 99, 255, 0.30)';
+                    completeColors['accent-shadow-strong'] = 'rgba(108, 99, 255, 0.40)';
+                    completeColors['accent-shadow-subtle'] = 'rgba(108, 99, 255, 0.12)';
+                }
+            }
+
             // Generate missing session restore bar variables
             if (!completeColors['session-restore-bg']) {
                 const bgActive = colors['color-bg-active'] || '#3d3d5c';
