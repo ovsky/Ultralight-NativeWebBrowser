@@ -451,6 +451,20 @@ header {
 /* Move the overlap to the tabs so the toolbar stays visually stable */
 .chrome-tabs { margin-bottom: -2px; }
 #bar { margin-top: 2px; }
+
+/* Remove any residual right-edge overlay artifact (fixes light tint in top-right corner) */
+/* Hide known overlay elements and ensure scroll corner is transparent */
+.chrome-tabs .chrome-tabs-bottom-bar,
+.right-edge-overlay,
+.edge-overlay,
+.toolbar-right-overlay { display: none !important; }
+
+/* Remove any unexpected box-shadows that might create a light rectangle */
+body, .chrome-tabs, #bar { box-shadow: none !important; }
+
+/* Ensure scrollbar corner and track don't show a light color */
+::-webkit-scrollbar-corner { background: transparent !important; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track, transparent) !important; }
 /* Avoid header icon visually overflowing buttons */
 header h1 { z-index: 1; }
 header .header-actions { z-index: 2; }
