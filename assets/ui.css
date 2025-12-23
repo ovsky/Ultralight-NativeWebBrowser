@@ -450,7 +450,7 @@ header {
 /* Slight overlap to remove small gap between chrome-tabs and toolbar */
 /* Move the overlap to the tabs so the toolbar stays visually stable */
 .chrome-tabs { margin-bottom: -2px; }
-#bar { margin-top: 0; }
+#bar { margin-top: 2px; }
 /* Avoid header icon visually overflowing buttons */
 header h1 { z-index: 1; }
 header .header-actions { z-index: 2; }
