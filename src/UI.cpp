@@ -1011,15 +1011,42 @@ void UI::LoadCachedStartPage()
 {
   // Pre-load the start page HTML into memory for instant tab creation
   // This eliminates file I/O delay when opening new tabs
-  std::ifstream in("assets/static-sties/google-static.html", std::ios::in | std::ios::binary);
+  
+  // Get current working directory to construct absolute path
+  char cwd_buf[1024] = {0};
+#ifdef _WIN32
+  _getcwd(cwd_buf, sizeof(cwd_buf));
+#else
+  getcwd(cwd_buf, sizeof(cwd_buf));
+#endif
+  
+  std::string cwd(cwd_buf);
+  std::string file_path = cwd + "/assets/static-sties/google-static.html";
+  
+  std::ifstream in(file_path, std::ios::in | std::ios::binary);
   if (!in.is_open())
   {
-    // Fallback to a minimal dark page if file not found
-    cached_start_page_html_ = R"(<!DOCTYPE html><html><head><title>New Tab</title>
-      <style>body,html{margin:0;padding:0;height:100%;background:#202124;}</style>
-      </head><body></body></html>)";
-    return;
+    // Try alternative path (in case assets folder is in a different location)
+    std::string alt_path = cwd + "/../assets/static-sties/google-static.html";
+    in.open(alt_path, std::ios::in | std::ios::binary);
+    
+    if (!in.is_open())
+    {
+      // Last resort: try new_tab_page.html
+      std::string fallback_path = cwd + "/assets/new_tab_page.html";
+      in.open(fallback_path, std::ios::in | std::ios::binary);
+      
+      if (!in.is_open())
+      {
+        // Final fallback: minimal dark page if file not found
+        cached_start_page_html_ = R"(<!DOCTYPE html><html><head><title>New Tab</title>
+          <style>body,html{margin:0;padding:0;height:100%;background:#202124;}</style>
+          </head><body></body></html>)";
+        return;
+      }
+    }
   }
+  
   std::ostringstream ss;
   ss << in.rdbuf();
   cached_start_page_html_ = ss.str();
@@ -1047,9 +1074,29 @@ void UI::LoadCachedInternalPages()
       "file:///about.html",
       "file:///new_tab_page.html"};
 
+  // Get current working directory to construct absolute paths
+  char cwd_buf[1024] = {0};
+#ifdef _WIN32
+  _getcwd(cwd_buf, sizeof(cwd_buf));
+#else
+  getcwd(cwd_buf, sizeof(cwd_buf));
+#endif
+  
+  std::string cwd(cwd_buf);
+
   for (size_t i = 0; i < sizeof(pages) / sizeof(pages[0]); ++i)
   {
-    std::ifstream in(pages[i], std::ios::in | std::ios::binary);
+    // Try primary path
+    std::string file_path = cwd + "/" + pages[i];
+    std::ifstream in(file_path, std::ios::in | std::ios::binary);
+    
+    // If not found, try alternative path
+    if (!in.is_open())
+    {
+      file_path = cwd + "/../" + pages[i];
+      in.open(file_path, std::ios::in | std::ios::binary);
+    }
+    
     if (in.is_open())
     {
       std::ostringstream ss;
