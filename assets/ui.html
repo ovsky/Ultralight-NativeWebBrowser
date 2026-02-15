@@ -211,6 +211,7 @@
             }
 
             bar.classList.add('visible');
+            try { document.body.classList.add('session-restore-visible'); } catch (e) {}
 
             // Set up event handlers
             const restoreBtn = document.getElementById('restore-session-btn');
@@ -219,6 +220,7 @@
 
             const hideBar = () => {
                 bar.classList.remove('visible');
+                try { document.body.classList.remove('session-restore-visible'); } catch (e) {}
             };
 
             if (restoreBtn) {
@@ -270,6 +272,7 @@
         function hideSessionRestoreBar() {
             const bar = document.getElementById('session-restore-bar');
             if (bar) bar.classList.remove('visible');
+            try { document.body.classList.remove('session-restore-visible'); } catch (e) {}
         }
 
         function bindCallbacks() {

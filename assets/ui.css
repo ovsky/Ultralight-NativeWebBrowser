@@ -371,20 +371,23 @@ body.compact-tabs #toggle-downloads .downloads-badge {
 
 /* Session Restore Bar */
 #session-restore-bar {
+     --session-restore-height: 48px;
      display: none;
      position: fixed;
      top: 0;
      left: 0;
      right: 0;
-     background: var(--session-restore-bg, linear-gradient(180deg, #2d4a6f 0%, #1e3a5f 100%));
-     border-bottom: 1px solid var(--session-restore-border, #3d6a9f);
-     padding: var(--spacing-sm, 8px) var(--spacing-lg, 16px);
+     height: var(--session-restore-height);
+     background: var(--session-restore-bg, var(--color-bg-elevated, #23232a));
+     border-bottom: 1px solid var(--session-restore-border, rgba(255,255,255,0.04));
+     padding: 10px 16px;
      z-index: 9999;
      align-items: center;
      justify-content: space-between;
-     box-shadow: var(--card-shadow, 0 2px 8px rgba(0, 0, 0, 0.3));
-     animation: slideDown 0.3s ease-out;
-     transition: background 0.3s ease, border-color 0.3s ease;
+     box-shadow: none;
+     animation: slideDown 0.18s ease-out;
+     transition: background 0.18s ease, border-color 0.18s ease;
+     backdrop-filter: none;
 }
 
 /* Standardize buttons across pages using theme variables */
@@ -621,42 +624,37 @@ header .header-actions { z-index: 2; }
 }
 
 #session-restore-bar .restore-btn {
-     padding: 6px 14px;
-     border-radius: 10px;
+     padding: 6px 12px;
+     border-radius: 8px;
      border: none;
      font-size: var(--font-size-sm, 12px);
-     font-weight: var(--font-weight-medium, 500);
+     font-weight: var(--font-weight-medium, 600);
      cursor: pointer;
-     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+     transition: background 0.12s ease, transform 0.08s ease;
 }
 
-#session-restore-bar .restore-btn:hover {
-     transform: translateY(-1px);
-}
+#session-restore-bar .restore-btn:hover { transform: none; }
 
-#session-restore-bar .restore-btn:active {
-     transform: translateY(0);
-}
+#session-restore-bar .restore-btn:active { transform: none; }
 
 #session-restore-bar .restore-btn.primary {
-     background: var(--btn-primary-bg, #4a9eff);
-     color: var(--btn-primary-text, white);
-     box-shadow: 0 3px 10px var(--accent-shadow-subtle, rgba(0,0,0,0.12));
+     background: var(--accent-color, var(--color-accent-primary, #6C63FF));
+     color: #fff;
+     box-shadow: none;
 }
 
 #session-restore-bar .restore-btn.primary:hover {
-     background: var(--btn-primary-hover, #5aadff);
-     box-shadow: 0 6px 18px var(--accent-shadow, rgba(108,99,255,0.30));
+     background: var(--accent-hover, #8a83ff);
 }
 
 #session-restore-bar .restore-btn.secondary {
-     background: var(--btn-secondary-bg, rgba(255, 255, 255, 0.1));
-     color: var(--btn-secondary-text, #c0d0e0);
-     border: 1px solid var(--btn-secondary-border, rgba(255, 255, 255, 0.2));
+     background: transparent;
+     color: var(--session-restore-text, #c8cbd6);
+     border: 1px solid rgba(255,255,255,0.04);
 }
 
 #session-restore-bar .restore-btn.secondary:hover {
-     background: var(--btn-secondary-hover, rgba(255, 255, 255, 0.15));
+     background: rgba(255,255,255,0.02);
 }
 
 #session-restore-bar .dismiss-btn {
@@ -673,8 +671,18 @@ header .header-actions { z-index: 2; }
 }
 
 #session-restore-bar .dismiss-btn:hover {
-     background: var(--btn-secondary-bg, rgba(255, 255, 255, 0.1));
-     color: var(--btn-secondary-text, #c0d0e0);
+     background: rgba(255,255,255,0.02);
+     color: var(--session-restore-text, #c8cbd6);
+}
+
+/* When the session restore bar is visible, push the toolbar down so it doesn't overlap */
+body.session-restore-visible #bar {
+     margin-top: calc(var(--session-restore-height, 48px) + 6px);
+     transition: margin-top 0.18s ease-out;
+}
+
+#bar {
+     transition: margin-top 0.18s ease-out;
 }
 
 .shortcut-badge {
