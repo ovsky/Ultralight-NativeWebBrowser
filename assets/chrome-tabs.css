@@ -7,7 +7,7 @@
   padding: 0.38em 1.2em 0.0em 1.2em;
   border-radius: 0.5em 0.5em 0 0;
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-family: var(--font-family-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol");
 }
 
 .chrome-tabs * {
@@ -17,32 +17,33 @@
 }
 
 #chrome-tabs-add-tab {
-  background: linear-gradient(180deg, #212130, #1c1c24);
+  background: var(--tab-bg, linear-gradient(180deg, #212130, #1c1c24));
   display: flex;
   align-items: center;
   justify-content: center;
   position: absolute;
-  top: 2px;
+  top: 4px; /* nudge down slightly to match tabs */
   left: 0;
   padding: 0 18px;
-  border: 0.8px solid #252532;
+  border: 0.8px solid var(--add-tab-border, #252532);
   border-bottom: none;
   border-radius: 8px 8px 0 0;
   font-size: 13px;
-  height: 37px;
-  color: #c4c2d0 !important;
+  height: 33px; /* slightly shorter so it doesn't protrude */
+  color: var(--add-tab-text, #c4c2d0);
   cursor: pointer;
   z-index: 100;
   min-width: 40px;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium, 500);
+  transition: background 0.1s ease-out, transform 0.1s ease-out;
 }
 
 #chrome-tabs-add-tab:hover {
-  background: linear-gradient(180deg, #2d2d3d, #323242);
+  background: var(--tab-hover-bg, linear-gradient(180deg, #2d2d3d, #323242));
 }
 
 #chrome-tabs-add-tab:active {
-  background: linear-gradient(180deg, #262633, #1e1e29);
+  background: var(--tab-active-bg, linear-gradient(180deg, #313141, #282836));
   box-shadow: none;
   transform: translateY(2px);
 }
@@ -54,7 +55,7 @@
   left: 0;
   width: 100%;
   z-index: 20;
-  border-bottom: 0.8px solid #252532;
+  border-bottom: 0.8px solid var(--toolbar-border, #252532);
 }
 
 .chrome-tabs .chrome-tabs-content {
@@ -73,7 +74,7 @@
   margin: 0;
   z-index: 1;
   top: 2px;
-  color: #c4c2d0;
+  color: var(--tab-text, #c4c2d0);
 }
 
 .chrome-tabs .chrome-tab,
@@ -93,7 +94,7 @@
 
   width: calc(100% - 8px);
   height: 100%;
-  background: linear-gradient(180deg, #212130, #1c1c24);
+  background: var(--tab-bg, linear-gradient(180deg, #212130, #1c1c24));
   border-radius: 8px 8px 0 0;
   margin: 2px 4px 4px 4px;
 }
@@ -110,19 +111,19 @@
 }
 
 .chrome-tabs .chrome-tab .chrome-tab-background>svg .chrome-tab-background {
-  fill: #c4c2d0;
+  fill: var(--tab-text, #c4c2d0);
   transform: translateX(0.25px) translateY(0.25px);
 }
 
 .chrome-tabs .chrome-tab.chrome-tab-current {
   z-index: 999;
-  color: white;
+  color: var(--tab-active-text, white);
 }
 
 .chrome-tabs .chrome-tab.chrome-tab-current .chrome-tab-background {
-  background: linear-gradient(180deg, #313141, #282836);
+  background: var(--tab-active-bg, linear-gradient(180deg, #313141, #282836));
   /*box-shadow: 0px 1px 2px 1px rgba(0, 0, 0, 0.4); */
-  border: 0.7px solid #292934;
+  border: 0.7px solid var(--color-border-secondary, #292934);
   border-bottom: none;
 }
 
@@ -208,10 +209,11 @@
   z-index: 2;
   right: 1.4em;
   top: 11px;
+  color: var(--color-text-muted);
 }
 
 .chrome-tabs .chrome-tab-close::before {
-  content: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'><path stroke='%235a5a5a' stroke-width='1.3' d='M4 4 L10 10 M10 4 L4 10'></path></svg>");
+  content: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'><path stroke='currentColor' stroke-width='1.3' d='M4 4 L10 10 M10 4 L4 10'></path></svg>");
   position: absolute;
   display: block;
   top: 0;
@@ -226,8 +228,8 @@ body.compact-tabs .chrome-tabs {
 }
 
 body.compact-tabs #chrome-tabs-add-tab {
-  height: 26px;
-  top: 1px;
+  height: 24px; /* slightly shorter in compact mode */
+  top: 2px;    /* nudge to align with compact tabs */
   padding: 0 10px;
   font-size: 11px;
   min-width: 32px;
@@ -274,15 +276,16 @@ body.compact-tabs .chrome-tabs .chrome-tab-close {
 
 .chrome-tabs .chrome-tab-close:hover::before,
 .chrome-tabs .chrome-tab-close:hover:active::before {
-  content: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'><path stroke='%23fff' stroke-width='1.3' d='M4 4 L10 10 M10 4 L4 10'></path></svg>");
+  content: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'><path stroke='currentColor' stroke-width='1.3' d='M4 4 L10 10 M10 4 L4 10'></path></svg>");
 }
 
 .chrome-tabs .chrome-tab-close:hover {
-  background: #e25c4b;
+  background: var(--color-danger, #e25c4b);
+  color: var(--color-text-on-danger, #fff);
 }
 
 .chrome-tabs .chrome-tab-close:hover:active {
-  background: #b74a3b;
+  background: var(--color-danger-bg, #b74a3b);
 }
 
 #chrome-tabs-add-tab:focus {

@@ -114,7 +114,7 @@ private:
     DownloadId next_id_ = 1;
     std::map<DownloadId, DownloadRecord> records_;
     std::unordered_map<DownloadId, ActiveDownload> active_;
-    std::unordered_map<DownloadId, DownloadId> external_to_internal_id_;  // Maps Ultralight's ID to our internal ID
+    std::unordered_map<DownloadId, DownloadId> external_to_internal_id_; // Maps Ultralight's ID to our internal ID
     uint64_t start_sequence_counter_ = 0;
     uint64_t last_started_sequence_ = 0;
     std::function<void()> on_change_;

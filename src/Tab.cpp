@@ -21,10 +21,10 @@ Tab::Tab(UI *ui, uint64_t id, uint32_t width, uint32_t height, int x, int y,
   // Create a ViewConfig with the user agent - always set one
   ultralight::ViewConfig cfg;
   cfg.initial_device_scale = ui->window_->scale();
-  
+
   // Apply view settings from browser settings
   cfg.enable_javascript = view_settings.enable_javascript;
-  
+
   // Match acceleration/display settings with main UI view to avoid GPU driver issues
   // But allow user to override via settings (hardware_acceleration)
   if (ui->overlay_ && ui->overlay_->view())
@@ -33,7 +33,7 @@ Tab::Tab(UI *ui, uint64_t id, uint32_t width, uint32_t height, int x, int y,
     cfg.is_accelerated = ui->overlay_->view()->is_accelerated() && view_settings.hardware_acceleration;
     cfg.display_id = ui->overlay_->view()->display_id();
   }
-  
+
   // Always set a user agent - use provided one or fall back to a Chromium-like default
   if (!user_agent.empty())
   {
@@ -234,14 +234,24 @@ void Tab::OnAddConsoleMessage(View *caller, const ConsoleMessage &msg)
   std::string m = u.data() ? u.data() : "";
   auto src = msg.source_id().utf8();
   std::string source = src.data() ? src.data() : "";
-  
-  const char* level_str = "LOG";
-  switch (msg.level()) {
-    case kMessageLevel_Warning: level_str = "WARN"; break;
-    case kMessageLevel_Error: level_str = "ERROR"; break;
-    case kMessageLevel_Debug: level_str = "DEBUG"; break;
-    case kMessageLevel_Info: level_str = "INFO"; break;
-    default: break;
+
+  const char *level_str = "LOG";
+  switch (msg.level())
+  {
+  case kMessageLevel_Warning:
+    level_str = "WARN";
+    break;
+  case kMessageLevel_Error:
+    level_str = "ERROR";
+    break;
+  case kMessageLevel_Debug:
+    level_str = "DEBUG";
+    break;
+  case kMessageLevel_Info:
+    level_str = "INFO";
+    break;
+  default:
+    break;
   }
   std::fprintf(stderr, "[CONSOLE:%s] %s (line %u, %s)\n", level_str, m.c_str(), msg.line_number(), source.c_str());
 
@@ -330,7 +340,7 @@ void Tab::OnWindowObjectReady(View *caller, uint64_t frame_id, bool is_main_fram
   {
     // First inject XHR fix to ensure credentials are sent with requests
     // This helps with same-origin requests that might fail due to CORS quirks
-    const char* xhrFix = R"JS(
+    const char *xhrFix = R"JS(
 (function() {
   'use strict';
   // Patch XMLHttpRequest to always include credentials for same-origin requests
@@ -351,7 +361,7 @@ void Tab::OnWindowObjectReady(View *caller, uint64_t frame_id, bool is_main_fram
     }
     return result;
   };
-  
+
   // Also patch fetch to include credentials
   var originalFetch = window.fetch;
   window.fetch = function(input, init) {
@@ -362,7 +372,7 @@ void Tab::OnWindowObjectReady(View *caller, uint64_t frame_id, bool is_main_fram
     }
     return originalFetch.call(this, input, init);
   };
-  
+
   console.log('[Ultralight] XHR/Fetch credentials fix loaded');
 })();
 )JS";
@@ -371,7 +381,7 @@ void Tab::OnWindowObjectReady(View *caller, uint64_t frame_id, bool is_main_fram
     // Check if crypto.subtle exists and provide a basic polyfill if not
     // Note: This is a minimal polyfill - real crypto operations may not work correctly
     // but it prevents "undefined is not an object" errors
-    const char* cryptoPolyfill = R"JS(
+    const char *cryptoPolyfill = R"JS(
 (function() {
   'use strict';
   if (typeof window.crypto === 'undefined') {
@@ -472,9 +482,11 @@ void Tab::OnWindowObjectReady(View *caller, uint64_t frame_id, bool is_main_fram
       geoScript << R"JS(
 (function() {
   'use strict';
-  var spoofedLat = )JS" << lat << R"JS(;
-  var spoofedLng = )JS" << lng << R"JS(;
-  
+  var spoofedLat = )JS"
+                << lat << R"JS(;
+  var spoofedLng = )JS"
+                << lng << R"JS(;
+
   // Create a fake GeolocationPosition object
   function createPosition() {
     return {
@@ -490,7 +502,7 @@ void Tab::OnWindowObjectReady(View *caller, uint64_t frame_id, bool is_main_fram
       timestamp: Date.now()
     };
   }
-  
+
   // Override getCurrentPosition
   var originalGetCurrentPosition = navigator.geolocation.getCurrentPosition;
   navigator.geolocation.getCurrentPosition = function(success, error, options) {
@@ -499,7 +511,7 @@ void Tab::OnWindowObjectReady(View *caller, uint64_t frame_id, bool is_main_fram
       success(createPosition());
     }, 100);
   };
-  
+
   // Override watchPosition
   var watchId = 0;
   var watches = {};
@@ -511,7 +523,7 @@ void Tab::OnWindowObjectReady(View *caller, uint64_t frame_id, bool is_main_fram
     }, 1000);
     return id;
   };
-  
+
   // Override clearWatch
   navigator.geolocation.clearWatch = function(id) {
     if (watches[id]) {
@@ -519,18 +531,18 @@ void Tab::OnWindowObjectReady(View *caller, uint64_t frame_id, bool is_main_fram
       delete watches[id];
     }
   };
-  
+
   console.log('[Ultralight] Location spoofing enabled:', spoofedLat, spoofedLng);
 })();
 )JS";
       caller->EvaluateScript(String(geoScript.str().c_str()), nullptr);
     }
-    
+
     // Inject Do Not Track (DNT) header simulation if enabled in settings
     // This overrides navigator.doNotTrack to report the user's preference
     if (ui_->do_not_track_enabled())
     {
-      const char* dntScript = R"JS(
+      const char *dntScript = R"JS(
 (function() {
   'use strict';
   // Set Do Not Track property to '1' (enabled)
@@ -559,18 +571,18 @@ void Tab::OnWindowObjectReady(View *caller, uint64_t frame_id, bool is_main_fram
 )JS";
       caller->EvaluateScript(String(dntScript), nullptr);
     }
-    
+
     // Block third-party cookie access if enabled in settings
     // This is a best-effort approach since true cookie blocking requires network-level control
     if (ui_->block_third_party_cookies_enabled())
     {
-      const char* cookieBlockScript = R"JS(
+      const char *cookieBlockScript = R"JS(
 (function() {
   'use strict';
   // Monitor and log third-party cookie attempts
   var originalDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie');
   var topOrigin = window.top.location.origin;
-  
+
   Object.defineProperty(document, 'cookie', {
     get: function() {
       return originalDescriptor.get.call(this);
@@ -659,7 +671,7 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
       global["exportPasswords"] = BindJSCallback(&Tab::JS_ExportPasswords);
       global["importPasswords"] = BindJSCallback(&Tab::JS_ImportPasswords);
       global["isDarkModeEnabled"] = BindJSCallbackWithRetval(&Tab::JS_IsDarkModeEnabled);
-      
+
       // Notify the page that native bindings are ready, so it can reload passwords
       caller->EvaluateScript("(function(){ if(typeof loadPasswords === 'function') loadPasswords(); })();", nullptr);
     }
@@ -678,7 +690,7 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
     global["__ul_toggleDarkMode"] = BindJSCallback(&Tab::JS_ToggleDarkMode);
     global["__ul_isDarkModeEnabled"] = BindJSCallbackWithRetval(&Tab::JS_IsDarkModeEnabled);
     global["__ul_getAppInfo"] = BindJSCallbackWithRetval(&Tab::JS_GetAppInfo);
-    
+
     // Bookmark bridge functions
     global["getBookmarks"] = BindJSCallbackWithRetval(&Tab::JS_GetBookmarks);
     global["getBookmarkBar"] = BindJSCallbackWithRetval(&Tab::JS_GetBookmarkBar);
@@ -686,6 +698,8 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
     global["removeBookmark"] = BindJSCallback(&Tab::JS_RemoveBookmark);
     global["isBookmarked"] = BindJSCallbackWithRetval(&Tab::JS_IsBookmarked);
     global["toggleBookmark"] = BindJSCallback(&Tab::JS_ToggleBookmark);
+    global["reorderBookmarks"] = BindJSCallback(&Tab::JS_ReorderBookmarks);
+    global["updateBookmark"] = BindJSCallbackWithRetval(&Tab::JS_UpdateBookmark);
 
     const char *attachScript = R"JS((function(){
       try{
@@ -792,19 +806,19 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
         SetJSContext(ctx->ctx());
         JSObject global = JSGlobalObject();
         global["NativeFaviconFetched"] = BindJSCallback(&Tab::OnFaviconFetched);
-        
+
         const char *faviconScript = R"JS((function(){
           if (window.__ul_favicon_fetched) return;
           window.__ul_favicon_fetched = true;
-          
+
           function fetchFavicon() {
             var pageUrl = window.location.href;
             var origin = window.location.origin;
-            
+
             // Try to find favicon in page head
             var iconLinks = document.querySelectorAll('link[rel*="icon"]');
             var faviconUrl = null;
-            
+
             // Priority: apple-touch-icon > icon > shortcut icon
             for (var i = 0; i < iconLinks.length; i++) {
               var link = iconLinks[i];
@@ -817,12 +831,12 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
                 }
               }
             }
-            
+
             // Fallback to /favicon.ico
             if (!faviconUrl) {
               faviconUrl = origin + '/favicon.ico';
             }
-            
+
             // Fetch and convert to data URL
             var img = new Image();
             img.crossOrigin = 'anonymous';
@@ -866,7 +880,7 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
             };
             img.src = faviconUrl;
           }
-          
+
           // Run after a short delay to let page set up icons
           setTimeout(fetchFavicon, 100);
         })();)JS";
@@ -886,7 +900,7 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
         RefPtr<JSContext> ctx = caller->LockJSContext();
         SetJSContext(ctx->ctx());
         JSObject global = JSGlobalObject();
-        
+
         // Bind password manager callbacks
         global["NativePasswordFormDetected"] = BindJSCallback(&Tab::OnPasswordFormDetected);
         global["NativePasswordFormSubmitted"] = BindJSCallback(&Tab::OnPasswordFormSubmitted);
@@ -898,29 +912,29 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
         const char *passwordScript = R"JS((function(){
           if (window.__ul_password_manager_installed) return;
           window.__ul_password_manager_installed = true;
-          
+
           var origin = window.location.origin;
           var pendingForms = [];
           var lastSubmittedCredentials = null;
-          
+
           // Find password fields
           function findPasswordFields() {
             return document.querySelectorAll('input[type="password"]');
           }
-          
+
           // Find associated username field for a password field
           function findUsernameField(passwordField) {
             var form = passwordField.closest('form');
             var fields = form ? form.querySelectorAll('input') : document.querySelectorAll('input');
             var usernameTypes = ['text', 'email', 'tel'];
             var usernameNames = ['user', 'email', 'login', 'name', 'account', 'id'];
-            
+
             for (var i = 0; i < fields.length; i++) {
               var f = fields[i];
               if (f === passwordField) continue;
               var type = (f.type || '').toLowerCase();
               var name = ((f.name || '') + (f.id || '')).toLowerCase();
-              
+
               if (usernameTypes.indexOf(type) >= 0) {
                 for (var j = 0; j < usernameNames.length; j++) {
                   if (name.indexOf(usernameNames[j]) >= 0) {
@@ -935,22 +949,22 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
             }
             return null;
           }
-          
+
           // Create autofill dropdown
           var dropdown = null;
           function showAutofillDropdown(field, suggestions) {
             hideAutofillDropdown();
             if (!suggestions || suggestions.length === 0) return;
-            
+
             dropdown = document.createElement('div');
             dropdown.className = '__ul_password_dropdown';
             dropdown.style.cssText = 'position:absolute;z-index:999999;background:#fff;border:1px solid #ccc;border-radius:4px;box-shadow:0 2px 10px rgba(0,0,0,0.2);max-height:200px;overflow-y:auto;min-width:200px;';
-            
+
             var rect = field.getBoundingClientRect();
             dropdown.style.top = (window.scrollY + rect.bottom + 2) + 'px';
             dropdown.style.left = (window.scrollX + rect.left) + 'px';
             dropdown.style.width = Math.max(rect.width, 200) + 'px';
-            
+
             suggestions.forEach(function(s) {
               var item = document.createElement('div');
               item.style.cssText = 'padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee;';
@@ -967,23 +981,23 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
               });
               dropdown.appendChild(item);
             });
-            
+
             document.body.appendChild(dropdown);
           }
-          
+
           function hideAutofillDropdown() {
             if (dropdown && dropdown.parentNode) {
               dropdown.parentNode.removeChild(dropdown);
             }
             dropdown = null;
           }
-          
+
           function escapeHtml(text) {
             var div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
           }
-          
+
           // Fill form with credentials
           window.__ul_fill_password_form = function(username, password) {
             var pwFields = findPasswordFields();
@@ -999,14 +1013,14 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
               pwField.dispatchEvent(new Event('change', {bubbles: true}));
             });
           };
-          
+
           // Submit credentials to native
           function submitCredentials(username, password) {
             // Avoid duplicate submissions
             var credKey = username + '|' + password;
             if (lastSubmittedCredentials === credKey) return;
             lastSubmittedCredentials = credKey;
-            
+
             if (username && password && window.NativePasswordFormSubmitted) {
               console.log('[PasswordManager] Submitting credentials for:', origin, username);
               window.NativePasswordFormSubmitted(JSON.stringify({
@@ -1016,23 +1030,23 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
               }));
             }
           }
-          
+
           // Detect and handle password forms
           function setupPasswordFields() {
             var pwFields = findPasswordFields();
             if (pwFields.length === 0) return;
-            
+
             // Notify native that we found password forms
             if (window.NativePasswordFormDetected) {
               window.NativePasswordFormDetected(JSON.stringify({origin: origin}));
             }
-            
+
             pwFields.forEach(function(pwField) {
               if (pwField.__ul_pw_setup) return;
               pwField.__ul_pw_setup = true;
-              
+
               var userField = findUsernameField(pwField);
-              
+
               // Show autofill dropdown on focus
               function showDropdown(field) {
                 if (window.NativeGetPasswordSuggestions) {
@@ -1045,31 +1059,31 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
                   } catch(e) {}
                 }
               }
-              
+
               pwField.addEventListener('focus', function() { showDropdown(pwField); });
               if (userField) {
                 userField.addEventListener('focus', function() { showDropdown(userField); });
               }
-              
+
               // Hide dropdown when clicking elsewhere
               document.addEventListener('click', function(e) {
                 if (dropdown && !dropdown.contains(e.target) && e.target !== pwField && e.target !== userField) {
                   hideAutofillDropdown();
                 }
               });
-              
+
               // Handle form submission
               var form = pwField.closest('form');
               if (form && !form.__ul_pw_submit_setup) {
                 form.__ul_pw_submit_setup = true;
-                
+
                 // Traditional form submit
                 form.addEventListener('submit', function(e) {
                   var username = userField ? userField.value : '';
                   var password = pwField.value;
                   submitCredentials(username, password);
                 });
-                
+
                 // Also capture click on submit buttons (for JS-based form handling)
                 var submitBtns = form.querySelectorAll('button[type="submit"], input[type="submit"], button:not([type])');
                 submitBtns.forEach(function(btn) {
@@ -1087,7 +1101,7 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
                   });
                 });
               }
-              
+
               // Also handle Enter key on password field
               pwField.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
@@ -1102,14 +1116,14 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
               });
             });
           }
-          
+
           // Run on page load
           if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', setupPasswordFields);
           } else {
             setupPasswordFields();
           }
-          
+
           // Also watch for dynamically added forms
           var observer = new MutationObserver(function(mutations) {
             var hasNewInputs = mutations.some(function(m) {
@@ -1120,7 +1134,7 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
             }
           });
           observer.observe(document.body || document.documentElement, {childList: true, subtree: true});
-          
+
         })();)JS";
 
         caller->EvaluateScript(passwordScript, nullptr);
@@ -1185,7 +1199,7 @@ void Tab::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const 
   // This significantly speeds up internal page loading
   auto page_url = caller->url().utf8();
   bool is_internal = page_url.data() && UI::IsBrowserInternalPage(std::string(page_url.data()));
-  
+
   if (!is_internal && ui_)
   {
     // Auto Dark Mode: if enabled, inject dark styling in this document
@@ -1600,27 +1614,29 @@ JSValue Tab::JS_AddBookmark(const JSObject &obj, const JSArgs &args)
 {
   if (!ui_ || !ui_->bookmark_store() || args.empty())
     return JSValue(0);
-  
+
   ultralight::String url_ul = args[0].ToString();
   auto url_str = url_ul.utf8();
   std::string url = url_str.data() ? url_str.data() : "";
-  
+
   std::string title;
-  if (args.size() > 1) {
+  if (args.size() > 1)
+  {
     ultralight::String title_ul = args[1].ToString();
     auto title_str = title_ul.utf8();
     title = title_str.data() ? title_str.data() : "";
   }
-  
+
   std::string favicon;
-  if (args.size() > 2) {
+  if (args.size() > 2)
+  {
     ultralight::String favicon_ul = args[2].ToString();
     auto favicon_str = favicon_ul.utf8();
     favicon = favicon_str.data() ? favicon_str.data() : "";
   }
-  
+
   bool show_on_bar = args.size() > 3 ? (bool)args[3] : true;
-  
+
   uint64_t id = ui_->bookmark_store()->AddBookmark(url, title, favicon, show_on_bar);
   return JSValue((double)id);
 }
@@ -1629,7 +1645,7 @@ void Tab::JS_RemoveBookmark(const JSObject &obj, const JSArgs &args)
 {
   if (!ui_ || !ui_->bookmark_store() || args.empty())
     return;
-  
+
   uint64_t id = static_cast<uint64_t>((double)args[0]);
   ui_->bookmark_store()->RemoveBookmark(id);
 }
@@ -1638,7 +1654,7 @@ JSValue Tab::JS_IsBookmarked(const JSObject &obj, const JSArgs &args)
 {
   if (!ui_ || !ui_->bookmark_store() || args.empty())
     return JSValue(false);
-  
+
   ultralight::String url_ul = args[0].ToString();
   auto url_str = url_ul.utf8();
   std::string url = url_str.data() ? url_str.data() : "";
@@ -1649,29 +1665,31 @@ void Tab::JS_ToggleBookmark(const JSObject &obj, const JSArgs &args)
 {
   if (!ui_ || !ui_->bookmark_store() || args.empty())
     return;
-  
+
   ultralight::String url_ul = args[0].ToString();
   auto url_str = url_ul.utf8();
   std::string url = url_str.data() ? url_str.data() : "";
-  
+
   std::string title;
-  if (args.size() > 1) {
+  if (args.size() > 1)
+  {
     ultralight::String title_ul = args[1].ToString();
     auto title_str = title_ul.utf8();
     title = title_str.data() ? title_str.data() : "";
   }
-  
+
   std::string favicon;
-  if (args.size() > 2) {
+  if (args.size() > 2)
+  {
     ultralight::String favicon_ul = args[2].ToString();
     auto favicon_str = favicon_ul.utf8();
     favicon = favicon_str.data() ? favicon_str.data() : "";
   }
-  
+
   if (ui_->bookmark_store()->IsBookmarked(url))
   {
     // Remove the bookmark
-    auto* bm = ui_->bookmark_store()->GetBookmarkByUrl(url);
+    auto *bm = ui_->bookmark_store()->GetBookmarkByUrl(url);
     if (bm)
       ui_->bookmark_store()->RemoveBookmark(bm->id);
   }
@@ -1680,6 +1698,86 @@ void Tab::JS_ToggleBookmark(const JSObject &obj, const JSArgs &args)
     // Add the bookmark
     ui_->bookmark_store()->AddBookmark(url, title, favicon, true);
   }
+}
+
+void Tab::JS_ReorderBookmarks(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || !ui_->bookmark_store() || args.empty())
+    return;
+
+  // Parse the JSON array of IDs
+  ultralight::String json_ul = args[0].ToString();
+  auto json_str = json_ul.utf8();
+  std::string json = json_str.data() ? json_str.data() : "";
+
+  std::vector<uint64_t> ordered_ids;
+
+  // Simple JSON array parsing for [id1, id2, id3, ...]
+  size_t pos = json.find('[');
+  if (pos == std::string::npos)
+    return;
+  pos++;
+
+  while (pos < json.length())
+  {
+    // Skip whitespace
+    while (pos < json.length() && std::isspace(json[pos]))
+      pos++;
+
+    if (json[pos] == ']')
+      break;
+
+    // Parse number
+    std::string num;
+    while (pos < json.length() && std::isdigit(json[pos]))
+    {
+      num += json[pos++];
+    }
+
+    if (!num.empty())
+    {
+      ordered_ids.push_back(std::stoull(num));
+    }
+
+    // Skip comma and whitespace
+    while (pos < json.length() && (json[pos] == ',' || std::isspace(json[pos])))
+      pos++;
+  }
+
+  if (!ordered_ids.empty())
+  {
+    ui_->bookmark_store()->ReorderBookmarks(ordered_ids);
+  }
+}
+
+JSValue Tab::JS_UpdateBookmark(const JSObject &obj, const JSArgs &args)
+{
+  if (!ui_ || !ui_->bookmark_store() || args.size() < 3)
+    return JSValue(false);
+
+  // Args: id, url, title
+  uint64_t id = static_cast<uint64_t>((double)args[0]);
+
+  ultralight::String url_ul = args[1].ToString();
+  auto url_str = url_ul.utf8();
+  std::string url = url_str.data() ? url_str.data() : "";
+
+  ultralight::String title_ul = args[2].ToString();
+  auto title_str = title_ul.utf8();
+  std::string title = title_str.data() ? title_str.data() : "";
+
+  // Keep existing favicon and show_on_bar settings
+  std::string favicon;
+  bool show_on_bar = true;
+
+  auto *existing = ui_->bookmark_store()->GetBookmarkById(id);
+  if (existing)
+  {
+    favicon = existing->favicon;
+    show_on_bar = existing->show_on_bar;
+  }
+
+  return JSValue(ui_->bookmark_store()->UpdateBookmark(id, url, title, favicon, show_on_bar));
 }
 
 JSValue Tab::OnDownloadsGetData(const JSObject &obj, const JSArgs &args)
@@ -2114,10 +2212,10 @@ void Tab::OnFaviconFetched(const JSObject &obj, const JSArgs &args)
   // Forward favicon data to UI for caching and tab update
   if (!ui_ || args.size() < 2)
     return;
-  
+
   // Delegate to UI's OnFaviconReady which handles caching
   ui_->OnFaviconReady(obj, args);
-  
+
   // Update this tab's favicon display
   if (args[1].IsString())
   {

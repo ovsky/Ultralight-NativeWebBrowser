@@ -495,7 +495,7 @@ UI::UI(RefPtr<Window> window)
   download_manager_->SetOnChangeCallback([this]()
                                          { NotifyDownloadsChanged(); });
   download_manager_->SetWebPConversionCallback([this]()
-                                         { return settings_.convert_webp_to_png; });
+                                               { return settings_.convert_webp_to_png; });
 
   // Initialize password manager
   password_manager_ = std::make_unique<password::PasswordManager>();
@@ -523,7 +523,7 @@ UI::UI(RefPtr<Window> window)
 
   // Load history from disk
   LoadHistoryFromDisk();
-  
+
   // Load session data for crash recovery
   LoadSessionFromDisk();
 }
@@ -555,7 +555,7 @@ UI::UI(RefPtr<Window> window, AdBlocker *adblock, AdBlocker *tracker)
   download_manager_->SetOnChangeCallback([this]()
                                          { NotifyDownloadsChanged(); });
   download_manager_->SetWebPConversionCallback([this]()
-                                         { return settings_.convert_webp_to_png; });
+                                               { return settings_.convert_webp_to_png; });
 
   // Initialize password manager
   password_manager_ = std::make_unique<password::PasswordManager>();
@@ -642,7 +642,7 @@ void UI::HideDrmTab(uint64_t id)
   auto it = drm_tabs_.find(id);
   if (it == drm_tabs_.end() || !it->second)
     return;
-  it->second->Blur();  // Release focus before hiding
+  it->second->Blur(); // Release focus before hiding
   it->second->Hide();
   if (id == active_tab_id_)
   {
@@ -650,7 +650,7 @@ void UI::HideDrmTab(uint64_t id)
     if (tab_it != tabs_.end() && tab_it->second)
     {
       tab_it->second->Show();
-      tab_it->second->view()->Focus();  // Give focus back to Ultralight tab
+      tab_it->second->view()->Focus(); // Give focus back to Ultralight tab
     }
   }
   drm_tab_titles_.erase(id);
@@ -766,12 +766,12 @@ bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_init
 
   drm_tab_urls_[tab_id] = url;
   drm_tab_titles_[tab_id] = "Loading DRM System...";
-  
+
   // Show loading page in Ultralight tab while WebView2 initializes
   if (ultra_tab)
   {
     ultra_tab->view()->LoadURL("file:///drm_loading.html");
-    ultra_tab->Show();  // Keep showing the loading page
+    ultra_tab->Show(); // Keep showing the loading page
   }
   // DON'T show WebView2 yet - it will be shown when it starts loading
   // This ensures the loading page is visible while WebView2 initializes
@@ -785,7 +785,7 @@ bool UI::MaybeOpenDrmTab(uint64_t tab_id, const std::string &url, bool user_init
     {
       ultralight::String title_str("Loading DRM System...");
       ultralight::String url_str(url.c_str());
-      updateTab({tab_id, title_str, GetFaviconURL(url_str), true});  // true = loading
+      updateTab({tab_id, title_str, GetFaviconURL(url_str), true}); // true = loading
     }
     // Update URL bar
     if (tab_id == active_tab_id_)
@@ -836,7 +836,7 @@ void UI::HandleDrmLoading(uint64_t tab_id, bool is_loading)
 {
   if (tab_id == active_tab_id_)
     SetLoading(is_loading);
-  
+
   // When WebView2 starts loading content, show it and hide the Ultralight loading page
   if (is_loading)
   {
@@ -849,7 +849,7 @@ void UI::HandleDrmLoading(uint64_t tab_id, bool is_loading)
       if (tab_id == active_tab_id_ && !menu_overlay_ && !downloads_overlay_ && !context_menu_overlay_)
         drm_it->second->Show();
     }
-    
+
     // Pre-load solid background in Ultralight tab so it's ready when overlays open (no lag)
     // The background has a fast fade-in animation for smooth visual transition
     auto tab_it = tabs_.find(tab_id);
@@ -888,7 +888,7 @@ UI::~UI()
   // Save session one final time with clean_exit flag
   // This preserves tabs for restoration while indicating it was a normal shutdown
   SaveSessionToDiskWithCleanExit();
-  
+
   // Persist or clear history on shutdown based on settings
   if (clear_history_on_exit_)
   {
@@ -1029,26 +1029,24 @@ void UI::LoadCachedStartPage()
 void UI::LoadCachedInternalPages()
 {
   // Pre-load frequently used internal pages for instant loading
-  static const char* pages[] = {
-    "assets/settings.html",
-    "assets/history.html",
-    "assets/downloads.html",
-    "assets/passwords.html",
-    "assets/extensions.html",
-    "assets/about.html",
-    "assets/new_tab_page.html"
-  };
-  
-  static const char* urls[] = {
-    "file:///settings.html",
-    "file:///history.html",
-    "file:///downloads.html",
-    "file:///passwords.html",
-    "file:///extensions.html",
-    "file:///about.html",
-    "file:///new_tab_page.html"
-  };
-  
+  static const char *pages[] = {
+      "assets/settings.html",
+      "assets/history.html",
+      "assets/downloads.html",
+      "assets/passwords.html",
+      "assets/extensions.html",
+      "assets/about.html",
+      "assets/new_tab_page.html"};
+
+  static const char *urls[] = {
+      "file:///settings.html",
+      "file:///history.html",
+      "file:///downloads.html",
+      "file:///passwords.html",
+      "file:///extensions.html",
+      "file:///about.html",
+      "file:///new_tab_page.html"};
+
   for (size_t i = 0; i < sizeof(pages) / sizeof(pages[0]); ++i)
   {
     std::ifstream in(pages[i], std::ios::in | std::ios::binary);
@@ -1062,7 +1060,7 @@ void UI::LoadCachedInternalPages()
   }
 }
 
-const std::string& UI::GetCachedPageHTML(const std::string& url) const
+const std::string &UI::GetCachedPageHTML(const std::string &url) const
 {
   static const std::string empty;
   auto it = cached_internal_pages_.find(url);
@@ -1149,6 +1147,12 @@ bool UI::RunShortcutAction(const std::string &action)
     CreateNewTabForChildView(String("file:///history.html"));
     return true;
   }
+  if (action == "open-bookmarks")
+  {
+    // Open Bookmarks in a NEW tab
+    CreateNewTabForChildView(String("file:///bookmarks.html"));
+    return true;
+  }
   if (action == "focus-address")
   {
     if (focusAddressBar)
@@ -1184,6 +1188,12 @@ bool UI::RunShortcutAction(const std::string &action)
     CreateNewTabForChildView(String("file:///settings.html"));
     return true;
   }
+  if (action == "open-themes")
+  {
+    // Open Themes in a new tab
+    CreateNewTabForChildView(String("file:///themes.html"));
+    return true;
+  }
   return false;
 }
 
@@ -1203,7 +1213,7 @@ bool UI::OnMouseEvent(const ultralight::MouseEvent &evt)
         tab_it->second->Show();
     }
   }
-  
+
   // If menu overlay is active, route mouse events to it and consume
   if (menu_overlay_ && menu_overlay_->view())
   {
@@ -1486,9 +1496,12 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
   global["OnRequestChangeURL"] = BindJSCallback(&UI::OnRequestChangeURL);
   global["OnAddressBarNavigate"] = BindJSCallback(&UI::OnAddressBarNavigate);
   global["OnOpenHistoryNewTab"] = BindJSCallback(&UI::OnOpenHistoryNewTab);
+  global["OnOpenBookmarksNewTab"] = BindJSCallback(&UI::OnOpenBookmarksNewTab);
   global["OnOpenDownloadsNewTab"] = BindJSCallback(&UI::OnOpenDownloadsNewTab);
   global["OnOpenPasswordsNewTab"] = BindJSCallback(&UI::OnOpenPasswordsNewTab);
   global["OnOpenExtensionsNewTab"] = BindJSCallback(&UI::OnOpenExtensionsNewTab);
+  global["OnOpenThemesNewTab"] = BindJSCallback(&UI::OnOpenThemesNewTab);
+  global["OnOpenThemesDirectory"] = BindJSCallback(&UI::OnOpenThemesDirectory);
   global["GetDownloadsSnapshot"] = BindJSCallbackWithRetval(&UI::OnDownloadsOverlayGet);
   global["ClearDownloadsSnapshot"] = BindJSCallback(&UI::OnDownloadsOverlayClear);
   global["OnAddressBarBlur"] = BindJSCallback(&UI::OnAddressBarBlur);
@@ -1574,7 +1587,7 @@ void UI::OnDOMReady(View *caller, uint64_t frame_id, bool is_main_frame, const S
         // IMPORTANT: Set this flag BEFORE creating the tab to prevent session saving
         // from overwriting the saved session while the restore bar is visible
         session_restore_bar_visible_ = true;
-        
+
         // Create a blank tab first, then show restore bar
         CreateNewTab();
         // Show the session restore bar to ask user
@@ -1686,7 +1699,7 @@ void UI::OnRequestNewWindow(const JSObject &obj, const JSArgs &args)
   // Get the executable path
   wchar_t exePath[MAX_PATH];
   GetModuleFileNameW(NULL, exePath, MAX_PATH);
-  
+
   // Launch new instance
   STARTUPINFOW si = {sizeof(si)};
   PROCESS_INFORMATION pi;
@@ -1739,7 +1752,7 @@ void UI::OnRequestTabClose(const JSObject &obj, const JSArgs &args)
 
     RefPtr<JSContext> lock(view()->LockJSContext());
     closeTab({id});
-    
+
     // Save session after tab close for crash recovery
     SaveSessionToDisk();
   }
@@ -1760,7 +1773,7 @@ void UI::OnActiveTabChange(const JSObject &obj, const JSArgs &args)
 
     // Always hide all DRM tabs first to ensure clean state
     HideAllDrmTabs();
-    
+
     // Hide the previous Ultralight tab if it wasn't DRM
     if (tabs_.count(active_tab_id_) && tabs_[active_tab_id_])
       tabs_[active_tab_id_]->Hide();
@@ -1787,7 +1800,7 @@ void UI::OnActiveTabChange(const JSObject &obj, const JSArgs &args)
     if (drm_tab)
     {
       drm_tab->Show();
-      drm_tab->Focus();  // Give focus to DRM tab
+      drm_tab->Focus(); // Give focus to DRM tab
       auto title_it = drm_tab_titles_.find(active_tab_id_);
       auto url_it = drm_tab_urls_.find(active_tab_id_);
       if (url_it != drm_tab_urls_.end())
@@ -1799,14 +1812,14 @@ void UI::OnActiveTabChange(const JSObject &obj, const JSArgs &args)
     else
     {
       tabs_[active_tab_id_]->Show();
-      tabs_[active_tab_id_]->view()->Focus();  // Give focus to Ultralight tab
+      tabs_[active_tab_id_]->view()->Focus(); // Give focus to Ultralight tab
       auto tab_view = tabs_[active_tab_id_]->view();
       SetLoading(tab_view->is_loading());
       SetCanGoBack(tab_view->CanGoBack());
       SetCanGoForward(tab_view->CanGoBack());
       SetURL(tab_view->url());
     }
-    
+
     // Update bookmark button state for the newly active tab
     UpdateBookmarkButtonState();
   }
@@ -1834,7 +1847,7 @@ void UI::OnRequestChangeURL(const JSObject &obj, const JSArgs &args)
       if (tab)
       {
         tab->Show();
-        tab->view()->Focus();  // Ensure focus returns to Ultralight
+        tab->view()->Focus(); // Ensure focus returns to Ultralight
         tab->view()->LoadURL(url);
       }
     }
@@ -1850,7 +1863,7 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
     auto url_data = url.utf8();
     if (url_data.data())
       url_utf8 = url_data.data();
-    
+
     // Record immediately so History UI updates quickly (dedup inside RecordHistory)
     RecordHistory(url, String(""));
 
@@ -1860,7 +1873,7 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
     // Check if currently on a DRM site
     auto drm_it = drm_tabs_.find(active_tab_id_);
     bool is_on_drm = (drm_it != drm_tabs_.end() && drm_it->second);
-    
+
     if (is_on_drm && new_url_is_drm)
     {
       // DRM -> DRM: Simple navigation within WebView2
@@ -1869,21 +1882,21 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
       SetURL(url);
       return;
     }
-    
+
     if (is_on_drm && !new_url_is_drm)
     {
       // DRM -> Non-DRM: Close DRM tab, convert to standard Ultralight tab
       uint64_t tab_id = active_tab_id_;
-      
+
       // Close and remove DRM WebView2
       drm_it->second->Close();
       drm_tabs_.erase(tab_id);
       drm_tab_urls_.erase(tab_id);
       drm_tab_titles_.erase(tab_id);
-      
+
       // Update UI to remove DRM badge
       UpdateDrmBadge(tab_id, false);
-      
+
       // Navigate the Ultralight tab to the new URL
       auto tab_it = tabs_.find(tab_id);
       if (tab_it != tabs_.end() && tab_it->second)
@@ -1891,19 +1904,19 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
         tab_it->second->Show();
         tab_it->second->view()->Focus();
         tab_it->second->view()->LoadURL(url);
-        
+
         // Update UI immediately
         SetURL(url);
         SetLoading(true);
       }
       return;
     }
-    
+
     if (!is_on_drm && new_url_is_drm)
     {
       // Non-DRM -> DRM: Convert existing tab to DRM tab
       uint64_t tab_id = active_tab_id_;
-      
+
       // Create DRM tab (this will handle loading page display)
       if (MaybeOpenDrmTab(tab_id, url_utf8, true))
       {
@@ -1912,7 +1925,7 @@ void UI::OnAddressBarNavigate(const JSObject &obj, const JSArgs &args)
       }
       return;
     }
-    
+
     // Non-DRM -> Non-DRM: Standard navigation
     auto tab_it = tabs_.find(active_tab_id_);
     if (tab_it != tabs_.end() && tab_it->second)
@@ -1929,6 +1942,11 @@ void UI::OnOpenHistoryNewTab(const JSObject &obj, const JSArgs &args)
   CreateNewTabForChildView(String("file:///history.html"));
 }
 
+void UI::OnOpenBookmarksNewTab(const JSObject &obj, const JSArgs &args)
+{
+  CreateNewTabForChildView(String("file:///bookmarks.html"));
+}
+
 void UI::OnOpenDownloadsNewTab(const JSObject &obj, const JSArgs &args)
 {
   CreateNewTabForChildView(String("file:///downloads.html"));
@@ -1942,6 +1960,34 @@ void UI::OnOpenPasswordsNewTab(const JSObject &obj, const JSArgs &args)
 void UI::OnOpenExtensionsNewTab(const JSObject &obj, const JSArgs &args)
 {
   CreateNewTabForChildView(String("file:///extensions.html"));
+}
+
+void UI::OnOpenThemesNewTab(const JSObject &obj, const JSArgs &args)
+{
+  CreateNewTabForChildView(String("file:///themes.html"));
+}
+
+void UI::OnOpenThemesDirectory(const JSObject &obj, const JSArgs &args)
+{
+  // Open themes directory in system file explorer
+  std::filesystem::path themes_dir = std::filesystem::current_path() / "data" / "themes";
+
+  // Create directory if it doesn't exist
+  if (!std::filesystem::exists(themes_dir)) {
+    std::filesystem::create_directories(themes_dir);
+  }
+
+  std::string path_str = themes_dir.string();
+#ifdef _WIN32
+  std::wstring wide_path(path_str.begin(), path_str.end());
+  ShellExecuteW(NULL, L"explore", wide_path.c_str(), NULL, NULL, SW_SHOWNORMAL);
+#elif defined(__APPLE__)
+  std::string cmd = "open " + util::EscapeShellArg(path_str);
+  system(cmd.c_str());
+#else
+  std::string cmd = "xdg-open " + util::EscapeShellArg(path_str);
+  system(cmd.c_str());
+#endif
 }
 
 // ============================================================================
@@ -2092,8 +2138,9 @@ void UI::OnReloadExtension(const JSObject &obj, const JSArgs &args)
   auto id_str = id_ul.utf8();
   std::string id = id_str.data() ? id_str.data() : "";
   // Reload a specific extension by unloading and reloading it
-  auto* ext = extensions::ExtensionManager::Instance().GetExtension(id);
-  if (ext) {
+  auto *ext = extensions::ExtensionManager::Instance().GetExtension(id);
+  if (ext)
+  {
     std::filesystem::path ext_path = ext->base_path;
     extensions::ExtensionManager::Instance().UnloadExtension(id);
     extensions::ExtensionManager::Instance().LoadExtension(ext_path);
@@ -2235,20 +2282,20 @@ void UI::CreateNewTab()
 {
   // Hide all DRM tabs when creating a new standard tab
   HideAllDrmTabs();
-  
+
   uint64_t id = tab_id_counter_++;
   RefPtr<Window> window = window_;
   int tab_height = window->height() - ui_height_;
   if (tab_height < 1)
     tab_height = 1;
-  
+
   // Build view settings from current browser settings
   TabViewSettings view_settings;
   view_settings.enable_javascript = settings_.enable_javascript;
   view_settings.hardware_acceleration = settings_.hardware_acceleration;
-  
+
   tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_, view_settings);
-  
+
   // Use cached HTML for instant page display (no file I/O delay)
   // This eliminates the white flash before page content loads
   const char *kStartPageURL = "file:///static-sties/google-static.html";
@@ -2266,7 +2313,7 @@ void UI::CreateNewTab()
     addTab({id, "New Tab", GetFaviconURL(kStartPageURL), tabs_[id]->view()->is_loading()});
   }
   UpdateDrmBadge(id, false);
-  
+
   // Save session after new tab for crash recovery
   SaveSessionToDisk();
 }
@@ -2275,24 +2322,24 @@ RefPtr<View> UI::CreateNewTabForChildView(const String &url)
 {
   // Hide all DRM tabs when creating a new standard tab
   HideAllDrmTabs();
-  
+
   uint64_t id = tab_id_counter_++;
   RefPtr<Window> window = window_;
   int tab_height = window->height() - ui_height_;
   if (tab_height < 1)
     tab_height = 1;
-  
+
   // Build view settings from current browser settings
   TabViewSettings view_settings;
   view_settings.enable_javascript = settings_.enable_javascript;
   view_settings.hardware_acceleration = settings_.hardware_acceleration;
-  
+
   tabs_[id] = std::make_unique<Tab>(this, id, window->width(), (uint32_t)tab_height, 0, ui_height_, active_user_agent_, view_settings);
 
   // Try to use cached HTML for instant loading of internal pages
   auto url_utf8 = url.utf8();
   std::string url_str(url_utf8.data() ? url_utf8.data() : "");
-  const std::string& cached_html = GetCachedPageHTML(url_str);
+  const std::string &cached_html = GetCachedPageHTML(url_str);
   if (!cached_html.empty())
   {
     // Use cached HTML for instant display
@@ -2374,7 +2421,7 @@ void UI::UpdateTabNavigation(uint64_t id, bool is_loading, bool can_go_back, boo
     SetCanGoBack(can_go_back);
     SetCanGoForward(can_go_forward);
   }
-  
+
   // Save session when navigation completes (not during loading to reduce disk I/O)
   if (!is_loading)
   {
@@ -2443,13 +2490,13 @@ void UI::UpdateBookmarkButtonState()
 {
   if (!bookmark_store_ || !active_tab() || !active_tab()->view())
     return;
-  
+
   auto url = active_tab()->view()->url();
   auto url_str = url.utf8();
   std::string url_string = url_str.data() ? url_str.data() : "";
-  
+
   bool is_bookmarked = bookmark_store_->IsBookmarked(url_string);
-  
+
   RefPtr<JSContext> lock(view()->LockJSContext());
   JSContextRef ctx = lock->ctx();
   ultralight::String js = ultralight::String("if(typeof updateBookmarkButton === 'function') updateBookmarkButton(") +
@@ -2469,7 +2516,7 @@ String UI::GetFaviconURL(const String &page_url)
     return String("");
 
   std::string_view url_view(url);
-  
+
   // Handle browser internal pages with custom favicons (base64-encoded SVGs for CSS compatibility)
   if (url_view.find("file:///") == 0)
   {
@@ -2477,46 +2524,54 @@ String UI::GetFaviconURL(const String &page_url)
     if (url_view.find("static-sties/") != std::string_view::npos ||
         url_view.find("google-static") != std::string_view::npos)
       return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTEwIDIwdi02aDR2Nmg1di04aDNMMTIgMyAyIDEyaDN2OHonLz48L3N2Zz4=");
-    
+
     // Settings page - gear icon
     if (url_view.find("settings.html") != std::string_view::npos)
       return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTE5LjE0IDEyLjk0Yy4wNC0uMzEuMDYtLjYzLjA2LS45NCAwLS4zMS0uMDItLjYzLS4wNi0uOTRsMi4wMy0xLjU4YS40OS40OSAwIDAwLjEyLS42MWwtMS45Mi0zLjMyYS40OS40OSAwIDAwLS41OS0uMjJsLTIuMzkuOTZjLS41LS4zOC0xLjAzLS43LTEuNjItLjk0bC0uMzYtMi41NGEuNDg0LjQ4NCAwIDAwLS40OC0uNDFoLTMuODRjLS4yNCAwLS40My4xNy0uNDcuNDFsLS4zNiAyLjU0Yy0uNTkuMjQtMS4xMy41Ny0xLjYyLjk0bC0yLjM5LS45NmEuNDkuNDkgMCAwMC0uNTkuMjJMMi43NCA4Ljg3Yy0uMTIuMjEtLjA4LjQ3LjEyLjYxbDIuMDMgMS41OGMtLjA0LjMxLS4wNi42My0uMDYuOTRzLjAyLjYzLjA2Ljk0bC0yLjAzIDEuNThhLjQ5LjQ5IDAgMDAtLjEyLjYxbDEuOTIgMy4zMmMuMTIuMjIuMzcuMjkuNTkuMjJsMi4zOS0uOTZjLjUuMzggMS4wMy43IDEuNjIuOTRsLjM2IDIuNTRjLjA1LjI0LjI0LjQxLjQ4LjQxaDMuODRjLjI0IDAgLjQ0LS4xNy40Ny0uNDFsLjM2LTIuNTRjLjU5LS4yNCAxLjEzLS41NiAxLjYyLS45NGwyLjM5Ljk2Yy4yMi4wOC40NyAwIC41OS0uMjJsMS45Mi0zLjMyYy4xMi0uMjIuMDctLjQ3LS4xMi0uNjFsLTIuMDEtMS41OHpNMTIgMTUuNmMtMS45OCAwLTMuNi0xLjYyLTMuNi0zLjZzMS42Mi0zLjYgMy42LTMuNiAzLjYgMS42MiAzLjYgMy42LTEuNjIgMy42LTMuNiAzLjZ6Jy8+PC9zdmc+");
-    
+
     // History page - clock icon
     if (url_view.find("history.html") != std::string_view::npos)
       return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTEzIDNhOSA5IDAgMDAtOSA5SDFsMy44OSAzLjg5LjA3LjE0TDkgMTJINmMwLTMuODcgMy4xMy03IDctN3M3IDMuMTMgNyA3LTMuMTMgNy03IDdjLTEuOTMgMC0zLjY4LS43OS00Ljk0LTIuMDZsLTEuNDIgMS40MkE4Ljk1NCA4Ljk1NCAwIDAwMTMgMjFhOSA5IDAgMDAwLTE4em0tMSA1djVsNC4yOCAyLjU0LjcyLTEuMjEtMy41LTIuMDhWOEgxMnonLz48L3N2Zz4=");
-    
+
     // Downloads page - download icon
     if (url_view.find("downloads.html") != std::string_view::npos ||
         url_view.find("downloads-panel.html") != std::string_view::npos)
       return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTE5IDloLTRWM0g5djZINWw3IDcgNy03ek01IDE4djJoMTR2LTJINXonLz48L3N2Zz4=");
-    
+
     // Passwords page - key icon
     if (url_view.find("passwords.html") != std::string_view::npos)
       return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTEyLjY1IDEwQTUuOTkgNS45OSAwIDAwNyA2Yy0zLjMxIDAtNiAyLjY5LTYgNnMyLjY5IDYgNiA2YTUuOTkgNS45OSAwIDAwNS42NS00SDE3djRoNHYtNGgydi00SDEyLjY1ek03IDE0Yy0xLjEgMC0yLS45LTItMnMuOS0yIDItMiAyIC45IDIgMi0uOSAyLTIgMnonLz48L3N2Zz4=");
-    
+
     // Extensions page - puzzle piece icon
     if (url_view.find("extensions.html") != std::string_view::npos)
       return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTIwLjUgMTFIMTlWN2MwLTEuMS0uOS0yLTItMmgtNFYzLjVDMTMgMi4xMiAxMS44OCAxIDEwLjUgMVM4IDIuMTIgOCAzLjVWNUg0Yy0xLjEgMC0xLjk5LjktMS45OSAydjMuOEgzLjVjMS40OSAwIDIuNyAxLjIxIDIuNyAyLjdzLTEuMjEgMi43LTIuNyAyLjdIMlYyMGMwIDEuMS45IDIgMiAyaDMuOHYtMS41YzAtMS40OSAxLjIxLTIuNyAyLjctMi43IDEuNDkgMCAyLjcgMS4yMSAyLjcgMi43VjIySDE3YzEuMSAwIDItLjkgMi0ydi00aDEuNWMxLjM4IDAgMi41LTEuMTIgMi41LTIuNVMyMS44OCAxMSAyMC41IDExeicvPjwvc3ZnPg==");
-    
+
     // About page - info icon
     if (url_view.find("about.html") != std::string_view::npos)
       return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTEgMTVoLTJ2LTZoMnY2em0wLThoLTJWN2gydjJ6Jy8+PC9zdmc+");
-    
+
     // New tab page - home icon
     if (url_view.find("new_tab_page.html") != std::string_view::npos)
       return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTEwIDIwdi02aDR2Nmg1di04aDNMMTIgMyAyIDEyaDN2OHonLz48L3N2Zz4=");
-    
+
     // Release notes - document icon
     if (url_view.find("release_notes.html") != std::string_view::npos)
       return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTE0IDJINMM0LjkgMCA0LjAxLjkgNC4wMSAyTDQgMjBjMCAxLjEuODkgMiAxLjk5IDJIMTHJMS4xIDAgMi0uOSAyLTJWOGwtNi02em0yIDE2SDh2LTJoOHYyem0wLTRIOHYtMmg4djJ6bS0zLTVWMy41TDE4LjUgOUgxM3onLz48L3N2Zz4=");
-    
+
+    // Themes page - theme icon
+    if (url_view.find("themes.html") != std::string_view::npos)
+      return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTEyIDNjLTQuOTcgMC05IDQuMDMtOSA5czQuMDMgOSA5IDljLjgzIDAgMS41LS42NyAxLjUtMS41IDAtLjM5LS4xNS0uNzQtLjM5LTEuMDEtLjIzLS4yNi0uMzgtLjYxLS4zOC0uOTkgMC0uODMuNjctMS41IDEuNS0xLjVIMTZjMi43NiAwIDUtMi4yNCA1LTUgMC00LjQyLTQuMDMtOC05LTh6bS01LjUgOWMtLjgzIDAtMS41LS42Ny0xLjUtMS41UzUuNjcgOSA2LjUgOSA4IDkuNjcgOCA5LjY3IDcuMzMgMTIgNi41IDEyem0zLTRDOC42NyA4IDggNy4zMyA4IDYuNXM4LjY3IDUgOS41IDVzMS41LjY3IDEuNSAxLjVTMTAuMzMgOCA5LjUgej01IDBjLS44MyAwLTEuNS0uNjctMS41LTEuNVMxMy42NyA1IDE0LjUgNXMxLjUuNjcgMS41IDEuNVMxNS4zMyA4IDE0LjUgej0zIDRjLS44MyAwLTEuNS0uNjctMS41LTEuNVMxNi42NyA5IDE3LjUgOXMxLjUuNjcgMS41IDEuNS0uNjcgMS41LTEuNSAxLjV6Jy8+PC9zdmc+");
+
+    // Bookmarks page - folder icon
+    if (url_view.find("bookmarks.html") != std::string_view::npos)
+      return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCc+PHJlY3QgeD0iMiIgeT0iNCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjE2IiBmaWxsPSIjYzJiY2U4Ii8+PHJlY3QgeD0iMiIgeT0iMiIgd2lkdGg9IjEyIiBoZWlnaHQ9IjQiIGZpbGw9IiNjMmJjZTgiLz48L3N2Zz4=");
+
     // Default for other file:// URLs - globe icon
     return String("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nI2MyYmNlOCc+PHBhdGggZD0nTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bS0xIDE3LjkzYy0zLjk1LS40OS03LTMuODUtNy03LjkzIDAtLjYyLjA4LTEuMjEuMjEtMS43OUw5IDE1djFjMCAxLjEuOSAyIDIgMnYxLjkzem02LjktMi41NGMtLjI2LS44MS0xLTEuMzktMS45LTEuMzloLTF2LTNjMC0uNTUtLjQ1LTEtMS0xSDh2LTJoMmMuNTUgMCAxLS40NSAxLTFWN2gyYzEuMSAwIDItLjkgMi0ydi0uNDFjMi45MyAxLjE5IDUgNC4wNiA1IDcuNDEgMCAyLjA4LS44IDMuOTctMi4xIDUuMzl6Jy8+PC9zdmc+");
   }
-  
-  if (url_view.size() < 7 || 
-      (url_view.substr(0, 7) != "http://" && 
+
+  if (url_view.size() < 7 ||
+      (url_view.substr(0, 7) != "http://" &&
        (url_view.size() < 8 || url_view.substr(0, 8) != "https://")))
     return String("");
 
@@ -2566,8 +2621,8 @@ void UI::RecordHistory(const String &url, const String &title)
 
   // Only record http(s)
   std::string_view url_view(c_url);
-  if (url_view.size() < 7 || 
-      (url_view.substr(0, 7) != "http://" && 
+  if (url_view.size() < 7 ||
+      (url_view.substr(0, 7) != "http://" &&
        (url_view.size() < 8 || url_view.substr(0, 8) != "https://")))
     return;
 
@@ -3195,7 +3250,14 @@ void UI::OnUpdateSetting(const JSObject &, const JSArgs &args)
       ultralight::String str_ul = args[1].ToString();
       auto str_data = str_ul.utf8();
       std::string str = str_data.data() ? str_data.data() : "";
-      try { val = std::stod(str); } catch (...) { val = 0.0; }
+      try
+      {
+        val = std::stod(str);
+      }
+      catch (...)
+      {
+        val = 0.0;
+      }
     }
     // Clamp to valid latitude range
     val = (std::max)(-90.0, (std::min)(90.0, val));
@@ -3219,7 +3281,14 @@ void UI::OnUpdateSetting(const JSObject &, const JSArgs &args)
       ultralight::String str_ul = args[1].ToString();
       auto str_data = str_ul.utf8();
       std::string str = str_data.data() ? str_data.data() : "";
-      try { val = std::stod(str); } catch (...) { val = 0.0; }
+      try
+      {
+        val = std::stod(str);
+      }
+      catch (...)
+      {
+        val = 0.0;
+      }
     }
     // Clamp to valid longitude range
     val = (std::max)(-180.0, (std::min)(180.0, val));
@@ -3419,7 +3488,7 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
 {
   // Appearance
   SetDarkModeEnabled(settings_.launch_dark_theme);
-  
+
   // Vibrant window theme - changes title bar color
   bool was_vibrant = vibrant_window_theme_enabled_;
   vibrant_window_theme_enabled_ = settings_.vibrant_window_theme;
@@ -3427,7 +3496,7 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
   {
     ApplyVibrantWindowTheme(vibrant_window_theme_enabled_);
   }
-  
+
   // Transparent toolbar - applies CSS to UI overlay
   bool was_transparent = experimental_transparent_toolbar_enabled_;
   experimental_transparent_toolbar_enabled_ = settings_.experimental_transparent_toolbar;
@@ -3471,7 +3540,7 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
 
   // Note: enable_javascript and hardware_acceleration are applied to NEW tabs via TabViewSettings.
   // Existing tabs keep their original settings since ViewConfig is immutable after creation.
-  // 
+  //
   // Privacy settings implementation:
   // - do_not_track: Implemented via JavaScript injection (sets navigator.doNotTrack = '1')
   // - block_third_party_cookies: Implemented via JavaScript injection (blocks cross-origin cookie access)
@@ -3511,7 +3580,7 @@ void UI::ApplySettings(bool initial, bool snapshot_is_baseline)
   // Accessibility
   reduce_motion_enabled_ = settings_.reduce_motion;
   high_contrast_ui_enabled_ = settings_.high_contrast_ui;
-  
+
   // Apply accessibility CSS to all views
   auto apply_accessibility = [&](RefPtr<View> v)
   {
@@ -3969,7 +4038,7 @@ void UI::OnContextMenuAction(const JSObject &obj, const JSArgs &args)
   if (action == "open_tab" && args.size() >= 2)
   {
     ultralight::String url = args[1];
-    CreateNewTabForChildView(url);  // Handles loading internally
+    CreateNewTabForChildView(url); // Handles loading internally
     HideContextMenuOverlay();
     return;
   }
@@ -4079,27 +4148,26 @@ bool UI::IsBrowserInternalPage(const std::string &url)
   // Fast check for browser internal pages - called from C++ to skip JS execution
   if (url.find("file:///") != 0)
     return false;
-  
+
   // List of browser internal pages that have their own dark styling
-  static const char* internal_pages[] = {
-    "settings.html",
-    "passwords.html",
-    "extensions.html",
-    "downloads.html",
-    "history.html",
-    "ui.html",
-    "menu.html",
-    "contextmenu.html",
-    "suggestions.html",
-    "quick-inspector.html",
-    "downloads-panel.html",
-    "about.html",
-    "new_tab_page.html",
-    "release_notes.html",
-    "static-sties/"
-  };
-  
-  for (const char* page : internal_pages)
+  static const char *internal_pages[] = {
+      "settings.html",
+      "passwords.html",
+      "extensions.html",
+      "downloads.html",
+      "history.html",
+      "ui.html",
+      "menu.html",
+      "contextmenu.html",
+      "suggestions.html",
+      "quick-inspector.html",
+      "downloads-panel.html",
+      "about.html",
+      "new_tab_page.html",
+      "release_notes.html",
+      "static-sties/"};
+
+  for (const char *page : internal_pages)
   {
     if (url.find(page) != std::string::npos)
       return true;
@@ -4111,16 +4179,16 @@ void UI::ApplyDarkModeToView(RefPtr<View> v)
 {
   if (!v)
     return;
-  
+
   // Fast C++ check: skip dark mode injection entirely for browser internal pages
   // This avoids expensive JS execution for pages that don't need it
   auto url = v->url().utf8();
   if (url.data() && IsBrowserInternalPage(std::string(url.data())))
     return;
-  
+
   // Build excluded sites list from settings
   std::string excluded_patterns = settings_.dark_theme_excluded_sites;
-  
+
   const char *js = R"JS((function(){
     try{
       var url = window.location.href;
@@ -4184,20 +4252,24 @@ void UI::ApplyDarkModeToView(RefPtr<View> v)
       return true;
     }catch(e){return false;}
   })())JS";
-  
+
   // Parse excluded patterns into JSON array
   std::string patterns_json = "[]";
-  if (!excluded_patterns.empty()) {
+  if (!excluded_patterns.empty())
+  {
     std::stringstream ss;
     ss << "[";
     bool first = true;
     std::istringstream iss(excluded_patterns);
     std::string line;
-    while (std::getline(iss, line)) {
+    while (std::getline(iss, line))
+    {
       line.erase(0, line.find_first_not_of(" \t\r\n"));
       line.erase(line.find_last_not_of(" \t\r\n") + 1);
-      if (!line.empty() && line[0] != '#') {
-        if (!first) ss << ",";
+      if (!line.empty() && line[0] != '#')
+      {
+        if (!first)
+          ss << ",";
         ss << "\"" << line << "\"";
         first = false;
       }
@@ -4205,7 +4277,7 @@ void UI::ApplyDarkModeToView(RefPtr<View> v)
     ss << "]";
     patterns_json = ss.str();
   }
-  
+
   char buffer[8192];
   snprintf(buffer, sizeof(buffer), js, patterns_json.c_str());
   v->EvaluateScript(buffer, nullptr);
@@ -4349,11 +4421,11 @@ void UI::ApplyTransparentToolbar(bool enabled)
   // Apply transparent/translucent effect to toolbar UI
   if (!overlay_)
     return;
-  
+
   RefPtr<View> ui_view = overlay_->view();
   if (!ui_view)
     return;
-  
+
   const char *js_enable = R"JS((function(){
     try{
       if(document.getElementById('__ul_transparent_toolbar')) return true;
@@ -4562,15 +4634,15 @@ void UI::SaveSessionToDisk()
 {
   // Save current session state to disk for crash recovery
   // This is called whenever tabs change (new tab, close tab, navigation)
-  
+
   if (!settings_.save_session_continuously)
     return;
-  
+
   // Don't overwrite saved session while restore bar is visible
   // User hasn't made a choice yet, so preserve their previous session
   if (session_restore_bar_visible_)
     return;
-    
+
   EnsureDataDirectoryExists();
   std::ofstream out("data/session.json", std::ios::out | std::ios::binary | std::ios::trunc);
   if (!out.is_open())
@@ -4588,22 +4660,22 @@ void UI::SaveSessionToDisk()
   out << "  \"clean_exit\": false,\n";
   out << "  \"active_tab_id\": " << active_tab_id_ << ",\n";
   out << "  \"tabs\": [\n";
-  
+
   bool first = true;
   for (const auto &entry : tabs_)
   {
     if (!entry.second)
       continue;
-      
+
     auto view = entry.second->view();
     if (!view)
       continue;
-      
+
     auto url_ul = view->url();
     auto title_ul = view->title();
     std::string url = url_ul.utf8().data() ? url_ul.utf8().data() : "";
     std::string title = title_ul.utf8().data() ? title_ul.utf8().data() : "";
-    
+
     // Skip internal pages that shouldn't be restored
     if (url.find("file:///ui.html") != std::string::npos ||
         url.find("file:///menu.html") != std::string::npos ||
@@ -4611,22 +4683,22 @@ void UI::SaveSessionToDisk()
         url.find("file:///suggestions.html") != std::string::npos ||
         url.find("file:///downloads-panel.html") != std::string::npos)
       continue;
-    
+
     // Skip empty URLs
     if (url.empty() || url == "about:blank")
       continue;
-    
+
     if (!first)
       out << ",\n";
     first = false;
-    
-    out << "    {\"id\": " << entry.first 
-        << ", \"url\": \"" << jsonEscape(url) 
+
+    out << "    {\"id\": " << entry.first
+        << ", \"url\": \"" << jsonEscape(url)
         << "\", \"title\": \"" << jsonEscape(title) << "\"}";
   }
-  
+
   out << "\n  ],\n";
-  
+
   // Also save DRM tabs
   out << "  \"drm_tabs\": [\n";
   first = true;
@@ -4634,16 +4706,16 @@ void UI::SaveSessionToDisk()
   {
     auto title_it = drm_tab_titles_.find(entry.first);
     std::string title = (title_it != drm_tab_titles_.end()) ? title_it->second : "";
-    
+
     if (entry.second.empty())
       continue;
-    
+
     if (!first)
       out << ",\n";
     first = false;
-    
-    out << "    {\"id\": " << entry.first 
-        << ", \"url\": \"" << jsonEscape(entry.second) 
+
+    out << "    {\"id\": " << entry.first
+        << ", \"url\": \"" << jsonEscape(entry.second)
         << "\", \"title\": \"" << jsonEscape(title) << "\"}";
   }
   out << "\n  ]\n";
@@ -4665,9 +4737,9 @@ void UI::LoadSessionFromDisk()
   std::stringstream buffer;
   buffer << in.rdbuf();
   in.close();
-  
+
   std::string content = buffer.str();
-  
+
   // Parse clean_exit flag to determine if last session crashed
   size_t clean_exit_pos = content.find("\"clean_exit\"");
   if (clean_exit_pos != std::string::npos)
@@ -4679,7 +4751,7 @@ void UI::LoadSessionFromDisk()
       session_was_clean_exit_ = (value.find("true") != std::string::npos);
     }
   }
-  
+
   // Mark for restore if we have session data (regardless of how last session ended)
   // Chrome-like behavior: always restore previous session if enabled
   if (content.find("\"tabs\"") != std::string::npos)
@@ -4709,27 +4781,27 @@ bool UI::HasSavedSession() const
   std::ifstream in("data/session.json");
   if (!in.is_open())
     return false;
-  
+
   // Quick check if file has any tab data
   std::stringstream buffer;
   buffer << in.rdbuf();
   std::string content = buffer.str();
-  
+
   // Check if there are any tabs saved
   size_t tabs_pos = content.find("\"tabs\"");
   if (tabs_pos == std::string::npos)
     return false;
-    
+
   // Check if tabs array is non-empty
   size_t bracket_start = content.find("[", tabs_pos);
   size_t bracket_end = content.find("]", bracket_start);
   if (bracket_start == std::string::npos || bracket_end == std::string::npos)
     return false;
-    
+
   std::string tabs_content = content.substr(bracket_start + 1, bracket_end - bracket_start - 1);
   // Remove whitespace
   tabs_content.erase(std::remove_if(tabs_content.begin(), tabs_content.end(), ::isspace), tabs_content.end());
-  
+
   return !tabs_content.empty();
 }
 
@@ -4743,7 +4815,7 @@ void UI::SaveSessionToDiskWithCleanExit()
 {
   // Save current session state with clean_exit=true
   // Called during normal shutdown to preserve tabs for next startup
-  
+
   EnsureDataDirectoryExists();
   std::ofstream out("data/session.json", std::ios::out | std::ios::binary | std::ios::trunc);
   if (!out.is_open())
@@ -4757,25 +4829,25 @@ void UI::SaveSessionToDiskWithCleanExit()
   out << "{\n";
   out << "  \"version\": 1,\n";
   out << "  \"timestamp\": " << timestamp << ",\n";
-  out << "  \"clean_exit\": true,\n";  // Mark as clean exit
+  out << "  \"clean_exit\": true,\n"; // Mark as clean exit
   out << "  \"active_tab_id\": " << active_tab_id_ << ",\n";
   out << "  \"tabs\": [\n";
-  
+
   bool first = true;
   for (const auto &entry : tabs_)
   {
     if (!entry.second)
       continue;
-      
+
     auto view = entry.second->view();
     if (!view)
       continue;
-      
+
     auto url_ul = view->url();
     auto title_ul = view->title();
     std::string url = url_ul.utf8().data() ? url_ul.utf8().data() : "";
     std::string title = title_ul.utf8().data() ? title_ul.utf8().data() : "";
-    
+
     // Skip internal UI pages
     if (url.find("file:///ui.html") != std::string::npos ||
         url.find("file:///menu.html") != std::string::npos ||
@@ -4783,19 +4855,19 @@ void UI::SaveSessionToDiskWithCleanExit()
         url.find("file:///suggestions.html") != std::string::npos ||
         url.find("file:///downloads-panel.html") != std::string::npos)
       continue;
-    
+
     if (url.empty() || url == "about:blank")
       continue;
-    
+
     if (!first)
       out << ",\n";
     first = false;
-    
-    out << "    {\"id\": " << entry.first 
-        << ", \"url\": \"" << jsonEscape(url) 
+
+    out << "    {\"id\": " << entry.first
+        << ", \"url\": \"" << jsonEscape(url)
         << "\", \"title\": \"" << jsonEscape(title) << "\"}";
   }
-  
+
   out << "\n  ],\n";
   out << "  \"drm_tabs\": [\n";
   first = true;
@@ -4803,16 +4875,16 @@ void UI::SaveSessionToDiskWithCleanExit()
   {
     auto title_it = drm_tab_titles_.find(entry.first);
     std::string title = (title_it != drm_tab_titles_.end()) ? title_it->second : "";
-    
+
     if (entry.second.empty())
       continue;
-    
+
     if (!first)
       out << ",\n";
     first = false;
-    
-    out << "    {\"id\": " << entry.first 
-        << ", \"url\": \"" << jsonEscape(entry.second) 
+
+    out << "    {\"id\": " << entry.first
+        << ", \"url\": \"" << jsonEscape(entry.second)
         << "\", \"title\": \"" << jsonEscape(title) << "\"}";
   }
   out << "\n  ]\n";
@@ -4830,33 +4902,33 @@ void UI::RestoreSavedSession()
   std::stringstream buffer;
   buffer << in.rdbuf();
   in.close();
-  
+
   std::string content = buffer.str();
-  
+
   // Parse tabs array - simple JSON parsing
   size_t tabs_pos = content.find("\"tabs\"");
   if (tabs_pos == std::string::npos)
     return;
-    
+
   size_t bracket_start = content.find("[", tabs_pos);
   size_t bracket_end = content.find("]", bracket_start);
   if (bracket_start == std::string::npos || bracket_end == std::string::npos)
     return;
-  
+
   std::string tabs_content = content.substr(bracket_start + 1, bracket_end - bracket_start - 1);
-  
+
   // Parse each tab entry - collect ALL tabs including duplicates
   size_t pos = 0;
   std::vector<std::string> urls_to_restore;
-  
+
   while ((pos = tabs_content.find("{", pos)) != std::string::npos)
   {
     size_t end_obj = tabs_content.find("}", pos);
     if (end_obj == std::string::npos)
       break;
-      
+
     std::string obj = tabs_content.substr(pos, end_obj - pos + 1);
-    
+
     // Extract URL
     size_t url_pos = obj.find("\"url\"");
     std::string url;
@@ -4869,27 +4941,27 @@ void UI::RestoreSavedSession()
         url = obj.substr(url_start + 1, url_end - url_start - 1);
       }
     }
-    
+
     // Add ALL non-empty URLs (including duplicates)
     if (!url.empty())
     {
       urls_to_restore.push_back(url);
     }
-    
+
     pos = end_obj + 1;
   }
-  
+
   // If no tabs to restore, do nothing
   if (urls_to_restore.empty())
   {
     session_restore_pending_ = false;
     return;
   }
-  
+
   // Strategy: Navigate the existing first tab to the first URL,
   // then create new tabs for the remaining URLs.
   // This avoids the complexity of closing tabs.
-  
+
   bool first_url = true;
   for (const auto &url : urls_to_restore)
   {
@@ -4909,10 +4981,10 @@ void UI::RestoreSavedSession()
       CreateNewTabForChildView(String(url.c_str()));
     }
   }
-  
+
   // Clear the pending restore flag
   session_restore_pending_ = false;
-  
+
   // Mark current session as active (not clean exit) since we're running
   SaveSessionToDisk();
 }
@@ -4922,25 +4994,25 @@ int UI::GetSavedSessionTabCount() const
   std::ifstream in("data/session.json");
   if (!in.is_open())
     return 0;
-  
+
   std::stringstream buffer;
   buffer << in.rdbuf();
   in.close();
-  
+
   std::string content = buffer.str();
-  
+
   // Count tabs in the array
   size_t tabs_pos = content.find("\"tabs\"");
   if (tabs_pos == std::string::npos)
     return 0;
-    
+
   size_t bracket_start = content.find("[", tabs_pos);
   size_t bracket_end = content.find("]", bracket_start);
   if (bracket_start == std::string::npos || bracket_end == std::string::npos)
     return 0;
-  
+
   std::string tabs_content = content.substr(bracket_start + 1, bracket_end - bracket_start - 1);
-  
+
   // Count '{' characters to count objects
   int count = 0;
   for (char c : tabs_content)
@@ -4948,7 +5020,7 @@ int UI::GetSavedSessionTabCount() const
     if (c == '{')
       count++;
   }
-  
+
   return count;
 }
 
@@ -4956,29 +5028,28 @@ bool UI::IsInternalBrowserPage(const std::string &url) const
 {
   // List of internal/default browser pages that don't need to be restored
   static const std::vector<std::string> internal_pages = {
-    "file:///static-sties/google-static.html",
-    "file:///new_tab_page.html",
-    "file:///settings.html",
-    "file:///history.html",
-    "file:///downloads.html",
-    "file:///passwords.html",
-    "file:///extensions.html",
-    "file:///about.html",
-    "file:///release_notes.html",
-    "file:///ui.html",
-    "file:///menu.html",
-    "file:///contextmenu.html",
-    "file:///suggestions.html",
-    "file:///downloads-panel.html",
-    "about:blank"
-  };
-  
+      "file:///static-sties/google-static.html",
+      "file:///new_tab_page.html",
+      "file:///settings.html",
+      "file:///history.html",
+      "file:///downloads.html",
+      "file:///passwords.html",
+      "file:///extensions.html",
+      "file:///about.html",
+      "file:///release_notes.html",
+      "file:///ui.html",
+      "file:///menu.html",
+      "file:///contextmenu.html",
+      "file:///suggestions.html",
+      "file:///downloads-panel.html",
+      "about:blank"};
+
   for (const auto &page : internal_pages)
   {
     if (url.find(page) != std::string::npos || url == page)
       return true;
   }
-  
+
   // Also check for any file:/// URL that's an internal asset
   if (url.find("file:///") == 0)
   {
@@ -4986,7 +5057,7 @@ bool UI::IsInternalBrowserPage(const std::string &url) const
     if (url.find("static-sties") != std::string::npos)
       return true;
   }
-  
+
   return false;
 }
 
@@ -4996,35 +5067,35 @@ int UI::GetMeaningfulSavedTabCount() const
   std::ifstream in("data/session.json");
   if (!in.is_open())
     return 0;
-  
+
   std::stringstream buffer;
   buffer << in.rdbuf();
   in.close();
-  
+
   std::string content = buffer.str();
-  
+
   size_t tabs_pos = content.find("\"tabs\"");
   if (tabs_pos == std::string::npos)
     return 0;
-    
+
   size_t bracket_start = content.find("[", tabs_pos);
   size_t bracket_end = content.find("]", bracket_start);
   if (bracket_start == std::string::npos || bracket_end == std::string::npos)
     return 0;
-  
+
   std::string tabs_content = content.substr(bracket_start + 1, bracket_end - bracket_start - 1);
-  
+
   int meaningful_count = 0;
   size_t pos = 0;
-  
+
   while ((pos = tabs_content.find("{", pos)) != std::string::npos)
   {
     size_t end_obj = tabs_content.find("}", pos);
     if (end_obj == std::string::npos)
       break;
-      
+
     std::string obj = tabs_content.substr(pos, end_obj - pos + 1);
-    
+
     // Extract URL
     size_t url_pos = obj.find("\"url\"");
     if (url_pos != std::string::npos)
@@ -5040,10 +5111,10 @@ int UI::GetMeaningfulSavedTabCount() const
         }
       }
     }
-    
+
     pos = end_obj + 1;
   }
-  
+
   return meaningful_count;
 }
 
@@ -5051,14 +5122,14 @@ void UI::ShowSessionRestoreBar()
 {
   // Mark that restore bar is visible to prevent session saving
   session_restore_bar_visible_ = true;
-  
+
   int tabCount = GetMeaningfulSavedTabCount();
   bool wasCrash = !session_was_clean_exit_;
-  
+
   std::ostringstream js;
   js << "(function(){ if(typeof showSessionRestoreBar === 'function') showSessionRestoreBar("
      << tabCount << ", " << (wasCrash ? "true" : "false") << "); })();";
-  
+
   view()->EvaluateScript(String(js.str().c_str()), nullptr);
 }
 
@@ -5075,10 +5146,10 @@ void UI::OnDismissSession(const JSObject &obj, const JSArgs &args)
   // User clicked "Start Fresh" or closed the bar
   // Clear the bar visibility flag so we can save the new session
   session_restore_bar_visible_ = false;
-  
+
   // Clear the pending flag so we don't show the bar again
   session_restore_pending_ = false;
-  
+
   // Start a new session with the current tab
   SaveSessionToDisk();
 }
@@ -5816,7 +5887,7 @@ void UI::OnSuggestionPick(const JSObject &obj, const JSArgs &args)
   }
   if (open_new_tab)
   {
-    CreateNewTabForChildView(s);  // Handles loading internally
+    CreateNewTabForChildView(s); // Handles loading internally
     return;
   }
   if (!tabs_.empty())
@@ -6267,14 +6338,14 @@ void UI::OnDrmPromptResponse(const JSObject &obj, const JSArgs &args)
     // We'll directly open the DRM tab without changing the setting
     bool old_setting = settings_.enable_drm_webview;
     settings_.enable_drm_webview = true;
-    
+
     // Try to open the DRM tab
     if (tab_id > 0 && tabs_.count(tab_id))
     {
       // Force open DRM tab for this URL
       MaybeOpenDrmTab(tab_id, url, true);
     }
-    
+
     // Restore the setting (user didn't want it permanently enabled)
     settings_.enable_drm_webview = old_setting;
   }
@@ -6284,7 +6355,7 @@ void UI::OnDrmPromptResponse(const JSObject &obj, const JSArgs &args)
     settings_.enable_drm_webview = true;
     ApplySettings(false, false);
     SaveSettingsToDisk();
-    
+
     // Now open the DRM tab
     if (tab_id > 0 && tabs_.count(tab_id))
     {
@@ -6350,27 +6421,29 @@ ultralight::JSValue UI::OnAddBookmark(const JSObject &obj, const JSArgs &args)
 {
   if (!bookmark_store_ || args.empty())
     return JSValue(0);
-  
+
   ultralight::String url_ul = args[0].ToString();
   auto url_str = url_ul.utf8();
   std::string url = url_str.data() ? url_str.data() : "";
-  
+
   std::string title;
-  if (args.size() > 1) {
+  if (args.size() > 1)
+  {
     ultralight::String title_ul = args[1].ToString();
     auto title_str = title_ul.utf8();
     title = title_str.data() ? title_str.data() : "";
   }
-  
+
   std::string favicon;
-  if (args.size() > 2) {
+  if (args.size() > 2)
+  {
     ultralight::String favicon_ul = args[2].ToString();
     auto favicon_str = favicon_ul.utf8();
     favicon = favicon_str.data() ? favicon_str.data() : "";
   }
-  
+
   bool show_on_bar = args.size() > 3 ? (bool)args[3] : true;
-  
+
   uint64_t id = bookmark_store_->AddBookmark(url, title, favicon, show_on_bar);
   return JSValue((double)id);
 }
@@ -6379,7 +6452,7 @@ void UI::OnRemoveBookmark(const JSObject &obj, const JSArgs &args)
 {
   if (!bookmark_store_ || args.empty())
     return;
-  
+
   uint64_t id = static_cast<uint64_t>((double)args[0]);
   bookmark_store_->RemoveBookmark(id);
 }
@@ -6388,7 +6461,7 @@ ultralight::JSValue UI::OnIsBookmarked(const JSObject &obj, const JSArgs &args)
 {
   if (!bookmark_store_ || args.empty())
     return JSValue(false);
-  
+
   ultralight::String url_ul = args[0].ToString();
   auto url_str = url_ul.utf8();
   std::string url = url_str.data() ? url_str.data() : "";
@@ -6399,25 +6472,25 @@ void UI::OnToggleBookmark(const JSObject &obj, const JSArgs &args)
 {
   if (!bookmark_store_)
     return;
-  
+
   std::string url;
   std::string title;
   std::string favicon;
-  
+
   // If no arguments provided, use the active tab's data
   if (args.empty())
   {
     if (!active_tab())
       return;
-    
+
     auto tab_url = active_tab()->view()->url();
     auto tab_url_str = tab_url.utf8();
     url = tab_url_str.data() ? tab_url_str.data() : "";
-    
+
     auto tab_title = active_tab()->view()->title();
     auto tab_title_str = tab_title.utf8();
     title = tab_title_str.data() ? tab_title_str.data() : "";
-    
+
     // Get favicon URL via UI's helper
     auto favicon_str_ul = GetFaviconURL(tab_url);
     auto favicon_str = favicon_str_ul.utf8();
@@ -6428,28 +6501,30 @@ void UI::OnToggleBookmark(const JSObject &obj, const JSArgs &args)
     ultralight::String url_ul = args[0].ToString();
     auto url_str = url_ul.utf8();
     url = url_str.data() ? url_str.data() : "";
-    
-    if (args.size() > 1) {
+
+    if (args.size() > 1)
+    {
       ultralight::String title_ul = args[1].ToString();
       auto title_str = title_ul.utf8();
       title = title_str.data() ? title_str.data() : "";
     }
-    
-    if (args.size() > 2) {
+
+    if (args.size() > 2)
+    {
       ultralight::String favicon_ul = args[2].ToString();
       auto favicon_str = favicon_ul.utf8();
       favicon = favicon_str.data() ? favicon_str.data() : "";
     }
   }
-  
+
   if (url.empty())
     return;
-  
+
   bool was_bookmarked = bookmark_store_->IsBookmarked(url);
-  
+
   if (was_bookmarked)
   {
-    auto* bm = bookmark_store_->GetBookmarkByUrl(url);
+    auto *bm = bookmark_store_->GetBookmarkByUrl(url);
     if (bm)
       bookmark_store_->RemoveBookmark(bm->id);
   }
@@ -6457,7 +6532,7 @@ void UI::OnToggleBookmark(const JSObject &obj, const JSArgs &args)
   {
     bookmark_store_->AddBookmark(url, title, favicon, true);
   }
-  
+
   // Update the bookmark button icon in the UI
   RefPtr<JSContext> lock(view()->LockJSContext());
   JSContextRef ctx = lock->ctx();
@@ -6471,28 +6546,30 @@ void UI::OnUpdateBookmark(const JSObject &obj, const JSArgs &args)
 {
   if (!bookmark_store_ || args.size() < 2)
     return;
-  
+
   uint64_t id = static_cast<uint64_t>((double)args[0]);
-  
+
   ultralight::String url_ul = args[1].ToString();
   auto url_str = url_ul.utf8();
   std::string url = url_str.data() ? url_str.data() : "";
-  
+
   std::string title;
-  if (args.size() > 2) {
+  if (args.size() > 2)
+  {
     ultralight::String title_ul = args[2].ToString();
     auto title_str = title_ul.utf8();
     title = title_str.data() ? title_str.data() : "";
   }
-  
+
   std::string favicon;
-  if (args.size() > 3) {
+  if (args.size() > 3)
+  {
     ultralight::String favicon_ul = args[3].ToString();
     auto favicon_str = favicon_ul.utf8();
     favicon = favicon_str.data() ? favicon_str.data() : "";
   }
-  
+
   bool show_on_bar = args.size() > 4 ? (bool)args[4] : true;
-  
+
   bookmark_store_->UpdateBookmark(id, url, title, favicon, show_on_bar);
 }

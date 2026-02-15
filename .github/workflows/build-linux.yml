@@ -336,20 +336,20 @@ jobs:
           if [ -f "build/CMakeCache.txt" ]; then
             echo "CMake cache found, checking if reconfiguration needed..."
             cacheValid=true
-            
+
             # Check if SDK root changed
             cachedSdkRoot=$(grep "ULTRALIGHT_SDK_ROOT:.*=" build/CMakeCache.txt | sed 's/.*=//' || true)
             if [ "$cachedSdkRoot" != "$ULTRALIGHT_SDK_ROOT" ]; then
               echo "SDK root changed, reconfiguration needed"
               cacheValid=false
             fi
-            
+
             if [ "$cacheValid" = "true" ]; then
               echo "✅ CMake cache is valid, skipping reconfiguration (saves ~30-60 seconds)"
               exit 0
             fi
           fi
-          
+
           cmake --version
           echo "Configuring with ULTRALIGHT_SDK_ROOT=$ULTRALIGHT_SDK_ROOT"
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DULTRALIGHT_SDK_ROOT="$ULTRALIGHT_SDK_ROOT" -DBUILD_TESTING=OFF -DAUTO_INSTALL_CURL=ON -DWEBBROWSER_VERSION="$WEBBROWSER_VERSION"
@@ -417,16 +417,16 @@ jobs:
         run: |
           set -euo pipefail
           echo "🚀 Generating comprehensive build summary..."
-          
+
           # Get SDK version
           sdkVersion="${ULTRALIGHT_VERSION:-Unknown}"
           if [ -f "build/ultralight_sdk_version.txt" ]; then
             sdkVersion=$(cat "build/ultralight_sdk_version.txt" | tr -d '[:space:]')
           fi
-          
+
           # Make script executable
           chmod +x scripts/generate-build-summary.sh
-          
+
           # Run the build summary script
           bash scripts/generate-build-summary.sh \
             "build" \
@@ -436,7 +436,7 @@ jobs:
             "${{ github.sha }}" \
             "$sdkVersion" \
             "BUILD-SUMMARY.md"
-          
+
           # Create JSON metadata file
           cat > build/BUILD-METADATA.json << EOF
           {
@@ -452,7 +452,7 @@ jobs:
             "runNumber": "${{ github.run_number }}"
           }
           EOF
-          
+
           echo "✅ Build summary and metadata generated successfully"
 
       - name: 8.1 Display Build Summary
@@ -563,7 +563,7 @@ jobs:
           else
             echo "⚠️ BUILD-SUMMARY.md not found, skipping job summary"
           fi
-          
+
           # Show cache statistics
           echo ""
           echo "📊 Cache Statistics:"

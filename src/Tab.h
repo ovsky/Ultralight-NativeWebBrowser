@@ -10,7 +10,8 @@ using namespace ultralight;
  * Settings that affect View/ViewConfig creation for a tab.
  * These must be provided at tab creation time since ViewConfig is immutable.
  */
-struct TabViewSettings {
+struct TabViewSettings
+{
   bool enable_javascript = true;
   bool hardware_acceleration = true;
 };
@@ -109,6 +110,8 @@ public:
   void JS_RemoveBookmark(const JSObject &obj, const JSArgs &args);
   JSValue JS_IsBookmarked(const JSObject &obj, const JSArgs &args);
   void JS_ToggleBookmark(const JSObject &obj, const JSArgs &args);
+  void JS_ReorderBookmarks(const JSObject &obj, const JSArgs &args);
+  JSValue JS_UpdateBookmark(const JSObject &obj, const JSArgs &args);
 
   // Downloads page callbacks
   JSValue OnDownloadsGetData(const JSObject &obj, const JSArgs &args);
@@ -174,7 +177,7 @@ public:
   JSValue OnGetPasswordSuggestions(const JSObject &obj, const JSArgs &args);
   void OnPasswordSelected(const JSObject &obj, const JSArgs &args);
   void OnPasswordSaveResponse(const JSObject &obj, const JSArgs &args);
-  
+
   // Favicon callback
   void OnFaviconFetched(const JSObject &obj, const JSArgs &args);
 
@@ -185,7 +188,7 @@ protected:
   uint64_t id_;
   bool ready_to_close_ = false;
   uint32_t container_width_, container_height_;
-  
+
   // Password manager state for this tab
   std::string pending_save_origin_;
   std::string pending_save_username_;

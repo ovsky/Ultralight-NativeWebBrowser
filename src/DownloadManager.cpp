@@ -119,9 +119,8 @@ namespace
     bool IsWebPFile(const std::filesystem::path &path)
     {
         std::string ext = path.extension().u8string();
-        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) {
-            return static_cast<char>(std::tolower(c));
-        });
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c)
+                       { return static_cast<char>(std::tolower(c)); });
         return ext == ".webp";
     }
 
@@ -148,9 +147,9 @@ namespace
             CLSID_WICImagingFactory,
             nullptr,
             CLSCTX_INPROC_SERVER,
-            IID_PPV_ARGS(&factory)
-        );
-        if (FAILED(hr)) goto cleanup;
+            IID_PPV_ARGS(&factory));
+        if (FAILED(hr))
+            goto cleanup;
 
         // Create decoder from file
         hr = factory->CreateDecoderFromFilename(
@@ -158,17 +157,19 @@ namespace
             nullptr,
             GENERIC_READ,
             WICDecodeMetadataCacheOnDemand,
-            &decoder
-        );
-        if (FAILED(hr)) goto cleanup;
+            &decoder);
+        if (FAILED(hr))
+            goto cleanup;
 
         // Get first frame
         hr = decoder->GetFrame(0, &frame);
-        if (FAILED(hr)) goto cleanup;
+        if (FAILED(hr))
+            goto cleanup;
 
         // Create format converter to convert to 32bppBGRA
         hr = factory->CreateFormatConverter(&converter);
-        if (FAILED(hr)) goto cleanup;
+        if (FAILED(hr))
+            goto cleanup;
 
         hr = converter->Initialize(
             frame,
@@ -176,9 +177,9 @@ namespace
             WICBitmapDitherTypeNone,
             nullptr,
             0.0,
-            WICBitmapPaletteTypeCustom
-        );
-        if (FAILED(hr)) goto cleanup;
+            WICBitmapPaletteTypeCustom);
+        if (FAILED(hr))
+            goto cleanup;
 
         // Create output PNG path
         out_png_path = webp_path;
@@ -186,58 +187,78 @@ namespace
 
         // Create stream for output
         hr = factory->CreateStream(&stream);
-        if (FAILED(hr)) goto cleanup;
+        if (FAILED(hr))
+            goto cleanup;
 
         hr = stream->InitializeFromFilename(out_png_path.wstring().c_str(), GENERIC_WRITE);
-        if (FAILED(hr)) goto cleanup;
+        if (FAILED(hr))
+            goto cleanup;
 
         // Create PNG encoder
         hr = factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, &encoder);
-        if (FAILED(hr)) goto cleanup;
+        if (FAILED(hr))
+            goto cleanup;
 
         hr = encoder->Initialize(stream, WICBitmapEncoderNoCache);
-        if (FAILED(hr)) goto cleanup;
+        if (FAILED(hr))
+            goto cleanup;
 
         // Create frame
         hr = encoder->CreateNewFrame(&frame_encode, nullptr);
-        if (FAILED(hr)) goto cleanup;
+        if (FAILED(hr))
+            goto cleanup;
 
         hr = frame_encode->Initialize(nullptr);
-        if (FAILED(hr)) goto cleanup;
+        if (FAILED(hr))
+            goto cleanup;
 
         // Get image dimensions
         UINT width, height;
         hr = converter->GetSize(&width, &height);
-        if (FAILED(hr)) goto cleanup;
+        if (FAILED(hr))
+            goto cleanup;
 
         hr = frame_encode->SetSize(width, height);
-        if (FAILED(hr)) goto cleanup;
+        if (FAILED(hr))
+            goto cleanup;
 
         WICPixelFormatGUID pixel_format = GUID_WICPixelFormat32bppBGRA;
         hr = frame_encode->SetPixelFormat(&pixel_format);
-        if (FAILED(hr)) goto cleanup;
+        if (FAILED(hr))
+            goto cleanup;
 
         // Write the converted bitmap
         hr = frame_encode->WriteSource(converter, nullptr);
-        if (FAILED(hr)) goto cleanup;
+        if (FAILED(hr))
+            goto cleanup;
 
         hr = frame_encode->Commit();
-        if (FAILED(hr)) goto cleanup;
+        if (FAILED(hr))
+            goto cleanup;
 
         hr = encoder->Commit();
-        if (FAILED(hr)) goto cleanup;
+        if (FAILED(hr))
+            goto cleanup;
 
         success = true;
 
     cleanup:
-        if (frame_encode) frame_encode->Release();
-        if (encoder) encoder->Release();
-        if (stream) stream->Release();
-        if (converter) converter->Release();
-        if (frame) frame->Release();
-        if (decoder) decoder->Release();
-        if (factory) factory->Release();
-        if (com_initialized) CoUninitialize();
+        if (frame_encode)
+            frame_encode->Release();
+        if (encoder)
+            encoder->Release();
+        if (stream)
+            stream->Release();
+        if (converter)
+            converter->Release();
+        if (frame)
+            frame->Release();
+        if (decoder)
+            decoder->Release();
+        if (factory)
+            factory->Release();
+        if (com_initialized)
+            CoUninitialize();
 
         return success;
     }
@@ -292,12 +313,12 @@ bool DownloadManager::OnRequestDownload(ultralight::View *caller, DownloadId id,
         return false;
 
     std::unique_lock<std::mutex> lock(mutex_);
-    
+
     // Generate our own unique internal ID to avoid collisions
     // (Ultralight may reuse external IDs across different downloads)
     DownloadId internal_id = next_id_++;
     external_to_internal_id_[id] = internal_id;
-    
+
     auto &record = GetOrCreateRecordLocked(internal_id);
     record.url = std::move(url_str);
     record.status = Status::Requested;
@@ -328,18 +349,21 @@ void DownloadManager::OnBeginDownload(ultralight::View *caller, DownloadId id, c
         return;
 
     std::unique_lock<std::mutex> lock(mutex_);
-    
+
     // Get or create internal ID mapping
     DownloadId internal_id;
     auto map_it = external_to_internal_id_.find(id);
-    if (map_it != external_to_internal_id_.end()) {
+    if (map_it != external_to_internal_id_.end())
+    {
         internal_id = map_it->second;
-    } else {
+    }
+    else
+    {
         // OnRequestDownload wasn't called, create mapping now
         internal_id = next_id_++;
         external_to_internal_id_[id] = internal_id;
     }
-    
+
     auto &record = GetOrCreateRecordLocked(internal_id);
     if (record.url.empty())
         record.url = url_str;
@@ -429,7 +453,7 @@ void DownloadManager::OnFinishDownload(ultralight::View *caller, DownloadId id)
     auto rec = FindRecordLocked(internal_id);
     std::filesystem::path original_path;
     bool should_convert = false;
-    
+
     if (rec)
     {
         if (rec->status != Status::Failed && rec->status != Status::Cancelled)
@@ -443,7 +467,7 @@ void DownloadManager::OnFinishDownload(ultralight::View *caller, DownloadId id)
         rec->suppress_ui = false;
         rec->placeholder = false;
         rec->finished_at = std::chrono::system_clock::now();
-        
+
         // Check if we should convert WebP to PNG
         original_path = rec->path;
         if (should_convert_webp_ && should_convert_webp_() && IsWebPFile(original_path))
@@ -453,7 +477,7 @@ void DownloadManager::OnFinishDownload(ultralight::View *caller, DownloadId id)
     }
 
     CloseStreamLocked(id, false);
-    
+
 #ifdef _WIN32
     // Perform WebP to PNG conversion after releasing the file stream
     if (should_convert && rec && !original_path.empty())
@@ -464,14 +488,14 @@ void DownloadManager::OnFinishDownload(ultralight::View *caller, DownloadId id)
             // Update the record with the new PNG path
             rec->path = png_path;
             rec->display_name = png_path.filename().u8string();
-            
+
             // Delete the original WebP file
             std::error_code ec;
             std::filesystem::remove(original_path, ec);
         }
     }
 #endif
-    
+
     NotifyChangeLocked(lock);
 }
 
@@ -706,7 +730,7 @@ std::filesystem::path DownloadManager::DetermineDefaultDirectory()
     base = std::filesystem::current_path();
 #else
     auto home = util::GetEnvVar("HOME");
-     if (!home.empty())
+    if (!home.empty())
         base = std::filesystem::path(home);
     else
         base = std::filesystem::current_path();
@@ -838,7 +862,7 @@ DownloadManager::DownloadId DownloadManager::GetInternalIdLocked(DownloadId exte
     auto it = external_to_internal_id_.find(external_id);
     if (it != external_to_internal_id_.end())
         return it->second;
-    return external_id;  // Fallback to external ID if no mapping exists
+    return external_id; // Fallback to external ID if no mapping exists
 }
 
 DownloadManager::DownloadRecord *DownloadManager::FindRecordLocked(DownloadId id)
@@ -858,11 +882,11 @@ void DownloadManager::CloseStreamLocked(DownloadId id, bool remove_file)
             it->second.stream->close();
         active_.erase(it);
     }
-    
+
     DownloadId internal_id = GetInternalIdLocked(id);
     // Clean up the ID mapping for this external ID (after we've used it)
     external_to_internal_id_.erase(id);
-    
+
     auto rec = records_.find(internal_id);
     if (remove_file && rec != records_.end() && !rec->second.path.empty())
     {

@@ -72,7 +72,7 @@ public:
     bool show_download_badge = true;
     bool auto_open_download_panel = true;
     bool ask_download_location = false;
-    bool convert_webp_to_png = false;       // Convert downloaded WebP images to PNG format
+    bool convert_webp_to_png = false; // Convert downloaded WebP images to PNG format
 
     // Performance
     bool smooth_scrolling = true;
@@ -105,13 +105,13 @@ public:
     bool enable_drm_webview = false;
 
     // Session restore settings
-    bool restore_session_on_startup = true;  // Restore previous session tabs on startup
-    bool save_session_continuously = true;   // Save session state continuously (crash recovery)
+    bool restore_session_on_startup = true; // Restore previous session tabs on startup
+    bool save_session_continuously = true;  // Save session state continuously (crash recovery)
 
     // Location Spoofing
-    bool enable_location_spoofing = false;   // When true, override navigator.geolocation
-    double spoofed_latitude = 0.0;           // Latitude to report (-90 to 90)
-    double spoofed_longitude = 0.0;          // Longitude to report (-180 to 180)
+    bool enable_location_spoofing = false; // When true, override navigator.geolocation
+    double spoofed_latitude = 0.0;         // Latitude to report (-90 to 90)
+    double spoofed_longitude = 0.0;        // Longitude to report (-180 to 180)
 
     bool operator==(const BrowserSettings &other) const;
     bool operator!=(const BrowserSettings &other) const { return !(*this == other); }
@@ -145,8 +145,11 @@ public:
   void OnAddressBarNavigate(const JSObject &obj, const JSArgs &args);
   // Open History page in a new tab (used by menu button and shortcuts)
   void OnOpenHistoryNewTab(const JSObject &obj, const JSArgs &args);
+  void OnOpenBookmarksNewTab(const JSObject &obj, const JSArgs &args);
   void OnOpenDownloadsNewTab(const JSObject &obj, const JSArgs &args);
   void OnOpenPasswordsNewTab(const JSObject &obj, const JSArgs &args);
+  void OnOpenThemesNewTab(const JSObject &obj, const JSArgs &args);
+  void OnOpenThemesDirectory(const JSObject &obj, const JSArgs &args);
   void OnAddressBarBlur(const JSObject &obj, const JSArgs &args);
   void OnAddressBarFocus(const JSObject &obj, const JSArgs &args);
   void OnMenuOpen(const JSObject &obj, const JSArgs &args);
@@ -235,12 +238,12 @@ public:
   password::PasswordManager *password_manager() { return password_manager_.get(); }
   BookmarkStore *bookmark_store() { return bookmark_store_.get(); }
   AdBlocker *network_blocker() { return adblock_; }
-  
+
   // Privacy settings accessors for Tab's JavaScript injection
   bool do_not_track_enabled() const { return settings_.do_not_track; }
   bool block_third_party_cookies_enabled() const { return settings_.block_third_party_cookies; }
   bool web_security_enabled() const { return settings_.enable_web_security; }
-  
+
   // Location spoofing accessors for Tab's JavaScript injection
   bool location_spoofing_enabled() const { return settings_.enable_location_spoofing; }
   double spoofed_latitude() const { return settings_.spoofed_latitude; }
@@ -288,12 +291,12 @@ protected:
   bool HasSavedSession() const;
   void ClearSavedSession();
   void RestoreSavedSession();
-  void ShowSessionRestoreBar();  // Show restore prompt in UI
-  void OnRestoreSession(const JSObject &obj, const JSArgs &args);  // User clicked restore
-  void OnDismissSession(const JSObject &obj, const JSArgs &args);  // User clicked dismiss
-  int GetSavedSessionTabCount() const;  // Get number of saved tabs
-  int GetMeaningfulSavedTabCount() const;  // Get count of non-internal tabs
-  bool IsInternalBrowserPage(const std::string &url) const;  // Check if URL is internal
+  void ShowSessionRestoreBar();                                   // Show restore prompt in UI
+  void OnRestoreSession(const JSObject &obj, const JSArgs &args); // User clicked restore
+  void OnDismissSession(const JSObject &obj, const JSArgs &args); // User clicked dismiss
+  int GetSavedSessionTabCount() const;                            // Get number of saved tabs
+  int GetMeaningfulSavedTabCount() const;                         // Get count of non-internal tabs
+  bool IsInternalBrowserPage(const std::string &url) const;       // Check if URL is internal
 
   // Downloads management helpers
   String GetDownloadsJSON();
@@ -414,12 +417,12 @@ protected:
   bool high_contrast_ui_enabled_ = false;
   bool vibrant_window_theme_enabled_ = false;
   bool smooth_scrolling_enabled_ = true;
-  
+
   // Session restore state
-  bool session_restore_pending_ = false;  // True if we should prompt to restore session
-  bool session_was_clean_exit_ = false;   // True if last exit was clean (not crash/ALT+F4)
-  bool session_restore_bar_visible_ = false;  // True while restore bar is shown (prevents session saving)
-  std::string session_file_path_;         // Path to session.json
+  bool session_restore_pending_ = false;     // True if we should prompt to restore session
+  bool session_was_clean_exit_ = false;      // True if last exit was clean (not crash/ALT+F4)
+  bool session_restore_bar_visible_ = false; // True while restore bar is shown (prevents session saving)
+  std::string session_file_path_;            // Path to session.json
 
   JSFunction updateBack;
   JSFunction updateForward;
@@ -492,7 +495,7 @@ protected:
   void LoadCachedStartPage();
   void LoadCachedInternalPages();
   // Get cached HTML for a file:/// URL, or empty if not cached
-  const std::string& GetCachedPageHTML(const std::string& url) const;
+  const std::string &GetCachedPageHTML(const std::string &url) const;
 
   // Cached user agent string currently applied to outgoing requests.
   std::string active_user_agent_;

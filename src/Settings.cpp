@@ -62,12 +62,24 @@ namespace
         ++pos;
         switch (buffer[pos])
         {
-        case 'n': result += '\n'; break;
-        case 'r': result += '\r'; break;
-        case 't': result += '\t'; break;
-        case '"': result += '"'; break;
-        case '\\': result += '\\'; break;
-        default: result += buffer[pos]; break;
+        case 'n':
+          result += '\n';
+          break;
+        case 'r':
+          result += '\r';
+          break;
+        case 't':
+          result += '\t';
+          break;
+        case '"':
+          result += '"';
+          break;
+        case '\\':
+          result += '\\';
+          break;
+        default:
+          result += buffer[pos];
+          break;
         }
       }
       else
@@ -105,9 +117,12 @@ namespace
     }
     if (numStr.empty())
       return fallback;
-    try {
+    try
+    {
       return std::stod(numStr);
-    } catch (...) {
+    }
+    catch (...)
+    {
       return fallback;
     }
   }
