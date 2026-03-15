@@ -104,9 +104,20 @@ jobs:
       development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
       clean_build: ${{ inputs.clean_build || github.event.inputs.clean_build || false }}
 
+  windows-arm64ec:
+    uses: ./.github/workflows/build-windows-arm64ec.yml
+    secrets: inherit
+    with:
+      sdk_url: ${{ inputs.sdk_url || github.event.inputs.sdk_url }}
+      version: ${{ inputs.version || github.event.inputs.version }}
+      webbrowser_version: ${{ inputs.webbrowser_version || github.event.inputs.webbrowser_version }}
+      development_build: ${{ inputs.development_build || github.event.inputs.development_build || false }}
+      clean_build: ${{ inputs.clean_build || github.event.inputs.clean_build || false }}
+      create_installer: ${{ inputs.create_installer || github.event_name == 'pull_request' }}
+
   summary:
     name: "📊 Build Summary"
-    needs: [windows, macos-x64, macos-arm64, linux-x64, linux-arm64]
+    needs: [windows, windows-arm64ec, macos-x64, macos-arm64, linux-x64, linux-arm64]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -129,13 +140,14 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Job status table
           echo "## 📋 Build Status" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| 🪟 Windows x64 | ${{ needs.windows.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🪟 Windows ARM64EC | ${{ needs.windows-arm64ec.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| 🍎 macOS x64 | ${{ needs.macos-x64.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| 🍎 macOS ARM64 | ${{ needs.macos-arm64.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| 🐧 Linux x64 | ${{ needs.linux-x64.result }} |" >> $GITHUB_STEP_SUMMARY
@@ -143,11 +155,11 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # List all artifacts
           echo "## 📦 Generated Artifacts" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ -d "artifacts" ]; then
             find artifacts -type f \( -name "*.zip" -o -name "*.exe" -o -name "*.tar.gz" -o -name "*.deb" -o -name "*.rpm" -o -name "*.dmg" \) | while read file; do
               size=$(du -h "$file" | cut -f1)
@@ -157,15 +169,15 @@ jobs:
           else
             echo "⚠️ No artifacts directory found" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Include individual platform summaries if available
           echo "## 📝 Platform Details" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           for summary in artifacts/*/BUILD-SUMMARY.md; do
             if [ -f "$summary" ]; then
               platform=$(dirname "$summary" | xargs basename)
@@ -180,7 +192,7 @@ jobs:
               echo "" >> $GITHUB_STEP_SUMMARY
             fi
           done
-          
+
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**🎉 Build completed!**" >> $GITHUB_STEP_SUMMARY
@@ -192,17 +204,19 @@ jobs:
         run: |
           echo "Checking build results..."
           if [[ "${{ needs.windows.result }}" != "success" ]] || \
+             [[ "${{ needs.windows-arm64ec.result }}" != "success" ]] || \
              [[ "${{ needs.macos-x64.result }}" != "success" ]] || \
              [[ "${{ needs.macos-arm64.result }}" != "success" ]] || \
              [[ "${{ needs.linux-x64.result }}" != "success" ]] || \
              [[ "${{ needs.linux-arm64.result }}" != "success" ]]; then
-            echo "⚠️ One or more builds failed or were skipped"
-            echo "Windows: ${{ needs.windows.result }}"
-            echo "macOS x64: ${{ needs.macos-x64.result }}"
-            echo "macOS ARM64: ${{ needs.macos-arm64.result }}"
-            echo "Linux x64: ${{ needs.linux-x64.result }}"
-            echo "Linux ARM64: ${{ needs.linux-arm64.result }}"
-            exit 1
+          echo "⚠️ One or more builds failed or were skipped"
+          echo "Windows: ${{ needs.windows.result }}"
+          echo "Windows ARM64EC: ${{ needs.windows-arm64ec.result }}"
+          echo "macOS x64: ${{ needs.macos-x64.result }}"
+          echo "macOS ARM64: ${{ needs.macos-arm64.result }}"
+          echo "Linux x64: ${{ needs.linux-x64.result }}"
+          echo "Linux ARM64: ${{ needs.linux-arm64.result }}"
+          exit 1
           else
             echo "✅ All builds succeeded!"
           fi
